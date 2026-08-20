@@ -15,7 +15,7 @@ platform-gated features are supported), see **[Platform Support](./platform-supp
 
 ## Quick Install
 ### With the Prometheus Desktop installer on macOS or Windows (recommended)
-To easily install the command-line and desktop applications, [download the Prometheus Desktop installer](https://github.com/geohot0199/Prometheus-agent/) from our website and run it.
+To easily install the command-line and desktop applications, follow the [Downloads](./downloads.md) page and run the installer for your OS.
 
 ### Without Prometheus Desktop:
 For a command-line only install without Prometheus Desktop, run:

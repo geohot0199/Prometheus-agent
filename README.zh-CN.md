@@ -5,7 +5,8 @@
 # Prometheus Agent ☤
 
 <p align="center">
-  <a href="https://github.com/geohot0199/Prometheus-agent/docs/"><img src="https://img.shields.io/badge/Docs-prometheus--agent.nousresearch.com-FFD700?style=for-the-badge" alt="Documentation"></a>
+  <a href="https://github.com/geohot0199/Prometheus-agent/releases"><img src="https://img.shields.io/github/v/release/geohot0199/Prometheus-agent?style=for-the-badge&label=Release" alt="Latest release"></a>
+  <a href="https://github.com/geohot0199/Prometheus-agent/blob/main/website/docs/getting-started/downloads.md"><img src="https://img.shields.io/badge/Docs-GitHub-FFD700?style=for-the-badge" alt="Documentation"></a>
   <a href="https://discord.gg/NousResearch"><img src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
   <a href="https://github.com/geohot0199/Prometheus-agent/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License: MIT"></a>
   <a href="https://nousresearch.com"><img src="https://img.shields.io/badge/Built%20by-Nous%20Research-blueviolet?style=for-the-badge" alt="Built by Nous Research"></a>
@@ -26,6 +27,14 @@
 <tr><td><b>随处运行</b></td><td>六种终端后端——本地、Docker、SSH、Daytona、Singularity 和 Modal。Daytona 和 Modal 提供 Serverless 持久化——代理环境空闲时休眠、按需唤醒，空闲期间几乎零成本。$5 VPS 或 GPU 集群都能跑。</td></tr>
 <tr><td><b>研究就绪</b></td><td>批量轨迹生成、轨迹压缩——用于训练下一代工具调用模型。</td></tr>
 </table>
+
+---
+
+## 下载
+
+- **最新发布：** [Prometheus Agent v0.20.4 (2026.8.20)](https://github.com/geohot0199/Prometheus-agent/releases/tag/v2026.8.20)
+- **全部 Releases：** [github.com/geohot0199/Prometheus-agent/releases](https://github.com/geohot0199/Prometheus-agent/releases)
+- **下载说明：** [Downloads](website/docs/getting-started/downloads.md)
 
 ---
 

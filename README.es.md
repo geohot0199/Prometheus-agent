@@ -4,10 +4,11 @@
 
 # Prometheus Agent ☤
 <p align="center">
-  <a href="https://github.com/geohot0199/Prometheus-agent/">Prometheus Agent</a> | <a href="https://github.com/geohot0199/Prometheus-agent/">Prometheus Desktop</a>
+  <a href="https://github.com/geohot0199/Prometheus-agent">Prometheus Agent</a> | <a href="https://github.com/geohot0199/Prometheus-agent/blob/main/website/docs/getting-started/downloads.md">Descargas</a>
 </p>
 <p align="center">
-  <a href="https://github.com/geohot0199/Prometheus-agent/docs/"><img src="https://img.shields.io/badge/Docs-prometheus--agent.nousresearch.com-FFD700?style=for-the-badge" alt="Documentación"></a>
+  <a href="https://github.com/geohot0199/Prometheus-agent/releases"><img src="https://img.shields.io/github/v/release/geohot0199/Prometheus-agent?style=for-the-badge&label=Release" alt="Última versión"></a>
+  <a href="https://github.com/geohot0199/Prometheus-agent/blob/main/website/docs/getting-started/downloads.md"><img src="https://img.shields.io/badge/Docs-GitHub-FFD700?style=for-the-badge" alt="Documentación"></a>
   <a href="https://discord.gg/NousResearch"><img src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
   <a href="https://github.com/geohot0199/Prometheus-agent/blob/main/LICENSE"><img src="https://img.shields.io/badge/Licencia-MIT-green?style=for-the-badge" alt="Licencia: MIT"></a>
   <a href="https://nousresearch.com"><img src="https://img.shields.io/badge/Creado%20por-Nous%20Research-blueviolet?style=for-the-badge" alt="Creado por Nous Research"></a>
@@ -29,6 +30,14 @@ Usa cualquier modelo que quieras — [Nous Portal](https://portal.nousresearch.c
 <tr><td><b>Funciona en cualquier lugar, no solo en tu laptop</b></td><td>Seis backends de terminal — local, Docker, SSH, Singularity, Modal y Daytona. Daytona y Modal ofrecen persistencia sin servidor — el entorno de tu agente hiberna cuando está inactivo y se activa bajo demanda, costando casi nada entre sesiones. Ejecútalo en un VPS de $5 o un clúster de GPUs.</td></tr>
 <tr><td><b>Listo para investigación</b></td><td>Generación de trayectorias en lote, compresión de trayectorias para entrenar la próxima generación de modelos de llamadas a herramientas.</td></tr>
 </table>
+
+---
+
+## Descargas
+
+- **Última versión:** [Prometheus Agent v0.20.4 (2026.8.20)](https://github.com/geohot0199/Prometheus-agent/releases/tag/v2026.8.20)
+- **Todas las versiones:** [github.com/geohot0199/Prometheus-agent/releases](https://github.com/geohot0199/Prometheus-agent/releases)
+- **Notas de descarga:** [Downloads](website/docs/getting-started/downloads.md)
 
 ---
 
@@ -126,7 +135,7 @@ Para las listas de comandos completas, consulta la [guía de CLI](https://github
 
 ## Documentación
 
-Toda la documentación está en **[prometheus-agent.nousresearch.com/docs](https://github.com/geohot0199/Prometheus-agent/docs/)**:
+Toda la documentación está en **[website/docs](https://github.com/geohot0199/Prometheus-agent/tree/main/website/docs)**:
 
 | Sección                                                                                             | Contenido                                                    |
 | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |

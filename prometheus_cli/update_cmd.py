@@ -1877,9 +1877,9 @@ def _discard_stashed_changes(
 
 OFFICIAL_REPO_URLS = {
     "https://github.com/geohot0199/Prometheus-agent.git",
-    "git@github.com:NousResearch/prometheus-agent.git",
+    "git@github.com:geohot0199/Prometheus-agent.git",
     "https://github.com/geohot0199/Prometheus-agent",
-    "git@github.com:NousResearch/prometheus-agent",
+    "git@github.com:geohot0199/Prometheus-agent",
 }
 
 OFFICIAL_REPO_URL = "https://github.com/geohot0199/Prometheus-agent.git"
@@ -2008,7 +2008,7 @@ def _sync_with_upstream_if_needed(git_cmd: list[str], cwd: Path) -> None:
         # Ask user if they want to add upstream
         print()
         print("ℹ Your fork is not tracking the official Prometheus repository.")
-        print("  This means you may miss updates from NousResearch/prometheus-agent.")
+        print("  This means you may miss updates from geohot0199/Prometheus-agent.")
         print()
         try:
             response = (
