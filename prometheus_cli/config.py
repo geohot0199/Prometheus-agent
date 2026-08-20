@@ -204,7 +204,7 @@ _ENV_VAR_NAME_DENYLIST: frozenset[str] = frozenset({
     "DYLD_FALLBACK_LIBRARY_PATH", "DYLD_FALLBACK_FRAMEWORK_PATH",
     # Python
     "PYTHONPATH", "PYTHONHOME", "PYTHONSTARTUP", "PYTHONUSERBASE",
-    "PYTHONEXECUTABLE", "PYTHONNOUSERSITE",
+    "PYTHONEXECUTABLE", "PYTHONPROMETHEUSERSITE",
     # Node
     "NODE_OPTIONS", "NODE_PATH",
     # General
@@ -464,7 +464,7 @@ def detect_install_method(project_root: Optional[Path] = None) -> str:
     The supported installs self-identify via the code-scoped stamp:
       - the curl installer (scripts/install.sh, the README/website install
         command) git-clones the repo and stamps ``git`` next to the code;
-      - the published ``nousresearch/prometheus-agent`` image bakes a ``docker``
+      - the published ``geohot0199/prometheus-agent`` image bakes a ``docker``
         stamp into ``/opt/prometheus`` at build time.
     An unsupported manual install dropped into a container (no stamp) falls
     through to the ``.git`` checks and behaves like any off-path install.
@@ -581,7 +581,7 @@ def recommended_update_command_for_method(method: str) -> str:
     if is_nix_install_method(method):
         return _NIX_UPDATE_MSG
     if method == "docker":
-        return "docker pull nousresearch/prometheus-agent:latest"
+        return "docker pull geohot0199/prometheus-agent:latest"
     if method == "apt":
         # By contract, the current "apt" install method is the Termux APT
         # distribution. It deliberately uses Termux's `pkg` frontend.
@@ -619,23 +619,23 @@ def recommended_update_command() -> str:
 _DOCKER_UPDATE_MESSAGE = """\
 ✗ ``prometheus update`` doesn't apply inside the Docker container.
 
-Prometheus Agent runs as a published image (nousresearch/prometheus-agent), not a
+Prometheus Agent runs as a published image (geohot0199/prometheus-agent), not a
 git checkout — the container has no working tree to pull into.  Update by
 pulling a fresh image and restarting your container instead:
 
-  docker pull nousresearch/prometheus-agent:latest
+  docker pull geohot0199/prometheus-agent:latest
   # then restart whatever started the container, e.g.:
   docker compose up -d --force-recreate prometheus-agent
   # or, for ad-hoc runs, exit the current container and `docker run` again
 
 Verify the new version after restart:
-  docker run --rm nousresearch/prometheus-agent:latest --version
+  docker run --rm geohot0199/prometheus-agent:latest --version
 
 Notes:
   • If you pinned a specific tag (e.g. ``:v0.14.0``) the ``:latest`` tag
     won't move your container — pull the newer tag you actually want, or
     switch to ``:latest`` / ``:main`` for rolling updates.  See available
-    tags at https://hub.docker.com/r/nousresearch/prometheus-agent/tags
+    tags at https://hub.docker.com/r/geohot0199/prometheus-agent/tags
   • Your config and session history live under ``$PROMETHEUS_HOME`` (``/opt/data``
     in the container, typically bind-mounted from the host) and persist
     across image upgrades — re-pulling doesn't lose any state.
@@ -987,7 +987,7 @@ ENV_VARS_BY_VERSION: Dict[int, List[str]] = {
 
 # Required environment variables with metadata for migration prompts.
 # LLM provider is required but handled in the setup wizard's provider
-# selection step (Nous Portal / OpenRouter / Custom endpoint), so this
+# selection step (Prometheus Portal / OpenRouter / Custom endpoint), so this
 # dict is intentionally empty — no single env var is universally required.
 REQUIRED_ENV_VARS = {}
 
@@ -3796,7 +3796,7 @@ _FALLBACK_COMMENT = """
 # Supported providers:
 #   openrouter   (OPENROUTER_API_KEY)  — routes to any model
 #   openai-codex (OAuth — prometheus auth) — OpenAI Codex
-#   nous         (OAuth — prometheus auth) — Nous Portal
+#   prometheus         (OAuth — prometheus auth) — Prometheus Portal
 #   zai          (ZAI_API_KEY)         — Z.AI / GLM
 #   kimi-coding  (KIMI_API_KEY)        — Kimi / Moonshot
 #   kimi-coding-cn (KIMI_CN_API_KEY)   — Kimi / Moonshot (China)
@@ -3828,7 +3828,7 @@ _COMMENTED_SECTIONS = """
 # Supported providers:
 #   openrouter   (OPENROUTER_API_KEY)  — routes to any model
 #   openai-codex (OAuth — prometheus auth) — OpenAI Codex
-#   nous         (OAuth — prometheus auth) — Nous Portal
+#   prometheus         (OAuth — prometheus auth) — Prometheus Portal
 #   zai          (ZAI_API_KEY)         — Z.AI / GLM
 #   kimi-coding  (KIMI_API_KEY)        — Kimi / Moonshot
 #   kimi-coding-cn (KIMI_CN_API_KEY)   — Kimi / Moonshot (China)

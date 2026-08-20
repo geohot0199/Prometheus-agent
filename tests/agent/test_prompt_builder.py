@@ -17,7 +17,7 @@ from agent.prompt_builder import (
     _find_git_root,
     _strip_yaml_frontmatter,
     build_skills_system_prompt,
-    build_nous_subscription_prompt,
+    build_prometheus_subscription_prompt,
     build_context_files_prompt,
     CONTEXT_FILE_MAX_CHARS,
     _dynamic_context_file_max_chars,
@@ -35,7 +35,7 @@ from agent.prompt_builder import (
     PLATFORM_HINTS,
     WSL_ENVIRONMENT_HINT,
 )
-from prometheus_cli.nous_subscription import NousFeatureState, NousSubscriptionFeatures
+from prometheus_cli.prometheus_subscription import PrometheusFeatureState, PrometheusSubscriptionFeatures
 
 
 # =========================================================================
@@ -368,62 +368,62 @@ class TestBuildSkillsSystemPrompt:
 
 
 
-class TestBuildNousSubscriptionPrompt:
+class TestBuildPrometheusSubscriptionPrompt:
     def test_includes_active_subscription_features(self, monkeypatch):
-        monkeypatch.setattr("tools.tool_backend_helpers.managed_nous_tools_enabled", lambda: True)
+        monkeypatch.setattr("tools.tool_backend_helpers.managed_prometheus_tools_enabled", lambda: True)
         monkeypatch.setattr(
-            "prometheus_cli.nous_subscription.get_nous_subscription_features",
-            lambda config=None: NousSubscriptionFeatures(
+            "prometheus_cli.prometheus_subscription.get_prometheus_subscription_features",
+            lambda config=None: PrometheusSubscriptionFeatures(
                 subscribed=True,
-                nous_auth_present=True,
-                provider_is_nous=True,
+                prometheus_auth_present=True,
+                provider_is_prometheus=True,
                 features={
-                    "web": NousFeatureState("web", "Web tools", True, True, True, True, False, True, "firecrawl"),
-                    "image_gen": NousFeatureState("image_gen", "Image generation", True, True, True, True, False, True, "Nous Subscription"),
-                    "video_gen": NousFeatureState("video_gen", "Video generation", False, False, False, False, False, False, ""),
-                    "tts": NousFeatureState("tts", "OpenAI TTS", True, True, True, True, False, True, "OpenAI TTS"),
-                    "stt": NousFeatureState("stt", "Speech-to-text", True, True, True, True, False, True, "OpenAI Whisper"),
-                    "browser": NousFeatureState("browser", "Browser automation", True, True, True, True, False, True, "Browser Use"),
-                    "modal": NousFeatureState("modal", "Modal execution", False, True, False, False, False, True, "local"),
+                    "web": PrometheusFeatureState("web", "Web tools", True, True, True, True, False, True, "firecrawl"),
+                    "image_gen": PrometheusFeatureState("image_gen", "Image generation", True, True, True, True, False, True, "Prometheus Subscription"),
+                    "video_gen": PrometheusFeatureState("video_gen", "Video generation", False, False, False, False, False, False, ""),
+                    "tts": PrometheusFeatureState("tts", "OpenAI TTS", True, True, True, True, False, True, "OpenAI TTS"),
+                    "stt": PrometheusFeatureState("stt", "Speech-to-text", True, True, True, True, False, True, "OpenAI Whisper"),
+                    "browser": PrometheusFeatureState("browser", "Browser automation", True, True, True, True, False, True, "Browser Use"),
+                    "modal": PrometheusFeatureState("modal", "Modal execution", False, True, False, False, False, True, "local"),
                 },
             ),
         )
 
-        prompt = build_nous_subscription_prompt({"web_search", "browser_navigate"})
+        prompt = build_prometheus_subscription_prompt({"web_search", "browser_navigate"})
 
         assert "Browser Use" in prompt
         assert "Modal execution is optional" in prompt
         assert "do not ask the user for Firecrawl, FAL, OpenAI TTS, OpenAI Whisper, or Browser-Use API keys" in prompt
 
     def test_non_subscriber_prompt_includes_relevant_upgrade_guidance(self, monkeypatch):
-        monkeypatch.setattr("tools.tool_backend_helpers.managed_nous_tools_enabled", lambda: True)
+        monkeypatch.setattr("tools.tool_backend_helpers.managed_prometheus_tools_enabled", lambda: True)
         monkeypatch.setattr(
-            "prometheus_cli.nous_subscription.get_nous_subscription_features",
-            lambda config=None: NousSubscriptionFeatures(
+            "prometheus_cli.prometheus_subscription.get_prometheus_subscription_features",
+            lambda config=None: PrometheusSubscriptionFeatures(
                 subscribed=False,
-                nous_auth_present=False,
-                provider_is_nous=False,
+                prometheus_auth_present=False,
+                provider_is_prometheus=False,
                 features={
-                    "web": NousFeatureState("web", "Web tools", True, False, False, False, False, True, ""),
-                    "image_gen": NousFeatureState("image_gen", "Image generation", True, False, False, False, False, True, ""),
-                    "video_gen": NousFeatureState("video_gen", "Video generation", False, False, False, False, False, False, ""),
-                    "tts": NousFeatureState("tts", "OpenAI TTS", True, False, False, False, False, True, ""),
-                    "stt": NousFeatureState("stt", "Speech-to-text", True, False, False, False, False, True, ""),
-                    "browser": NousFeatureState("browser", "Browser automation", True, False, False, False, False, True, ""),
-                    "modal": NousFeatureState("modal", "Modal execution", False, False, False, False, False, True, ""),
+                    "web": PrometheusFeatureState("web", "Web tools", True, False, False, False, False, True, ""),
+                    "image_gen": PrometheusFeatureState("image_gen", "Image generation", True, False, False, False, False, True, ""),
+                    "video_gen": PrometheusFeatureState("video_gen", "Video generation", False, False, False, False, False, False, ""),
+                    "tts": PrometheusFeatureState("tts", "OpenAI TTS", True, False, False, False, False, True, ""),
+                    "stt": PrometheusFeatureState("stt", "Speech-to-text", True, False, False, False, False, True, ""),
+                    "browser": PrometheusFeatureState("browser", "Browser automation", True, False, False, False, False, True, ""),
+                    "modal": PrometheusFeatureState("modal", "Modal execution", False, False, False, False, False, True, ""),
                 },
             ),
         )
 
-        prompt = build_nous_subscription_prompt({"image_generate"})
+        prompt = build_prometheus_subscription_prompt({"image_generate"})
 
-        assert "suggest Nous subscription as one option" in prompt
+        assert "suggest Prometheus subscription as one option" in prompt
         assert "Do not mention subscription unless" in prompt
 
     def test_feature_flag_off_returns_empty_prompt(self, monkeypatch):
-        monkeypatch.setattr("tools.tool_backend_helpers.managed_nous_tools_enabled", lambda: False)
+        monkeypatch.setattr("tools.tool_backend_helpers.managed_prometheus_tools_enabled", lambda: False)
 
-        prompt = build_nous_subscription_prompt({"web_search"})
+        prompt = build_prometheus_subscription_prompt({"web_search"})
 
         assert prompt == ""
 

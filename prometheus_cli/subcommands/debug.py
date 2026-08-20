@@ -30,7 +30,7 @@ Examples:
     prometheus debug share --expire 30  Keep paste for 30 days
     prometheus debug share --local      Print report locally (no upload)
     prometheus debug share --no-redact  Disable upload-time secret redaction
-    prometheus debug share --nous       Upload to Nous-internal storage (private)
+    prometheus debug share --prometheus       Upload to Prometheus-internal storage (private)
     prometheus debug delete <url>       Delete a previously uploaded paste
 """,
     )
@@ -77,12 +77,12 @@ Examples:
         ),
     )
     share_parser.add_argument(
-        "--nous",
+        "--prometheus",
         action="store_true",
         help=(
-            "Upload the debug bundle to Nous-internal storage (AWS S3) instead "
+            "Upload the debug bundle to Prometheus-internal storage (AWS S3) instead "
             "of a public paste service. The bundle is private — viewable only "
-            "by Nous staff (and allowlisted Discord mods) via a Google-login-"
+            "by Prometheus staff (and allowlisted Discord mods) via a Google-login-"
             "gated viewer — and auto-deletes after 14 days. Still force-redacts "
             "secrets unless --no-redact is also passed."
         ),

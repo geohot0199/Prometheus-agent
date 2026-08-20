@@ -1303,9 +1303,9 @@ def remove_oauth_tokens(
 # deploy. The github.io origin is deliberate: an authorization server MUST NOT
 # follow HTTP redirects when fetching the document
 # (draft-ietf-oauth-client-id-metadata-document section 5), and
-# prometheus-agent.nousresearch.com/docs/* 301s here.
+# geohot0199.github.io/prometheus-agent/docs/* 301s here.
 _CIMD_CLIENT_METADATA_URL = (
-    "https://nousresearch.github.io/prometheus-agent/docs/oauth/client-metadata.json"
+    "https://geohot0199.github.io/prometheus-agent/docs/oauth/client-metadata.json"
 )
 
 # Loopback callback ports declared in that document. The redirect URI in the

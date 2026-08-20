@@ -92,7 +92,7 @@ class TestVisionCheckUsesProbeMode:
 
         def fake_resolver(*a, **k):
             states.append(aux._aux_probe_active())
-            return ("nous", aux._AuxProbeClientStub(), "m")
+            return ("prometheus", aux._AuxProbeClientStub(), "m")
 
         with patch.object(aux, "resolve_vision_provider_client", fake_resolver):
             assert vision_tools.check_vision_requirements() is True

@@ -159,7 +159,7 @@ const config: Config = {
           position: 'right',
         },
         {
-          href: 'https://discord.gg/NousResearch',
+          href: 'https://github.com/geohot0199/Prometheus-agent/discussions',
           label: 'Discord',
           position: 'right',
         },
@@ -180,7 +180,7 @@ const config: Config = {
         {
           title: 'Community',
           items: [
-            { label: 'Discord', href: 'https://discord.gg/NousResearch' },
+            { label: 'Discord', href: 'https://github.com/geohot0199/Prometheus-agent/discussions' },
             { label: 'GitHub Issues', href: 'https://github.com/geohot0199/Prometheus-agent/issues' },
             { label: 'Skills Hub', href: 'https://agentskills.io' },
           ],
@@ -191,11 +191,11 @@ const config: Config = {
             { label: 'Downloads', to: '/getting-started/downloads' },
             { label: 'GitHub Releases', href: 'https://github.com/geohot0199/Prometheus-agent/releases' },
             { label: 'GitHub', href: 'https://github.com/geohot0199/Prometheus-agent' },
-            { label: 'Nous Research', href: 'https://nousresearch.com' },
+            { label: 'Prometheus', href: 'https://geohot0199.github.io/prometheus-agent' },
           ],
         },
       ],
-      copyright: `Built by <a href="https://nousresearch.com">Nous Research</a> · MIT License · ${new Date().getFullYear()}`,
+      copyright: `Built by <a href="https://geohot0199.github.io/prometheus-agent">Prometheus</a> · MIT License · ${new Date().getFullYear()}`,
     },
     prism: {
       theme: prismThemes.github,

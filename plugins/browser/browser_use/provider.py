@@ -6,8 +6,8 @@ ABC introduced in PR #25214). The legacy in-tree module
 is now the canonical implementation.
 
 Browser Use is the only browser backend with dual auth: a direct
-``BROWSER_USE_API_KEY`` for self-billed users, or the managed Nous tool
-gateway (which Prometheus uses to bill Browser Use sessions to a Nous
+``BROWSER_USE_API_KEY`` for self-billed users, or the managed Prometheus tool
+gateway (which Prometheus uses to bill Browser Use sessions to a Prometheus
 subscription). The dispatch order — direct API key first, managed gateway
 second — preserves the pre-migration behaviour in
 ``tools.browser_providers.browser_use.BrowserUseProvider._get_config_or_none``.
@@ -23,7 +23,7 @@ Config keys this provider responds to::
 Auth env vars (one of)::
 
     BROWSER_USE_API_KEY=...           # https://browser-use.com
-    # OR a managed Nous gateway entry (configured via 'prometheus setup')
+    # OR a managed Prometheus gateway entry (configured via 'prometheus setup')
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ from agent.secret_scope import get_secret
 
 logger = logging.getLogger(__name__)
 
-# Idempotency tracking for managed-mode session creation. The managed Nous
+# Idempotency tracking for managed-mode session creation. The managed Prometheus
 # gateway returns 409 "already in progress" on retried POSTs; we forward the
 # original idempotency key so the gateway can deduplicate. Cleared on
 # success or terminal failure.
@@ -106,7 +106,7 @@ class BrowserUseBrowserProvider(BrowserProvider):
     """Browser Use (https://browser-use.com) cloud browser backend.
 
     Dual auth: prefers a direct BROWSER_USE_API_KEY when set, falling back
-    to the managed Nous tool gateway when ``tool_gateway.browser`` config
+    to the managed Prometheus tool gateway when ``tool_gateway.browser`` config
     routes through it. Setting ``tool_gateway.browser: gateway`` flips the
     order so managed billing wins even when BROWSER_USE_API_KEY is present.
     """
@@ -123,19 +123,19 @@ class BrowserUseBrowserProvider(BrowserProvider):
         return self._get_config_or_none(refresh_token=False) is not None
 
     # ------------------------------------------------------------------
-    # Config resolution (direct API key OR managed Nous gateway)
+    # Config resolution (direct API key OR managed Prometheus gateway)
     # ------------------------------------------------------------------
 
     def _get_config_or_none(self, *, refresh_token: bool = True) -> Optional[Dict[str, Any]]:
         # Import here to avoid a hard dependency at module-import time —
-        # managed_tool_gateway pulls in the Nous auth stack which can be
+        # managed_tool_gateway pulls in the Prometheus auth stack which can be
         # heavy and is not needed for direct-API-key users.
         from tools.managed_tool_gateway import (
-            peek_nous_access_token,
+            peek_prometheus_access_token,
             resolve_managed_tool_gateway,
         )
         from tools.tool_backend_helpers import (
-            NOUS_MANAGED_PROVIDER,
+            PROMETHEUS_MANAGED_PROVIDER,
             read_selection,
         )
 
@@ -143,12 +143,12 @@ class BrowserUseBrowserProvider(BrowserProvider):
             # Keep availability scans off the synchronous OAuth refresh path.
             managed = resolve_managed_tool_gateway(
                 "browser-use",
-                token_reader=None if refresh_token else peek_nous_access_token,
+                token_reader=None if refresh_token else peek_prometheus_access_token,
             )
             if managed is None:
                 return None
             return {
-                "api_key": managed.nous_user_token,
+                "api_key": managed.prometheus_user_token,
                 "base_url": managed.gateway_origin.rstrip("/"),
                 "managed_mode": True,
             }
@@ -156,11 +156,11 @@ class BrowserUseBrowserProvider(BrowserProvider):
         api_key = get_secret("BROWSER_USE_API_KEY")
         selected = read_selection("browser")
 
-        # Strict selection: "nous" (or legacy use_gateway: true) → managed
+        # Strict selection: "prometheus" (or legacy use_gateway: true) → managed
         # gateway ONLY; any other stored browser selection → direct API key
         # ONLY (no silent managed fallback); never-configured → legacy
         # behavior (direct key when present, else managed gateway).
-        if selected == NOUS_MANAGED_PROVIDER:
+        if selected == PROMETHEUS_MANAGED_PROVIDER:
             return _managed_config()
         if selected is not None:
             if api_key:
@@ -180,8 +180,8 @@ class BrowserUseBrowserProvider(BrowserProvider):
 
     def _get_config(self) -> Dict[str, Any]:
         from tools.tool_backend_helpers import (
-            NOUS_MANAGED_PROVIDER,
-            managed_nous_tools_enabled,
+            PROMETHEUS_MANAGED_PROVIDER,
+            managed_prometheus_tools_enabled,
             read_selection,
             selection_error,
         )
@@ -189,11 +189,11 @@ class BrowserUseBrowserProvider(BrowserProvider):
         config = self._get_config_or_none()
         if config is None:
             selected = read_selection("browser")
-            if selected == NOUS_MANAGED_PROVIDER:
+            if selected == PROMETHEUS_MANAGED_PROVIDER:
                 raise ValueError(selection_error(
                     "browser",
-                    NOUS_MANAGED_PROVIDER,
-                    "the Nous Tool Gateway is not available (not entitled or "
+                    PROMETHEUS_MANAGED_PROVIDER,
+                    "the Prometheus Tool Gateway is not available (not entitled or "
                     "unreachable)",
                 ))
             if selected is not None:
@@ -205,7 +205,7 @@ class BrowserUseBrowserProvider(BrowserProvider):
             message = (
                 "Browser Use requires a direct BROWSER_USE_API_KEY credential."
             )
-            if managed_nous_tools_enabled():
+            if managed_prometheus_tools_enabled():
                 message = (
                     "Browser Use requires either a direct BROWSER_USE_API_KEY "
                     "credential or a managed Browser Use gateway configuration."
@@ -346,6 +346,6 @@ class BrowserUseBrowserProvider(BrowserProvider):
     def get_setup_schema(self) -> Optional[Dict[str, Any]]:
         # Hidden from the prometheus tools picker: the "Browser Use" row now
         # activates the CLI-based backend (tools/browser_use_cli.py). This
-        # provider stays registered for the Nous gateway path and un-migrated
+        # provider stays registered for the Prometheus gateway path and un-migrated
         # legacy cloud_provider configs.
         return None

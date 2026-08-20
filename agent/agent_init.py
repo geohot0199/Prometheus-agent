@@ -74,7 +74,7 @@ def _warn_memory_provider_unavailable(name: str, reason: str = "") -> None:
     log for itself. Without this warning a provider whose credentials/config are
     missing is silently dropped — the user has ``memory.provider`` set but gets
     no memory and no diagnostic. A common trigger is systemd/gateway services
-    not inheriting ``~/.prometheus/.env``. See NousResearch/prometheus-agent#2765.
+    not inheriting ``~/.prometheus/.env``. See geohot0199/Prometheus-agent#2765.
 
     ``reason`` is the provider's ``unavailable_reason()`` — a provider-specific,
     actionable hint (e.g. which package to install). Because an unavailable
@@ -721,13 +721,13 @@ def init_agent(
         # AWS Bedrock — auto-detect from provider name or base URL
         # (bedrock-runtime.<region>.amazonaws.com).
         agent.api_mode = "bedrock_converse"
-    elif agent.provider in {"nous", "nous-portal", "nousresearch"}:
+    elif agent.provider in {"prometheus", "prometheus-portal", "geohot0199"}:
         # Portal is dual-wire: anthropic/* → Messages, everything else →
         # chat_completions. Callers that already pass api_mode win above;
         # this covers direct AIAgent construction without a resolved runtime.
-        from prometheus_cli.providers import nous_api_mode
+        from prometheus_cli.providers import prometheus_api_mode
 
-        agent.api_mode = nous_api_mode(agent.model)
+        agent.api_mode = prometheus_api_mode(agent.model)
     else:
         # Host-mandated wire check — LAST, so the elif chain's provider-slug
         # rewrites (e.g. api.anthropic.com → provider="anthropic", #63425)
@@ -1031,7 +1031,7 @@ def init_agent(
     agent._rate_limit_state: Optional["RateLimitState"] = None
 
     # Credits tracking (dev-only, L0 usage-aware-credits) — updated from
-    # x-nous-credits-* response headers after each API call.  Session-start
+    # x-prometheus-credits-* response headers after each API call.  Session-start
     # remaining is latched the first time a header is ever seen so we can
     # report cumulative micros spent.  Surfaced behind PROMETHEUS_DEV_CREDITS.
     agent._credits_state = None
@@ -2765,7 +2765,7 @@ def init_agent(
             f"(this must be at least {MINIMUM_CONTEXT_LENGTH // 1000}K)."
         )
 
-    # Nous Prometheus 3/4 are chat models, not tool-call-tuned. The interactive
+    # Prometheus Prometheus 3/4 are chat models, not tool-call-tuned. The interactive
     # CLI already warns via cli.py show_banner() (richer output + /model hint),
     # so skip platform=="cli" here to avoid emitting the warning twice per
     # startup. (Gateway/TUI/cron construct with quiet_mode=True and are already
@@ -2779,7 +2779,7 @@ def init_agent(
             _prometheus_warn = _check_prometheus_model_warning(agent.model or "")
             if _prometheus_warn:
                 _user_msg = (
-                    "⚠ Nous Research Prometheus 3 & 4 models are NOT agentic — they "
+                    "⚠ Prometheus Prometheus 3 & 4 models are NOT agentic — they "
                     "lack reliable tool-calling for agent workflows (delegation, "
                     "cron, proactive tools). Consider an agentic model instead "
                     "(Claude, GPT, Gemini, Qwen-Coder, etc.)."

@@ -88,11 +88,11 @@ class TestAuxiliaryConfigBridge:
     def test_web_extract_bridged(self, monkeypatch):
         config = {
             "auxiliary": {
-                "web_extract": {"provider": "nous", "model": "gemini-2.5-flash"},
+                "web_extract": {"provider": "prometheus", "model": "gemini-2.5-flash"},
             }
         }
         _run_auxiliary_bridge(config, monkeypatch)
-        assert os.environ.get("AUXILIARY_WEB_EXTRACT_PROVIDER") == "nous"
+        assert os.environ.get("AUXILIARY_WEB_EXTRACT_PROVIDER") == "prometheus"
         assert os.environ.get("AUXILIARY_WEB_EXTRACT_MODEL") == "gemini-2.5-flash"
 
 

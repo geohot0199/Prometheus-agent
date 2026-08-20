@@ -2,12 +2,12 @@
 
 <p align="center">
   <a href="https://github.com/geohot0199/Prometheus-agent/releases"><img src="https://img.shields.io/badge/Download-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-FFD700?style=for-the-badge" alt="Download"></a>
-  <a href="https://github.com/geohot0199/Prometheus-agent/docs/"><img src="https://img.shields.io/badge/Docs-prometheus--agent.nousresearch.com-FFD700?style=for-the-badge" alt="Documentation"></a>
-  <a href="https://discord.gg/NousResearch"><img src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
+  <a href="https://github.com/geohot0199/Prometheus-agent/docs/"><img src="https://img.shields.io/badge/Docs-prometheus--agent.geohot0199.github.io/prometheus-agent-FFD700?style=for-the-badge" alt="Documentation"></a>
+  <a href="https://github.com/geohot0199/Prometheus-agent/discussions"><img src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
   <a href="https://github.com/geohot0199/Prometheus-agent/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License: MIT"></a>
 </p>
 
-**The native desktop app for [Prometheus Agent](../../README.md) — the self-improving AI agent from [Nous Research](https://nousresearch.com).** Same agent, same skills, same memory as the CLI and gateway, in a polished native window — chat with streaming tool output, side-by-side previews, a file browser, voice, and settings, no terminal required. Available for **macOS, Windows, and Linux**.
+**The native desktop app for [Prometheus Agent](../../README.md) — the self-improving AI agent from [Prometheus](https://geohot0199.github.io/prometheus-agent).** Same agent, same skills, same memory as the CLI and gateway, in a polished native window — chat with streaming tool output, side-by-side previews, a file browser, voice, and settings, no terminal required. Available for **macOS, Windows, and Linux**.
 
 <table>
 <tr><td><b>Chat with the full agent</b></td><td>Streaming responses, live tool activity, structured tool summaries, and the same conversation history as every other Prometheus surface.</td></tr>
@@ -213,7 +213,7 @@ rm "$HOME/.prometheus/prometheus-agent/.prometheus-bootstrap-complete"
 # Rebuild a broken Python venv
 rm -rf "$HOME/.prometheus/prometheus-agent/venv"
 # Reset a stuck macOS microphone prompt (macOS only)
-tccutil reset Microphone com.nousresearch.prometheus
+tccutil reset Microphone com.geohot0199.prometheus
 ```
 
 **Windows (PowerShell):**
@@ -231,7 +231,7 @@ Remove-Item -Recurse -Force "$env:LOCALAPPDATA\prometheus\prometheus-agent\venv"
 
 ## Community
 
-- 💬 [Discord](https://discord.gg/NousResearch)
+- 💬 [Discord](https://github.com/geohot0199/Prometheus-agent/discussions)
 - 📖 [Documentation](https://github.com/geohot0199/Prometheus-agent/docs/)
 - 🐛 [Issues](https://github.com/geohot0199/Prometheus-agent/issues)
 
@@ -241,4 +241,4 @@ Remove-Item -Recurse -Force "$env:LOCALAPPDATA\prometheus\prometheus-agent\venv"
 
 MIT — see [LICENSE](../../LICENSE).
 
-Built by [Nous Research](https://nousresearch.com).
+Built by [Prometheus](https://geohot0199.github.io/prometheus-agent).

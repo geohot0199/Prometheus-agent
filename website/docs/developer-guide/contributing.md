@@ -294,7 +294,7 @@ When you ask Prometheus to review a PR in a repository that has `.agents/checks/
 
 ## Community
 
-- **Discord**: [discord.gg/NousResearch](https://discord.gg/NousResearch)
+- **Discord**: [github.com/geohot0199/Prometheus-agent/discussions](https://github.com/geohot0199/Prometheus-agent/discussions)
 - **GitHub Discussions**: For design proposals and architecture discussions
 - **Skills Hub**: Upload specialized skills and share with the community
 

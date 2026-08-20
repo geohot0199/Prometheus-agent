@@ -32,8 +32,8 @@ High-level categories:
 
 For the authoritative code-derived registry, see [Built-in Tools Reference](/reference/tools-reference) and [Toolsets Reference](/reference/toolsets-reference).
 
-:::tip Nous Tool Gateway
-Paid [Nous Portal](https://portal.nousresearch.com) subscribers can use web search, image generation, TTS, and browser automation through the **[Tool Gateway](tool-gateway.md)** — no separate API keys needed. Run `prometheus model` to enable it, or configure individual tools with `prometheus tools`.
+:::tip Prometheus Tool Gateway
+Paid [Prometheus Portal](https://geohot0199.github.io/prometheus-agent/portal) subscribers can use web search, image generation, TTS, and browser automation through the **[Tool Gateway](tool-gateway.md)** — no separate API keys needed. Run `prometheus model` to enable it, or configure individual tools with `prometheus tools`.
 :::
 
 ## Using Toolsets

@@ -3,7 +3,7 @@
 Why: the desktop BOTS roster previews ``last_session`` (the profile's most
 recently active session) but clicking a bot row opens the PINNED canonical
 chat — two different session identities, so the preview shows one
-conversation and the click lands in another (NousResearch/prometheus-agent#88200).
+conversation and the click lands in another (geohot0199/Prometheus-agent#88200).
 The generic fix at the RPC layer: callers that know which session they care
 about pass ``preferred_session_ids={profile: session_id}`` and receive a
 precise ``preferred_session`` summary per profile — hidden sessions included,

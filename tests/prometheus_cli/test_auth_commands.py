@@ -94,12 +94,12 @@ def test_auth_add_api_key_persists_manual_entry(tmp_path, monkeypatch):
     assert entry["access_token"] == "sk-or-manual"
 
 
-def test_auth_add_nous_oauth_persists_pool_entry(tmp_path, monkeypatch):
+def test_auth_add_prometheus_oauth_persists_pool_entry(tmp_path, monkeypatch):
     monkeypatch.setenv("PROMETHEUS_HOME", str(tmp_path / "prometheus"))
     _write_auth_store(tmp_path, {"version": 1, "providers": {}})
-    token = _jwt_with_email("nous@example.com")
+    token = _jwt_with_email("prometheus@example.com")
     monkeypatch.setattr(
-        "prometheus_cli.auth._nous_device_code_login",
+        "prometheus_cli.auth._prometheus_device_code_login",
         lambda **kwargs: {
             "portal_base_url": "https://portal.example.com",
             "inference_base_url": "https://inference.example.com/v1",
@@ -124,7 +124,7 @@ def test_auth_add_nous_oauth_persists_pool_entry(tmp_path, monkeypatch):
     from prometheus_cli.auth_commands import auth_add_command
 
     class _Args:
-        provider = "nous"
+        provider = "prometheus"
         auth_type = "oauth"
         api_key = None
         label = None
@@ -144,7 +144,7 @@ def test_auth_add_nous_oauth_persists_pool_entry(tmp_path, monkeypatch):
     # Pool has exactly one canonical `device_code` entry — not a duplicate
     # pair of `manual:device_code` + `device_code` (the latter would be
     # materialised by _seed_from_singletons on every load_pool).
-    entries = payload["credential_pool"]["nous"]
+    entries = payload["credential_pool"]["prometheus"]
     device_code_entries = [
         item for item in entries if item["source"] == "device_code"
     ]
@@ -155,11 +155,11 @@ def test_auth_add_nous_oauth_persists_pool_entry(tmp_path, monkeypatch):
     assert entry["agent_key"] == token
     assert entry["portal_base_url"] == "https://portal.example.com"
 
-    # `prometheus auth add nous` must also populate providers.nous so the
-    # 401-recovery path (resolve_nous_runtime_credentials) can refresh an
+    # `prometheus auth add prometheus` must also populate providers.prometheus so the
+    # 401-recovery path (resolve_prometheus_runtime_credentials) can refresh an
     # invoke JWT when the token expires. If this mirror is missing, recovery
-    # raises "Prometheus is not logged into Nous Portal" and the agent dies.
-    singleton = payload["providers"]["nous"]
+    # raises "Prometheus is not logged into Prometheus Portal" and the agent dies.
+    singleton = payload["providers"]["prometheus"]
     assert singleton["access_token"] == token
     assert singleton["refresh_token"] == "refresh-token"
     assert singleton["agent_key"] == token
@@ -167,16 +167,16 @@ def test_auth_add_nous_oauth_persists_pool_entry(tmp_path, monkeypatch):
     assert singleton["inference_base_url"] == "https://inference.example.com/v1"
 
 
-def test_auth_add_nous_oauth_honors_custom_label(tmp_path, monkeypatch):
-    """`prometheus auth add nous --type oauth --label <name>` must preserve the
+def test_auth_add_prometheus_oauth_honors_custom_label(tmp_path, monkeypatch):
+    """`prometheus auth add prometheus --type oauth --label <name>` must preserve the
     custom label end-to-end — it was silently dropped in the first cut of the
-    persist_nous_credentials helper because `--label` wasn't threaded through.
+    persist_prometheus_credentials helper because `--label` wasn't threaded through.
     """
     monkeypatch.setenv("PROMETHEUS_HOME", str(tmp_path / "prometheus"))
     _write_auth_store(tmp_path, {"version": 1, "providers": {}})
-    token = _jwt_with_email("nous@example.com")
+    token = _jwt_with_email("prometheus@example.com")
     monkeypatch.setattr(
-        "prometheus_cli.auth._nous_device_code_login",
+        "prometheus_cli.auth._prometheus_device_code_login",
         lambda **kwargs: {
             "portal_base_url": "https://portal.example.com",
             "inference_base_url": "https://inference.example.com/v1",
@@ -201,10 +201,10 @@ def test_auth_add_nous_oauth_honors_custom_label(tmp_path, monkeypatch):
     from prometheus_cli.auth_commands import auth_add_command
 
     class _Args:
-        provider = "nous"
+        provider = "prometheus"
         auth_type = "oauth"
         api_key = None
-        label = "my-nous"
+        label = "my-prometheus"
         portal_url = None
         inference_url = None
         client_id = None
@@ -219,13 +219,13 @@ def test_auth_add_nous_oauth_honors_custom_label(tmp_path, monkeypatch):
     payload = json.loads((tmp_path / "prometheus" / "auth.json").read_text())
 
     # Custom label reaches the pool entry …
-    pool_entry = payload["credential_pool"]["nous"][0]
+    pool_entry = payload["credential_pool"]["prometheus"][0]
     assert pool_entry["source"] == "device_code"
-    assert pool_entry["label"] == "my-nous"
+    assert pool_entry["label"] == "my-prometheus"
 
-    # … and survives in providers.nous so a subsequent load_pool() re-seeds
+    # … and survives in providers.prometheus so a subsequent load_pool() re-seeds
     # it without reverting to the auto-derived fingerprint.
-    assert payload["providers"]["nous"]["label"] == "my-nous"
+    assert payload["providers"]["prometheus"]["label"] == "my-prometheus"
 
 
 def test_auth_add_codex_oauth_keeps_distinct_pool_accounts(tmp_path, monkeypatch):
@@ -731,7 +731,7 @@ def test_credential_sources_registry_has_expected_steps():
         "Any env-seeded credential (XAI_API_KEY, DEEPSEEK_API_KEY, etc.)",
         "~/.claude/.credentials.json",
         "~/.prometheus/.anthropic_oauth.json",
-        "auth.json providers.nous",
+        "auth.json providers.prometheus",
         "auth.json providers.openai-codex + ~/.codex/auth.json",
         "auth.json providers.minimax-oauth",
         "~/.qwen/oauth_creds.json",

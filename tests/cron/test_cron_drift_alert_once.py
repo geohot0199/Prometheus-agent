@@ -82,7 +82,7 @@ class TestDriftAlertOnce:
             cron_jobs.save_jobs([job])
             for _ in range(2):
                 fresh = [j for j in cron_jobs.load_jobs() if j["id"] == job["id"]][0]
-                ok, agent_called = _tick(fresh, tmp_path, "nous", deliveries)
+                ok, agent_called = _tick(fresh, tmp_path, "prometheus", deliveries)
                 assert agent_called is False, "drifted tick must not spend"
 
             stored = [j for j in cron_jobs.load_jobs() if j["id"] == job["id"]][0]
@@ -106,7 +106,7 @@ class TestDriftAlertOnce:
             cron_jobs.save_jobs([job])
             # Tick 1: drifted -> one alert, bit set.
             fresh = [j for j in cron_jobs.load_jobs() if j["id"] == job["id"]][0]
-            _tick(fresh, tmp_path, "nous", deliveries)
+            _tick(fresh, tmp_path, "prometheus", deliveries)
             assert len(deliveries) == 1
 
             # Tick 2: drift healed (resolution matches snapshot) -> runs, bit cleared.
@@ -118,7 +118,7 @@ class TestDriftAlertOnce:
 
             # Tick 3: drifts again -> re-alerts (not swallowed).
             fresh = [j for j in cron_jobs.load_jobs() if j["id"] == job["id"]][0]
-            _tick(fresh, tmp_path, "nous", deliveries)
+            _tick(fresh, tmp_path, "prometheus", deliveries)
 
         drift_alerts = [d for d in deliveries if "drift" in d.lower()]
         assert len(drift_alerts) == 2, f"expected re-alert after heal: {deliveries}"

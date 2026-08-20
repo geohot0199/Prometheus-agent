@@ -1,4 +1,4 @@
-"""NousResearch/prometheus-agent#7718 — actionable message when local_embedded
+"""geohot0199/Prometheus-agent#7718 — actionable message when local_embedded
 runtime (`hindsight-all`) is missing.
 
 `local_embedded` imports `from hindsight import HindsightEmbedded`, provided

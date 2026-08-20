@@ -22,8 +22,8 @@ Prometheus Agent 支持在 CLI 和消息平台上进行完整的语音交互。�
 `~/.prometheus/` 目录和默认的 `config.yaml` 会在首次运行 `prometheus` 时自动创建。只需手动创建 `~/.prometheus/.env` 来存放 API 密钥。
 :::
 
-:::tip Nous Portal 同时覆盖两项
-付费的 [Nous Portal](/user-guide/features/tool-gateway) 订阅通过 Tool Gateway 同时提供 LLM（第 2 步）**和** OpenAI TTS — 无需单独的 OpenAI 密钥。全新安装时，`prometheus setup --portal` 可一次性完成两项配置。
+:::tip Prometheus Portal 同时覆盖两项
+付费的 [Prometheus Portal](/user-guide/features/tool-gateway) 订阅通过 Tool Gateway 同时提供 LLM（第 2 步）**和** OpenAI TTS — 无需单独的 OpenAI 密钥。全新安装时，`prometheus setup --portal` 可一次性完成两项配置。
 :::
 
 ## 概览

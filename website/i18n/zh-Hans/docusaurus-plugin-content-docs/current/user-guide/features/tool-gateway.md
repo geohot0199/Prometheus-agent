@@ -1,17 +1,17 @@
 ---
-title: "Nous Tool Gateway（工具网关）"
-description: "通过 Nous 订阅统一使用网页搜索、文生图、语音合成与浏览器自动化，无需单独申请 Firecrawl、FAL、OpenAI、Browser Use 等 API Key"
+title: "Prometheus Tool Gateway（工具网关）"
+description: "通过 Prometheus 订阅统一使用网页搜索、文生图、语音合成与浏览器自动化，无需单独申请 Firecrawl、FAL、OpenAI、Browser Use 等 API Key"
 sidebar_label: "Tool Gateway"
 sidebar_position: 2
 ---
 
-# Nous Tool Gateway（工具网关）
+# Prometheus Tool Gateway（工具网关）
 
 :::tip 快速开始
-Tool Gateway 包含在付费 Nous Portal 订阅中。**[管理订阅 →](https://portal.nousresearch.com/manage-subscription)**
+Tool Gateway 包含在付费 Prometheus Portal 订阅中。**[管理订阅 →](https://geohot0199.github.io/prometheus-agent/portal/manage-subscription)**
 :::
 
-**Tool Gateway** 让已付费的 [Nous Portal](https://portal.nousresearch.com) 用户通过同一份订阅，直接使用网页搜索、文生图、语音合成（TTS）与浏览器自动化，而**不必**再分别注册 Firecrawl、FAL、OpenAI、Browser Use 等服务的 API Key。
+**Tool Gateway** 让已付费的 [Prometheus Portal](https://geohot0199.github.io/prometheus-agent/portal) 用户通过同一份订阅，直接使用网页搜索、文生图、语音合成（TTS）与浏览器自动化，而**不必**再分别注册 Firecrawl、FAL、OpenAI、Browser Use 等服务的 API Key。
 
 ## 包含能力
 
@@ -22,11 +22,11 @@ Tool Gateway 包含在付费 Nous Portal 订阅中。**[管理订阅 →](https:
 | **语音合成** | 通过 OpenAI TTS 将文字转为语音 | `VOICE_TOOLS_OPENAI_KEY`、`ELEVENLABS_API_KEY` |
 | **浏览器自动化** | 通过 Browser Use 控制云端浏览器 | `BROWSER_USE_API_KEY`、`BROWSERBASE_API_KEY` |
 
-上述四类能力均计入 Nous 订阅计费。你可以按需组合——例如网页与文生图走网关，TTS 仍使用自己的 ElevenLabs Key。
+上述四类能力均计入 Prometheus 订阅计费。你可以按需组合——例如网页与文生图走网关，TTS 仍使用自己的 ElevenLabs Key。
 
 ## 资格与账号
 
-Tool Gateway 仅对 **[付费](https://portal.nousresearch.com/manage-subscription)** Nous Portal 订阅开放；免费档不可用——请 [升级订阅](https://portal.nousresearch.com/manage-subscription) 后解锁。
+Tool Gateway 仅对 **[付费](https://geohot0199.github.io/prometheus-agent/portal/manage-subscription)** Prometheus Portal 订阅开放；免费档不可用——请 [升级订阅](https://geohot0199.github.io/prometheus-agent/portal/manage-subscription) 后解锁。
 
 检查当前状态：
 
@@ -34,19 +34,19 @@ Tool Gateway 仅对 **[付费](https://portal.nousresearch.com/manage-subscripti
 prometheus status
 ```
 
-在输出中找到 **Nous Tool Gateway** 小节：会标明哪些工具经订阅网关启用、哪些使用直连 Key、哪些尚未配置。
+在输出中找到 **Prometheus Tool Gateway** 小节：会标明哪些工具经订阅网关启用、哪些使用直连 Key、哪些尚未配置。
 
 ## 如何启用 Tool Gateway
 
 ### 在模型配置流程中
 
-运行 `prometheus model` 并选择 Nous Portal 作为提供商时，Prometheus 会主动询问是否启用 Tool Gateway：
+运行 `prometheus model` 并选择 Prometheus Portal 作为提供商时，Prometheus 会主动询问是否启用 Tool Gateway：
 
 ```
-Your Nous subscription includes the Tool Gateway.
+Your Prometheus subscription includes the Tool Gateway.
 
   The Tool Gateway gives you access to web search, image generation,
-  text-to-speech, and browser automation through your Nous subscription.
+  text-to-speech, and browser automation through your Prometheus subscription.
   No need to sign up for separate API keys — just pick the tools you want.
 
   ○ Web search & extract (Firecrawl) — not configured
@@ -70,49 +70,49 @@ Your Nous subscription includes the Tool Gateway.
 prometheus tools
 ```
 
-选择工具类别（Web、Browser、Image Generation、TTS），再将提供商选为 **Nous Subscription**。这会把该类别的选择键写为 `nous`（例如 `image_gen.provider: nous`）。
+选择工具类别（Web、Browser、Image Generation、TTS），再将提供商选为 **Prometheus Subscription**。这会把该类别的选择键写为 `prometheus`（例如 `image_gen.provider: prometheus`）。
 
 ### 手动编辑配置
 
-每个工具类别只有一个选择键，选 **Nous Subscription** 即写入 `nous`：
+每个工具类别只有一个选择键，选 **Prometheus Subscription** 即写入 `prometheus`：
 
 ```yaml
 web:
-  backend: nous          # 网页搜索/抓取走 Tool Gateway
+  backend: prometheus          # 网页搜索/抓取走 Tool Gateway
 
 image_gen:
-  provider: nous
+  provider: prometheus
 
 tts:
-  provider: nous
+  provider: prometheus
 
 stt:
-  provider: nous
+  provider: prometheus
 
 browser:
-  cloud_provider: nous
+  cloud_provider: prometheus
 ```
 
 ## 工作原理
 
-当某工具类别的选择键为 `nous` 时，运行时会把 API 调用路由到 Nous Tool Gateway，而不是使用直连 Key：
+当某工具类别的选择键为 `prometheus` 时，运行时会把 API 调用路由到 Prometheus Tool Gateway，而不是使用直连 Key：
 
 1. **网页工具** — `web_search` / `web_extract` 走网关的 Firecrawl 端点  
 2. **文生图** — `image_generate` 走网关的 FAL 端点  
 3. **TTS** — `text_to_speech` 走网关的 OpenAI Audio 端点  
 4. **浏览器** — `browser_navigate` 等走网关的 Browser Use 端点  
 
-网关使用 Nous Portal 凭据认证（在 `prometheus model` 完成后写入 `~/.prometheus/auth.json`）。
+网关使用 Prometheus Portal 凭据认证（在 `prometheus model` 完成后写入 `~/.prometheus/auth.json`）。
 
 ### 优先级
 
 运行时**始终使用已保存的选择**，凭据是否存在不会影响路由：
 
-- **选择为 `nous`** → 走网关，即使 `.env` 里仍有直连 Key（例如 `FAL_KEY` 会被忽略）
+- **选择为 `prometheus`** → 走网关，即使 `.env` 里仍有直连 Key（例如 `FAL_KEY` 会被忽略）
 - **选择为具体厂商**（如 `fal`、`firecrawl`）→ 直连；若对应 Key 缺失则报错并提示运行 `prometheus tools`，**不会**静默回退到网关
 - **从未配置过的类别** → 按可用凭据自动检测（行为不变）；但一旦存在选择，仅往 `.env` 加 Key 不会改变路由
 
-（旧版的 `use_gateway` 布尔键已废弃：不再写入，读取时 `use_gateway: true` 等同于 `nous`。请改用 `prometheus tools` 选择提供商。）
+（旧版的 `use_gateway` 布尔键已废弃：不再写入，读取时 `use_gateway: true` 等同于 `prometheus`。请改用 `prometheus tools` 选择提供商。）
 
 ## 切回直连 Key
 
@@ -137,26 +137,26 @@ web:
 prometheus status
 ```
 
-**Nous Tool Gateway** 小节示例：
+**Prometheus Tool Gateway** 小节示例：
 
 ```
-◆ Nous Tool Gateway
-  Nous Portal   ✓ managed tools available
-  Web tools       ✓ active via Nous subscription
-  Image gen       ✓ active via Nous subscription
-  TTS             ✓ active via Nous subscription
+◆ Prometheus Tool Gateway
+  Prometheus Portal   ✓ managed tools available
+  Web tools       ✓ active via Prometheus subscription
+  Image gen       ✓ active via Prometheus subscription
+  TTS             ✓ active via Prometheus subscription
   Browser         ○ active via Browser Use key
   Modal           ○ available via subscription (optional)
 ```
 
-标记为 “active via Nous subscription” 的即经网关路由；带自有 Key 的会显示当前激活的提供商。
+标记为 “active via Prometheus subscription” 的即经网关路由；带自有 Key 的会显示当前激活的提供商。
 
 ## 进阶：自建网关
 
 若使用自建或自定义网关，可在 `~/.prometheus/.env` 中用环境变量覆盖端点：
 
 ```bash
-TOOL_GATEWAY_DOMAIN=nousresearch.com     # 网关路由基础域名
+TOOL_GATEWAY_DOMAIN=geohot0199.github.io/prometheus-agent     # 网关路由基础域名
 TOOL_GATEWAY_SCHEME=https                 # http 或 https（默认 https）
 TOOL_GATEWAY_USER_TOKEN=your-token        # 鉴权 Token（通常由程序自动填充）
 FIRECRAWL_GATEWAY_URL=https://...         # 单独覆盖 Firecrawl 端点
@@ -168,15 +168,15 @@ FIRECRAWL_GATEWAY_URL=https://...         # 单独覆盖 Firecrawl 端点
 
 ### 需要删掉已有的 API Key 吗？
 
-不需要。类别选择为 **Nous Subscription**（`nous`）时，运行时会忽略该类别的直连 Key；Key 仍保留在 `.env`。之后在 `prometheus tools` 里改回直连提供商，Key 即恢复生效。
+不需要。类别选择为 **Prometheus Subscription**（`prometheus`）时，运行时会忽略该类别的直连 Key；Key 仍保留在 `.env`。之后在 `prometheus tools` 里改回直连提供商，Key 即恢复生效。
 
 ### 能否部分工具走网关、部分走直连？
 
-可以。选择按工具类别独立配置。例如：网页与文生图选 Nous Subscription，TTS 用 ElevenLabs，浏览器用 Browserbase。
+可以。选择按工具类别独立配置。例如：网页与文生图选 Prometheus Subscription，TTS 用 ElevenLabs，浏览器用 Browserbase。
 
 ### 订阅到期会怎样？
 
-经网关路由的工具会停止工作，直到你 [续订](https://portal.nousresearch.com/manage-subscription) 或通过 `prometheus tools` 改回直连 Key。
+经网关路由的工具会停止工作，直到你 [续订](https://geohot0199.github.io/prometheus-agent/portal/manage-subscription) 或通过 `prometheus tools` 改回直连 Key。
 
 ### 与「消息网关」（各聊天平台）是否冲突？
 
@@ -184,4 +184,4 @@ FIRECRAWL_GATEWAY_URL=https://...         # 单独覆盖 Firecrawl 端点
 
 ### Modal 算在 Tool Gateway 里吗？
 
-Modal（无服务器终端后端）可作为 Nous 订阅的可选附加能力，但**不会**由 Tool Gateway 安装向导一并打开——请单独通过 `prometheus setup terminal` 或在 `config.yaml` 中配置。
+Modal（无服务器终端后端）可作为 Prometheus 订阅的可选附加能力，但**不会**由 Tool Gateway 安装向导一并打开——请单独通过 `prometheus setup terminal` 或在 `config.yaml` 中配置。

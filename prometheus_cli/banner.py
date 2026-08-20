@@ -30,8 +30,6 @@ logger = logging.getLogger(__name__)
 # ANSI building blocks for conversation display
 # =========================================================================
 
-_GOLD = "\033[1;38;2;255;215;0m"  # True-color #FFD700 bold
-_BOLD = "\033[1m"
 _DIM = "\033[2m"
 _RST = "\033[0m"
 
@@ -67,28 +65,26 @@ def _skin_color(key: str, fallback: str) -> str:
 
 from prometheus_cli import __version__ as VERSION, __release_date__ as RELEASE_DATE
 
-PROMETHEUS_AGENT_LOGO = """[bold #FFD700]██████╗ ██████╗  ██████╗ ███╗   ███╗███████╗████████╗██╗  ██╗███████╗██╗   ██╗███████╗[/]
-[bold #FFD700]██╔══██╗██╔══██╗██╔═══██╗████╗ ████║██╔════╝╚══██╔══╝██║  ██║██╔════╝██║   ██║██╔════╝[/]
-[#FFBF00]██████╔╝██████╔╝██║   ██║██╔████╔██║█████╗     ██║   ███████║█████╗  ██║   ██║███████╗[/]
-[#FFBF00]██╔═══╝ ██╔══██╗██║   ██║██║╚██╔╝██║██╔══╝     ██║   ██╔══██║██╔══╝  ██║   ██║╚════██║[/]
-[#CD7F32]██║     ██║  ██║╚██████╔╝██║ ╚═╝ ██║███████╗   ██║   ██║  ██║███████╗╚██████╔╝███████║[/]
-[#CD7F32]╚═╝     ╚═╝  ╚═╝ ╚═════╝ ╚═╝     ╚═╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚══════╝[/]"""
+# Monochrome wordmark: pure black-and-white block ASCII, no color markup.
+# Any terminal renders it in the default foreground color.
+PROMETHEUS_AGENT_LOGO = """██████╗ ██████╗  ██████╗ ███╗   ███╗███████╗████████╗██╗  ██╗███████╗██╗   ██╗███████╗
+██╔══██╗██╔══██╗██╔═══██╗████╗ ████║██╔════╝╚══██╔══╝██║  ██║██╔════╝██║   ██║██╔════╝
+██████╔╝██████╔╝██║   ██║██╔████╔██║█████╗     ██║   ███████║█████╗  ██║   ██║███████╗
+██╔═══╝ ██╔══██╗██║   ██║██║╚██╔╝██║██╔══╝     ██║   ██╔══██║██╔══╝  ██║   ██║╚════██║
+██║     ██║  ██║╚██████╔╝██║ ╚═╝ ██║███████╗   ██║   ██║  ██║███████╗╚██████╔╝███████║
+╚═╝     ╚═╝  ╚═╝ ╚═════╝ ╚═╝     ╚═╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚══════╝"""
 
-PROMETHEUS_CADUCEUS = """[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⡀⠀⣀⣀⠀⢀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#CD7F32]⠀⠀⠀⠀⠀⠀⢀⣠⣴⣾⣿⣿⣇⠸⣿⣿⠇⣸⣿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠀⠀[/]
-[#FFBF00]⠀⢀⣠⣴⣶⠿⠋⣩⡿⣿⡿⠻⣿⡇⢠⡄⢸⣿⠟⢿⣿⢿⣍⠙⠿⣶⣦⣄⡀⠀[/]
-[#FFBF00]⠀⠀⠉⠉⠁⠶⠟⠋⠀⠉⠀⢀⣈⣁⡈⢁⣈⣁⡀⠀⠉⠀⠙⠻⠶⠈⠉⠉⠀⠀[/]
-[#FFD700]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣴⣿⡿⠛⢁⡈⠛⢿⣿⣦⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#FFD700]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠿⣿⣦⣤⣈⠁⢠⣴⣿⠿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#FFBF00]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠉⠻⢿⣿⣦⡉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#FFBF00]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⢷⣦⣈⠛⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣴⠦⠈⠙⠿⣦⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⣿⣤⡈⠁⢤⣿⠇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#B8860B]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠛⠷⠄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#B8860B]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⠑⢶⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#B8860B]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⠁⢰⡆⠈⡿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#B8860B]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠳⠈⣡⠞⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#B8860B]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]"""
+# The torch of Prometheus: black-and-white hero art for the left panel.
+PROMETHEUS_TORCH = """        ▄▄▄▄▄▄
+       █▀▀▀▀▀▀█
+      █  ▄▄▄▄  █
+     █  █▀▀▀▀█  █
+    █   █ ██ █   █
+   █    ▀▀██▀▀    █
+  █                █
+  █      ████      █
+   ▀█▄▄▄██████▄▄▄█▀
+     ▀▀▀▀▀▀▀▀▀▀▀▀"""
 
 
 
@@ -761,6 +757,52 @@ def _format_context_length(tokens: int) -> str:
     return str(tokens)
 
 
+def _truncate_model_slug(name: str, limit: int = 28) -> str:
+    """Shorten a model id to a compact banner slug (``...`` past ``limit``)."""
+    short = name.split("/")[-1] if "/" in name else name
+    if short.endswith(".gguf"):
+        short = short[:-5]
+    if len(short) > limit:
+        short = short[: limit - 3] + "..."
+    return short
+
+
+def _format_tool_names(
+    tool_names: List[str],
+    disabled_tools: set,
+    lazy_tools: set,
+    text_color: str,
+    plain_limit: int = 45,
+    width_limit: int = 42,
+) -> str:
+    """Render a toolset's tool names with status coloring.
+
+    Long lists are truncated with a dim ellipsis so the panel stays
+    readable; short lists show every tool colored in place.
+    """
+
+    def color(name: str) -> str:
+        if name in disabled_tools:
+            return f"[red]{name}[/]"
+        if name in lazy_tools:
+            return f"[yellow]{name}[/]"
+        return f"[{text_color}]{name}[/]"
+
+    ordered = sorted(tool_names)
+    if len(", ".join(ordered)) <= plain_limit:
+        return ", ".join(color(name) for name in ordered)
+
+    shown: List[str] = []
+    length = 0
+    for name in ordered:
+        if length + len(name) + 2 > width_limit:
+            shown.append("[dim]...[/]")
+            break
+        shown.append(color(name))
+        length += len(name) + 2
+    return ", ".join(shown)
+
+
 def _display_toolset_name(toolset_name: str) -> str:
     """Normalize internal/legacy toolset identifiers for banner display."""
     if not toolset_name:
@@ -980,10 +1022,10 @@ def build_welcome_banner(console: "Console", model: str, cwd: str,
     try:
         from prometheus_cli.skin_engine import get_active_skin
         _bskin = get_active_skin()
-        _hero = _bskin.banner_hero if hasattr(_bskin, 'banner_hero') and _bskin.banner_hero else PROMETHEUS_CADUCEUS
+        _hero = _bskin.banner_hero if hasattr(_bskin, 'banner_hero') and _bskin.banner_hero else PROMETHEUS_TORCH
     except Exception:
         _bskin = None
-        _hero = PROMETHEUS_CADUCEUS
+        _hero = PROMETHEUS_TORCH
     left_lines = ["", _hero, ""]
     if (provider or "").strip().lower() == "moa":
         # MoA virtual provider: ``model`` is a preset name. Show the preset and
@@ -1002,11 +1044,10 @@ def build_welcome_banner(console: "Console", model: str, cwd: str,
                 agg_label = _am.split("/")[-1] if "/" in _am else _am
         except Exception:
             agg_label = ""
-        if len(preset_name) > 28:
-            preset_name = preset_name[:25] + "..."
+        preset_name = _truncate_model_slug(preset_name)
         agg_str = f" [dim {dim}]·[/] [dim {dim}]agg {agg_label}[/]" if agg_label else ""
         ctx_str = f" [dim {dim}]·[/] [dim {dim}]{_format_context_length(context_length)} context[/]" if context_length else ""
-        left_lines.append(f"[{accent}]MoA: {preset_name}[/]{agg_str}{ctx_str} [dim {dim}]·[/] [dim {dim}]Nous Research[/]")
+        left_lines.append(f"[{accent}]MoA: {preset_name}[/]{agg_str}{ctx_str} [dim {dim}]·[/] [dim {dim}]Prometheus[/]")
     else:
         if not (model or "").strip() or (model or "").strip().lower() == "unknown":
             # Unconfigured install: say so in red instead of a blank/"unknown"
@@ -1017,13 +1058,9 @@ def build_welcome_banner(console: "Console", model: str, cwd: str,
                 f"[dim {dim}]— run /model or prometheus setup[/]"
             )
         else:
-            model_short = model.split("/")[-1] if "/" in model else model
-            if model_short.endswith(".gguf"):
-                model_short = model_short[:-5]
-            if len(model_short) > 28:
-                model_short = model_short[:25] + "..."
+            model_short = _truncate_model_slug(model)
             ctx_str = f" [dim {dim}]·[/] [dim {dim}]{_format_context_length(context_length)} context[/]" if context_length else ""
-            left_lines.append(f"[{accent}]{model_short}[/]{ctx_str} [dim {dim}]·[/] [dim {dim}]Nous Research[/]")
+            left_lines.append(f"[{accent}]{model_short}[/]{ctx_str} [dim {dim}]·[/] [dim {dim}]Prometheus[/]")
 
     if os.getenv("PROMETHEUS_YOLO_MODE"):
         left_lines.append(f"[bold red]⚠ YOLO mode[/] [dim {dim}]— all approval prompts bypassed[/]")
@@ -1055,37 +1092,7 @@ def build_welcome_banner(console: "Console", model: str, cwd: str,
 
     for toolset in display_toolsets:
         tool_names = toolsets_dict[toolset]
-        colored_names = []
-        for name in sorted(tool_names):
-            if name in disabled_tools:
-                colored_names.append(f"[red]{name}[/]")
-            elif name in lazy_tools:
-                colored_names.append(f"[yellow]{name}[/]")
-            else:
-                colored_names.append(f"[{text}]{name}[/]")
-
-        tools_str = ", ".join(colored_names)
-        if len(", ".join(sorted(tool_names))) > 45:
-            short_names = []
-            length = 0
-            for name in sorted(tool_names):
-                if length + len(name) + 2 > 42:
-                    short_names.append("...")
-                    break
-                short_names.append(name)
-                length += len(name) + 2
-            colored_names = []
-            for name in short_names:
-                if name == "...":
-                    colored_names.append("[dim]...[/]")
-                elif name in disabled_tools:
-                    colored_names.append(f"[red]{name}[/]")
-                elif name in lazy_tools:
-                    colored_names.append(f"[yellow]{name}[/]")
-                else:
-                    colored_names.append(f"[{text}]{name}[/]")
-            tools_str = ", ".join(colored_names)
-
+        tools_str = _format_tool_names(tool_names, disabled_tools, lazy_tools, text)
         right_lines.append(f"[dim {dim}]{toolset}:[/] {tools_str}")
 
     if remaining_toolsets > 0:

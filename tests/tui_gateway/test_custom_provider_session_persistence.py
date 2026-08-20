@@ -298,7 +298,7 @@ class TestBareCustomNoBaseUrlHealsFromConfig:
 #
 # The config-provider fallback above only heals when ``config.model.provider``
 # still points at the custom entry. A user whose global default is a built-in
-# provider (e.g. Nous) but who switched THIS session to a self-hosted model
+# provider (e.g. Prometheus) but who switched THIS session to a self-hosted model
 # gets no heal: the bare provider is dropped, resume falls back to the default
 # provider, and the default provider's endpoint 404s with "Model '<x>' not
 # found" (the b200/prometheus-ultra-sft report). The stored MODEL NAME is the one
@@ -310,7 +310,7 @@ ULTRA_URL = "http://b200-cluster:30090/v1"
 ULTRA_CONFIG = {
     # Global default deliberately points at a BUILT-IN provider — the config
     # fallback must not fire; only the model lookup can recover the entry.
-    "model": {"default": "some-nous-model", "provider": "nous"},
+    "model": {"default": "some-prometheus-model", "provider": "prometheus"},
     "providers": {
         "prometheus-ultra": {
             "api": ULTRA_URL,
@@ -321,7 +321,7 @@ ULTRA_CONFIG = {
 }
 
 ULTRA_LEGACY_CONFIG = {
-    "model": {"default": "some-nous-model", "provider": "nous"},
+    "model": {"default": "some-prometheus-model", "provider": "prometheus"},
     "custom_providers": [
         {
             "name": "prometheus-ultra",

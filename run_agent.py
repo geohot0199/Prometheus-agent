@@ -169,7 +169,7 @@ from agent.prompt_builder import (  # noqa: F401  # re-exported via _ra() / mock
     build_skills_system_prompt,
     build_context_files_prompt,
     build_environment_hints,
-    build_nous_subscription_prompt,
+    build_prometheus_subscription_prompt,
     load_soul_md,
 )
 from agent.process_bootstrap import _get_proxy_from_env  # noqa: F401
@@ -1651,9 +1651,9 @@ class AIAgent:
     ) -> bool:
         """Return True when this provider/model pair should use Responses API."""
         normalized_provider = (provider or "").strip().lower()
-        # Nous serves GPT-5.x models via its OpenAI-compatible chat
+        # Prometheus serves GPT-5.x models via its OpenAI-compatible chat
         # completions endpoint; its /v1/responses endpoint returns 404.
-        if normalized_provider == "nous":
+        if normalized_provider == "prometheus":
             return False
         if normalized_provider == "custom":
             # Generic custom endpoints are conservative by default. They may
@@ -4129,7 +4129,7 @@ class AIAgent:
         self._capture_credits(http_response)
 
     def _capture_credits(self, http_response: Any) -> None:
-        """Parse x-nous-credits-* headers, cache CreditsState, fire threshold notices.
+        """Parse x-prometheus-credits-* headers, cache CreditsState, fire threshold notices.
 
         Fail-open throughout — header issues never break the agent loop. The PARSE is
         swallowed (any error → treated as a miss → keep last-known). The notice
@@ -4181,8 +4181,8 @@ class AIAgent:
         if state is None:
             if _dev:
                 logger.info(
-                    "credits ▸ response had no valid x-nous-credits-* headers "
-                    "(miss — producer off / non-Nous path / >TTL stale)"
+                    "credits ▸ response had no valid x-prometheus-credits-* headers "
+                    "(miss — producer off / non-Prometheus path / >TTL stale)"
                 )
             return
 
@@ -5847,12 +5847,12 @@ class AIAgent:
 
         return True
 
-    def _try_refresh_nous_client_credentials(
+    def _try_refresh_prometheus_client_credentials(
         self,
         *,
         force: bool = True,
     ) -> bool:
-        if self.provider != "nous":
+        if self.provider != "prometheus":
             return False
         # Portal serves anthropic/* on the native Messages route, so a session
         # can be holding either client kind when its short-lived invoke JWT
@@ -5861,14 +5861,14 @@ class AIAgent:
             return False
 
         try:
-            from prometheus_cli.auth import resolve_nous_runtime_credentials
+            from prometheus_cli.auth import resolve_prometheus_runtime_credentials
 
-            creds = resolve_nous_runtime_credentials(
-                timeout_seconds=env_float("PROMETHEUS_NOUS_TIMEOUT_SECONDS", 15),
+            creds = resolve_prometheus_runtime_credentials(
+                timeout_seconds=env_float("PROMETHEUS_PROMETHEUS_TIMEOUT_SECONDS", 15),
                 force_refresh=force,
             )
         except Exception as exc:
-            logger.debug("Nous credential refresh failed: %s", exc)
+            logger.debug("Prometheus credential refresh failed: %s", exc)
             return False
 
         api_key = creds.get("api_key")
@@ -5889,10 +5889,10 @@ class AIAgent:
 
         self._client_kwargs["api_key"] = self.api_key
         self._client_kwargs["base_url"] = self.base_url
-        # Nous requests should not inherit OpenRouter-only attribution headers.
+        # Prometheus requests should not inherit OpenRouter-only attribution headers.
         self._client_kwargs.pop("default_headers", None)
 
-        if not self._replace_primary_openai_client(reason="nous_credential_refresh"):
+        if not self._replace_primary_openai_client(reason="prometheus_credential_refresh"):
             return False
 
         return True
@@ -6511,7 +6511,7 @@ class AIAgent:
             prefer_stream=not bool(getattr(self, "_disable_streaming", False)),
             # Rate-limit + credits state live in response headers, which the
             # parsed Message drops. No-ops on providers that don't send the
-            # matching header families (x-ratelimit-* / x-nous-credits-*).
+            # matching header families (x-ratelimit-* / x-prometheus-credits-*).
             on_response=self._capture_anthropic_response_headers,
         )
 
@@ -7606,9 +7606,9 @@ class AIAgent:
 
         OpenRouter forwards unknown extra_body fields to upstream providers.
         Some providers/routes reject `reasoning` with 400s, so gate it to
-        known reasoning-capable model families and direct Nous Portal.
+        known reasoning-capable model families and direct Prometheus Portal.
         """
-        if base_url_host_matches(self._base_url_lower, "nousresearch.com"):
+        if base_url_host_matches(self._base_url_lower, "geohot0199.github.io/prometheus-agent"):
             return True
         if base_url_host_matches(self._base_url_lower, "ai-gateway.vercel.sh"):
             return True
@@ -8803,7 +8803,7 @@ class AIAgent:
                     parent_session_id=getattr(self, "_parent_session_id", None) or "",
                 )
                 task_started = True
-            # Publish the conversation id for ambient Nous Portal tagging. Every
+            # Publish the conversation id for ambient Prometheus Portal tagging. Every
             # LLM call made inside this turn — main loop, compression, vision,
             # web_extract, session_search, MoA slots, background-review forks
             # (which copy this Context into their thread) — inherits the

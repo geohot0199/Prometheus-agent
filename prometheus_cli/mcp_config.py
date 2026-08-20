@@ -1143,7 +1143,7 @@ def mcp_command(args):
         run_picker()
         print(color("  Commands:", Colors.CYAN))
         _info("prometheus mcp                                    Open the catalog picker (default)")
-        _info("prometheus mcp catalog                            List Nous-approved MCPs")
+        _info("prometheus mcp catalog                            List Prometheus-approved MCPs")
         _info("prometheus mcp install <name>                     Install a catalog MCP")
         _info("prometheus mcp serve                              Run as MCP server")
         _info("prometheus mcp add <name> --url <endpoint>        Add a custom MCP server")

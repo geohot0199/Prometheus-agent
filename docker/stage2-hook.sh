@@ -494,16 +494,16 @@ if [ ! -f "$PROMETHEUS_HOME/auth.json" ] && [ -n "${PROMETHEUS_AUTH_JSON_BOOTSTR
     fi
 fi
 
-# auth.json: re-seed a TERMINALLY-DEAD Nous bootstrap session (self-heal).
+# auth.json: re-seed a TERMINALLY-DEAD Prometheus bootstrap session (self-heal).
 #
 # The [ ! -f ] guard above deliberately refuses to clobber an existing
-# auth.json, so a container whose Nous bootstrap session took a terminal
-# invalid_grant (tokens cleared, providers.nous.last_auth_error.relogin_required
+# auth.json, so a container whose Prometheus bootstrap session took a terminal
+# invalid_grant (tokens cleared, providers.prometheus.last_auth_error.relogin_required
 # stamped) can NOT recover from a plain restart — it stays unauthenticated until
 # the credential is replaced. An orchestrator that manages the container can
 # supply a freshly-issued session via PROMETHEUS_AUTH_JSON_REBOOTSTRAP (distinct
 # from the create-only *_BOOTSTRAP var); this helper swaps ONLY the
-# providers.nous entry when the on-disk entry is provably terminal OR the
+# providers.prometheus entry when the on-disk entry is provably terminal OR the
 # orchestrator seed has a later obtained_at timestamp. The latter covers the
 # stop/update/start sequence where NAS already revoked the still-healthy-looking
 # local session. Older/incomparable seeds remain no-ops, so leaving the env set
@@ -514,9 +514,9 @@ if [ -f "$PROMETHEUS_HOME/auth.json" ] && [ -n "${PROMETHEUS_AUTH_JSON_REBOOTSTR
         :
     else
         s6-setuidgid prometheus "$INSTALL_DIR/.venv/bin/python" \
-            "$INSTALL_DIR/scripts/docker_rebootstrap_nous_session.py" \
+            "$INSTALL_DIR/scripts/docker_rebootstrap_prometheus_session.py" \
             "$PROMETHEUS_HOME/auth.json" \
-            || echo "[stage2] Warning: docker_rebootstrap_nous_session.py failed; continuing"
+            || echo "[stage2] Warning: docker_rebootstrap_prometheus_session.py failed; continuing"
     fi
 fi
 

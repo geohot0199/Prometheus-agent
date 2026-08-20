@@ -64,8 +64,8 @@ async function stampExeIdentity(exe, desktopRoot = resolve(import.meta.dirname, 
     'version-string': {
       ProductName: 'Prometheus',
       FileDescription: 'Prometheus',
-      CompanyName: 'Nous Research',
-      LegalCopyright: 'Copyright (c) 2026 Nous Research'
+      CompanyName: 'Prometheus',
+      LegalCopyright: 'Copyright (c) 2026 Prometheus'
     }
   })
 

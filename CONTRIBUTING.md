@@ -24,8 +24,8 @@ A quick search before you build saves your time and keeps the PR queue clean —
 
 - **Search both open *and* merged PRs and issues** for your topic or error symptom — the duplicate-check in the PR template fires at review time, after you've already done the work:
   ```bash
-  gh search issues --repo NousResearch/prometheus-agent "<your terms>"
-  gh search prs --repo NousResearch/prometheus-agent --state all "<your terms>"
+  gh search issues --repo geohot0199/Prometheus-agent "<your terms>"
+  gh search prs --repo geohot0199/Prometheus-agent --state all "<your terms>"
   ```
   Or use the web UI: [issues](https://github.com/geohot0199/Prometheus-agent/issues?q=) · [PRs (all states)](https://github.com/geohot0199/Prometheus-agent/pulls?q=is%3Apr).
 - **The issue tracker can lag the code.** Many requested features are already implemented in-tree, so also search the source (`search_files`, or your editor's grep) for the capability before proposing it.
@@ -63,7 +63,7 @@ Bundled skills (in `skills/`) ship with every Prometheus install. They should be
 
 If your skill is official and useful but not universally needed (e.g., a paid service integration, a heavyweight dependency), put it in **`optional-skills/`** — it ships with the repo but isn't activated by default. Users can discover it via `prometheus skills browse` (labeled "official") and install it with `prometheus skills install` (no third-party warning, built-in trust).
 
-If your skill is specialized, community-contributed, or niche, it's better suited for a **Skills Hub** — upload it to a skills registry and share it in the [Nous Research Discord](https://discord.gg/NousResearch). Users can install it with `prometheus skills install`.
+If your skill is specialized, community-contributed, or niche, it's better suited for a **Skills Hub** — upload it to a skills registry and share it in the [community Discord](https://github.com/geohot0199/Prometheus-agent/discussions). Users can install it with `prometheus skills install`.
 
 ---
 
@@ -96,7 +96,7 @@ Publish these as a **standalone plugin repo** instead:
 - Implement the relevant ABC and use the existing plugin discovery path (`~/.prometheus/plugins/`, project `.prometheus/plugins/`, or a pip entry point) — see [Build a Prometheus Plugin](https://github.com/geohot0199/Prometheus-agent/docs/guides/build-a-prometheus-plugin)
 - Register lifecycle hooks (`pre_tool_call`, `post_tool_call`, `pre_llm_call`, `post_llm_call`, `on_session_start`, `on_session_end`), tools (`ctx.register_tool`), and CLI subcommands (`ctx.register_cli_command`) through the surface we already expose — no core changes needed
 - If your plugin needs a capability the framework doesn't expose, that's a feature request to **widen the generic plugin surface** (a new hook or `ctx` method) — never special-case your plugin in core
-- Promote it in the [Nous Research Discord](https://discord.gg/NousResearch) `#plugins-skills-and-skins` channel so users can find and install it
+- Promote it in the [community Discord](https://github.com/geohot0199/Prometheus-agent/discussions) `#plugins-skills-and-skins` channel so users can find and install it
 
 A well-built third-party-product plugin can clear automated review and still be closed for this reason — it's a placement decision, not a verdict on the code. PRs that add such a directory under `plugins/` will be closed with a pointer to publish it as its own repo.
 
@@ -235,7 +235,7 @@ prometheus-agent/
 │   ├── main.py                   # Entry point, argument parsing, command dispatch
 │   ├── config.py                 # Config management, migration, env var definitions
 │   ├── setup.py                  # Interactive setup wizard
-│   ├── auth.py                   # Provider resolution, OAuth, Nous Portal
+│   ├── auth.py                   # Provider resolution, OAuth, Prometheus Portal
 │   ├── models.py                 # OpenRouter model selection lists
 │   ├── banner.py                 # Welcome banner, ASCII art
 │   ├── commands.py               # Central slash command registry (CommandDef), autocomplete, gateway helpers
@@ -275,7 +275,7 @@ prometheus-agent/
 ├── skills/                   # Bundled skills (copied to ~/.prometheus/skills/ on install)
 ├── optional-skills/          # Official optional skills (discoverable via hub, not activated by default)
 ├── tests/                    # Test suite
-├── website/                  # Documentation site (prometheus-agent.nousresearch.com)
+├── website/                  # Documentation site (geohot0199.github.io/prometheus-agent)
 │
 ├── cli-config.yaml.example   # Example configuration (copied to ~/.prometheus/config.yaml)
 └── AGENTS.md                 # Development guide for AI coding assistants
@@ -287,7 +287,7 @@ prometheus-agent/
 |------|---------|
 | `~/.prometheus/config.yaml` | Settings (model, terminal, toolsets, compression, etc.) |
 | `~/.prometheus/.env` | API keys and secrets |
-| `~/.prometheus/auth.json` | OAuth credentials (Nous Portal) |
+| `~/.prometheus/auth.json` | OAuth credentials (Prometheus Portal) |
 | `~/.prometheus/skills/` | All active skills (bundled + hub-installed + agent-created) |
 | `~/.prometheus/memories/` | Persistent memory (MEMORY.md, USER.md) |
 | `~/.prometheus/state.db` | SQLite session database |
@@ -322,7 +322,7 @@ User message → AIAgent._run_agent_loop()
 - **Toolset grouping**: Tools are grouped into toolsets (`web`, `terminal`, `file`, `browser`, etc.) that can be enabled/disabled per platform.
 - **Session persistence**: All conversations are stored in SQLite (`prometheus_state.py`) with full-text search and unique session titles. Per-session JSON snapshots in `~/.prometheus/sessions/` were superseded by the SQLite store and are off by default; opt back in with `sessions.write_json_snapshots: true` if you have external tooling that consumes the JSON files directly.
 - **Ephemeral injection**: System prompts and prefill messages are injected at API call time, never persisted to the database or logs.
-- **Provider abstraction**: The agent works with any OpenAI-compatible API. Provider resolution happens at init time (Nous Portal OAuth, OpenRouter API key, or custom endpoint).
+- **Provider abstraction**: The agent works with any OpenAI-compatible API. Provider resolution happens at init time (Prometheus Portal OAuth, OpenRouter API key, or custom endpoint).
 - **Provider routing**: When using OpenRouter, `provider_routing` in config.yaml controls provider selection (sort by throughput/latency/price, allow/ignore specific providers, data retention policies). These are injected as `extra_body.provider` in API requests.
 
 ---
@@ -982,7 +982,7 @@ test(tools): add unit tests for file_operations
 
 ## Community
 
-- **Discord**: [discord.gg/NousResearch](https://discord.gg/NousResearch) — for questions, showcasing projects, and sharing skills
+- **Discord**: [github.com/geohot0199/Prometheus-agent/discussions](https://github.com/geohot0199/Prometheus-agent/discussions) — for questions, showcasing projects, and sharing skills
 - **GitHub Discussions**: For design proposals and architecture discussions
 - **Skills Hub**: Upload specialized skills to a registry and share them with the community
 

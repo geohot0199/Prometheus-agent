@@ -266,12 +266,12 @@ if [ -n "$HTTP_ROOT" ]; then
   cp -a "$HTTP_ROOT/." "$SANDBOX_ROOT/root/http/"
 fi
 if [ "$INSTALL_SHORTCUT" = true ]; then
-  mkdir -p "$SANDBOX_ROOT/root/http/prometheus-agent.nousresearch.com"
+  mkdir -p "$SANDBOX_ROOT/root/http/geohot0199.github.io/prometheus-agent"
   if [ -n "$INSTALL_REF" ]; then
     git -C "$UPSTREAM_REPO" show "$UPSTREAM_COMMIT:scripts/install.sh" \
-      > "$SANDBOX_ROOT/root/http/prometheus-agent.nousresearch.com/install.sh"
+      > "$SANDBOX_ROOT/root/http/geohot0199.github.io/prometheus-agent/install.sh"
   else
-    cp -a "$INSTALLER_PATH" "$SANDBOX_ROOT/root/http/prometheus-agent.nousresearch.com/install.sh"
+    cp -a "$INSTALLER_PATH" "$SANDBOX_ROOT/root/http/geohot0199.github.io/prometheus-agent/install.sh"
   fi
   set -- bash -c '
     set +e

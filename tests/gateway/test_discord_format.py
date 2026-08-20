@@ -50,11 +50,11 @@ class TestDiscordToolPreviewFormatting:
 
         adapter = _make_discord_adapter()
         url = "https://github.com/geohot0199/Prometheus-agent/docs/gateway/discord/tool-progress"
-        visible = "https://prometheus-agent.nousresearch..."
+        visible = "https://prometheus-agent.geohot0199..."
 
         out = adapter.format_tool_preview(ToolPreview(visible, truncated=True, url=url))
 
-        assert out == f"[prometheus-agent.nousresearch...](<{url}>)"
+        assert out == f"[prometheus-agent.geohot0199...](<{url}>)"
 
     def test_truncated_url_label_is_not_a_second_url_target(self):
         from agent.display import ToolPreview

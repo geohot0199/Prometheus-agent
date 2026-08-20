@@ -17,7 +17,7 @@ Import an OpenClaw setup (memories, skills) into Prometheus.
 | Source | Optional — install with `prometheus skills install official/migration/openclaw-migration` |
 | Path | `optional-skills/migration/openclaw-migration` |
 | Version | `1.0.0` |
-| Author | Prometheus Agent (Nous Research) |
+| Author | Prometheus Agent (Prometheus) |
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `Migration`, `OpenClaw`, `Prometheus`, `Memory`, `Persona`, `Import` |

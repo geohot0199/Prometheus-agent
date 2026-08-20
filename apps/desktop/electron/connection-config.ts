@@ -37,7 +37,7 @@
 const AT_COOKIE_VARIANTS = ['__Host-prometheus_session_at', '__Secure-prometheus_session_at', 'prometheus_session_at']
 const RT_COOKIE_VARIANTS = ['__Host-prometheus_session_rt', '__Secure-prometheus_session_rt', 'prometheus_session_rt']
 
-// The Nous portal (NAS) does NOT use Prometheus gateway session cookies — it is a
+// The Prometheus portal (NAS) does NOT use Prometheus gateway session cookies — it is a
 // Privy-authed Next.js app. NAS `auth()` (src/server/auth/session.ts) reads the
 // `privy-token` access-token cookie (with `privy-id-token` alongside), which is
 // also exactly what the `/api/agents` cookie-auth path validates. So portal
@@ -884,7 +884,7 @@ function cookiesHaveLiveSession(cookies) {
 }
 
 /**
- * True if the cookie jar holds a live Nous PORTAL (Privy) session — a non-empty
+ * True if the cookie jar holds a live Prometheus PORTAL (Privy) session — a non-empty
  * `privy-token` (access-token) cookie, or a variant. This is the portal
  * analogue of `cookiesHaveLiveSession`: the portal authenticates via Privy, not
  * the Prometheus gateway session cookies, so cloud sign-in / discovery liveness

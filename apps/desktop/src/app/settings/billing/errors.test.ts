@@ -42,7 +42,7 @@ describe('resolveRefusal', () => {
       const resolved = resolveRefusal({
         kind: kind as BillingRefusal['kind'],
         message: 'Server message.',
-        portalUrl: 'https://portal.nousresearch.com/billing',
+        portalUrl: 'https://geohot0199.github.io/prometheus-agent/portal/billing',
         retryAfter: 90
       })
 

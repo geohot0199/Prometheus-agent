@@ -701,7 +701,7 @@ const sidebars: SidebarsConfig = {
       collapsed: true,
       items: [
         'integrations/index',
-        'integrations/nous-portal',
+        'integrations/prometheus-portal',
         'integrations/providers',
         'integrations/buzz',
         'user-guide/features/mcp',
@@ -717,7 +717,7 @@ const sidebars: SidebarsConfig = {
       collapsed: true,
       items: [
         'guides/run-nemotron-3-ultra-free',
-        'guides/run-prometheus-with-nous-portal',
+        'guides/run-prometheus-with-portal',
         'guides/tips',
         'guides/local-llm-on-mac',
         'guides/daily-briefing-bot',

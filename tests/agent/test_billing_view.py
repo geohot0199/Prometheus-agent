@@ -33,8 +33,8 @@ from agent.billing_view import (
     parse_money,
     validate_charge_amount,
 )
-import prometheus_cli.nous_billing as nb
-from prometheus_cli.nous_billing import (
+import prometheus_cli.prometheus_billing as nb
+from prometheus_cli.prometheus_billing import (
     BillingAuthError,
     BillingError,
     BillingRateLimited,
@@ -253,7 +253,7 @@ def test_400_amount_out_of_bounds_is_base_error():
 
 def test_portal_base_url_default(monkeypatch):
     monkeypatch.delenv("PROMETHEUS_PORTAL_BASE_URL", raising=False)
-    monkeypatch.delenv("NOUS_PORTAL_BASE_URL", raising=False)
+    monkeypatch.delenv("PROMETHEUS_PORTAL_BASE_URL", raising=False)
     assert resolve_portal_base_url() == nb.DEFAULT_PORTAL_BASE_URL
 
 

@@ -37,7 +37,7 @@ Env vars::
 
     FIRECRAWL_API_KEY=...            # direct cloud auth
     FIRECRAWL_API_URL=...            # self-hosted Firecrawl
-    FIRECRAWL_GATEWAY_URL=...        # Nous tool-gateway (subscribers)
+    FIRECRAWL_GATEWAY_URL=...        # Prometheus tool-gateway (subscribers)
     TOOL_GATEWAY_DOMAIN=...          # alternate gateway env
     TOOL_GATEWAY_SCHEME=...
     TOOL_GATEWAY_USER_TOKEN=...
@@ -171,7 +171,7 @@ def _use_keyless_ring() -> bool:
     """True when Firecrawl calls should route via the keyless ring.
 
     Ring dispatch applies when there are no direct credentials, the
-    managed Nous gateway isn't the selected path, and the keyless tier
+    managed Prometheus gateway isn't the selected path, and the keyless tier
     isn't disabled or pinned paid. Keyed/self-hosted/gateway setups never
     reach the ring.
     """
@@ -182,10 +182,10 @@ def _use_keyless_ring() -> bool:
     if (get_env_value("FIRECRAWL_API_URL") or "").strip():
         return False
     import tools.web_tools as _wt
-    from tools.tool_backend_helpers import NOUS_MANAGED_PROVIDER, read_selection
+    from tools.tool_backend_helpers import PROMETHEUS_MANAGED_PROVIDER, read_selection
 
     try:
-        if read_selection("web") == NOUS_MANAGED_PROVIDER:
+        if read_selection("web") == PROMETHEUS_MANAGED_PROVIDER:
             return False
     except Exception:  # noqa: BLE001 — selection helpers optional
         pass
@@ -235,18 +235,18 @@ def _get_firecrawl_gateway_url() -> str:
 
 
 def _is_tool_gateway_ready() -> bool:
-    """Return True when gateway URL + Nous Subscriber token are available.
+    """Return True when gateway URL + Prometheus Subscriber token are available.
 
-    Reads ``peek_nous_access_token`` and ``resolve_managed_tool_gateway``
+    Reads ``peek_prometheus_access_token`` and ``resolve_managed_tool_gateway``
     via :mod:`tools.web_tools` rather than direct imports, so unit tests
-    that ``patch("tools.web_tools._peek_nous_access_token", ...)`` see
+    that ``patch("tools.web_tools._peek_prometheus_access_token", ...)`` see
     their patches honored. The names are re-exported on
     :mod:`tools.web_tools` for exactly this reason.
     """
     import tools.web_tools as _wt
 
     return _wt.resolve_managed_tool_gateway(
-        "firecrawl", token_reader=_wt._peek_nous_access_token
+        "firecrawl", token_reader=_wt._peek_prometheus_access_token
     ) is not None
 
 
@@ -263,12 +263,12 @@ def check_firecrawl_api_key() -> bool:
     existing tests and the ``prometheus tools`` setup flow.
     """
     from tools.tool_backend_helpers import (
-        NOUS_MANAGED_PROVIDER,
+        PROMETHEUS_MANAGED_PROVIDER,
         read_selection,
     )
 
     selected = read_selection("web")
-    if selected == NOUS_MANAGED_PROVIDER:
+    if selected == PROMETHEUS_MANAGED_PROVIDER:
         return _is_tool_gateway_ready()
     if selected is not None:
         return _has_direct_firecrawl_config()
@@ -279,10 +279,10 @@ def _firecrawl_backend_help_suffix() -> str:
     """Return optional managed-gateway guidance for Firecrawl help text."""
     import tools.web_tools as _wt
 
-    if not _wt.managed_nous_tools_enabled():
+    if not _wt.managed_prometheus_tools_enabled():
         return ""
     return (
-        ", or use the Nous Tool Gateway via your subscription "
+        ", or use the Prometheus Tool Gateway via your subscription "
         "(FIRECRAWL_GATEWAY_URL or TOOL_GATEWAY_DOMAIN)"
     )
 
@@ -296,13 +296,13 @@ def _raise_web_backend_configuration_error() -> "NoReturn":
         "Set FIRECRAWL_API_KEY for cloud Firecrawl or set FIRECRAWL_API_URL "
         "for a self-hosted Firecrawl instance."
     )
-    if _wt.managed_nous_tools_enabled():
+    if _wt.managed_prometheus_tools_enabled():
         message += (
-            " With your Nous subscription you can also use the Tool Gateway. "
-            "run `prometheus tools` and select Nous Subscription as the web provider."
+            " With your Prometheus subscription you can also use the Tool Gateway. "
+            "run `prometheus tools` and select Prometheus Subscription as the web provider."
         )
     else:
-        message += " " + _wt.nous_tool_gateway_unavailable_message(
+        message += " " + _wt.prometheus_tool_gateway_unavailable_message(
             "managed Firecrawl web tools",
         )
     raise ValueError(message)
@@ -312,12 +312,12 @@ def _get_firecrawl_client() -> Any:
     """Get or create the cached Firecrawl client.
 
     Strict selection semantics (switch on the stored ``web`` selection):
-    - ``"nous"`` (or legacy ``use_gateway: true``) → managed Tool Gateway
+    - ``"prometheus"`` (or legacy ``use_gateway: true``) → managed Tool Gateway
       ONLY; unavailable is a selection-naming error (a present
       FIRECRAWL_API_KEY does not reroute).
     - any other stored web backend → direct Firecrawl ONLY; missing config
       is a selection-naming error — never a silent managed fallback billed
-      to Nous.
+      to Prometheus.
     - never-configured web section → legacy behavior: direct config when
       present, else the managed gateway.
 
@@ -327,13 +327,13 @@ def _get_firecrawl_client() -> Any:
     ``_firecrawl_client`` and ``_firecrawl_client_config``) rather than on
     this plugin module so that unit tests that reset the cache via
     ``tools.web_tools._firecrawl_client = None`` keep working. Helper
-    functions (``resolve_managed_tool_gateway``, ``_read_nous_access_token``,
+    functions (``resolve_managed_tool_gateway``, ``_read_prometheus_access_token``,
     ``Firecrawl``) are also looked up via :mod:`tools.web_tools` for the same
     reason — see :func:`_is_tool_gateway_ready`.
     """
     import tools.web_tools as _wt
     from tools.tool_backend_helpers import (
-        NOUS_MANAGED_PROVIDER,
+        PROMETHEUS_MANAGED_PROVIDER,
         read_selection,
         selection_error,
         selection_exists,
@@ -345,32 +345,32 @@ def _get_firecrawl_client() -> Any:
 
     def _managed_kwargs():
         managed_gateway = _wt.resolve_managed_tool_gateway(
-            "firecrawl", token_reader=_wt._read_nous_access_token
+            "firecrawl", token_reader=_wt._read_prometheus_access_token
         )
         if managed_gateway is None:
             return None
         kwargs = {
-            "api_key": managed_gateway.nous_user_token,
+            "api_key": managed_gateway.prometheus_user_token,
             "api_url": managed_gateway.gateway_origin,
         }
         return kwargs, (
             "tool-gateway",
             kwargs["api_url"],
-            managed_gateway.nous_user_token,
+            managed_gateway.prometheus_user_token,
         )
 
-    if selected == NOUS_MANAGED_PROVIDER:
+    if selected == PROMETHEUS_MANAGED_PROVIDER:
         managed = _managed_kwargs()
         if managed is None:
             logger.error(
-                "Firecrawl client initialization failed: the Nous "
+                "Firecrawl client initialization failed: the Prometheus "
                 "Subscription web selection is stored but the tool gateway "
                 "is unavailable."
             )
             raise ValueError(selection_error(
                 "web",
-                NOUS_MANAGED_PROVIDER,
-                "the Nous Tool Gateway is not available (not entitled or "
+                PROMETHEUS_MANAGED_PROVIDER,
+                "the Prometheus Tool Gateway is not available (not entitled or "
                 "unreachable)",
             ))
         kwargs, client_config = managed
@@ -792,7 +792,7 @@ class FirecrawlWebSearchProvider(WebSearchProvider):
             "badge": "keyless/paid · optional gateway",
             "tag": (
                 "Full search + extract; supports keyless cloud, direct API, "
-                "and Nous tool-gateway routing."
+                "and Prometheus tool-gateway routing."
             ),
             "env_vars": [
                 {

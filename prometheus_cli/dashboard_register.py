@@ -1,12 +1,12 @@
 """``prometheus dashboard register`` — register a self-hosted dashboard OAuth client.
 
-Automates what a user otherwise does by hand: open the Nous Portal
+Automates what a user otherwise does by hand: open the Prometheus Portal
 ``/local-dashboards`` page in a browser, click "register", copy the
 resulting ``agent:{id}`` OAuth client ID, and paste it into ``~/.prometheus/.env``
 as ``PROMETHEUS_DASHBOARD_OAUTH_CLIENT_ID``.
 
 This command:
-  1. Resolves a fresh Nous Portal access token from the existing login
+  1. Resolves a fresh Prometheus Portal access token from the existing login
      (``~/.prometheus/auth.json``), refreshing it if needed. Fails fast with a
      "run `prometheus setup`" hint when the user isn't logged in.
   2. POSTs to ``{portal}/api/oauth/self-hosted-client`` with that bearer
@@ -72,22 +72,22 @@ def _resolve_portal_base_url(override: Optional[str] = None) -> str:
          this portal — it's minted by whatever portal you logged into, so an
          override only works if the token's issuer matches (e.g. you logged
          into the same staging/preview portal).
-      2. The ``portal_base_url`` stored on the Nous login — this is the
+      2. The ``portal_base_url`` stored on the Prometheus login — this is the
          portal that issued the token, so it's the correct default target.
       3. The production default.
     """
     if isinstance(override, str) and override.strip():
         return override.rstrip("/")
     try:
-        from prometheus_cli.auth import DEFAULT_NOUS_PORTAL_URL, get_provider_auth_state
+        from prometheus_cli.auth import DEFAULT_PROMETHEUS_PORTAL_URL, get_provider_auth_state
 
-        state = get_provider_auth_state("nous") or {}
+        state = get_provider_auth_state("prometheus") or {}
         base = state.get("portal_base_url")
         if isinstance(base, str) and base.strip():
             return base.rstrip("/")
-        return str(DEFAULT_NOUS_PORTAL_URL).rstrip("/")
+        return str(DEFAULT_PROMETHEUS_PORTAL_URL).rstrip("/")
     except Exception:
-        return "https://portal.nousresearch.com"
+        return "https://geohot0199.github.io/prometheus-agent/portal"
 
 
 def _register_self_hosted_client(
@@ -154,8 +154,8 @@ def _register_self_hosted_client(
             pass
         if exc.code == 401:
             raise RuntimeError(
-                "Nous Portal rejected the access token (401). "
-                "Try `prometheus auth add nous` to re-authenticate."
+                "Prometheus Portal rejected the access token (401). "
+                "Try `prometheus auth add prometheus` to re-authenticate."
             ) from exc
         if exc.code == 403:
             raise RuntimeError(
@@ -168,7 +168,7 @@ def _register_self_hosted_client(
         ) from exc
     except urllib.error.URLError as exc:
         raise RuntimeError(
-            f"Could not reach Nous Portal at {portal_base_url}: {exc.reason}"
+            f"Could not reach Prometheus Portal at {portal_base_url}: {exc.reason}"
         ) from exc
 
     if not isinstance(payload, dict) or not payload.get("client_id"):
@@ -198,7 +198,7 @@ def _print_post_register_hint(
         print("    PROMETHEUS_DASHBOARD_PUBLIC_URL=" + str(public_url))
     print()
     print(
-        "  Heads up — Nous login only *engages* on a non-loopback bind. A plain\n"
+        "  Heads up — Prometheus login only *engages* on a non-loopback bind. A plain\n"
         "  `prometheus dashboard` (localhost) leaves the gate off and serves locally\n"
         "  without auth, which is fine for your own machine."
     )
@@ -211,11 +211,11 @@ def _print_post_register_hint(
             host = urlparse(custom_redirect_uri).hostname or "your-host"
         except Exception:
             host = "your-host"
-        print("  To require Nous login on your registered host, run the dashboard")
+        print("  To require Prometheus login on your registered host, run the dashboard")
         print(f"  bound publicly (it must be reachable at https://{host}) and log in")
         print("  at its /login page.")
     else:
-        print("  To require Nous login (e.g. exposing on your LAN or a public host):")
+        print("  To require Prometheus login (e.g. exposing on your LAN or a public host):")
         print("    prometheus dashboard --host 0.0.0.0")
         print("  …then log in at the dashboard's /login page.")
     print()
@@ -228,8 +228,8 @@ def _print_post_register_hint(
 
 
 def cmd_dashboard_register(args) -> None:
-    """Register a self-hosted dashboard OAuth client with Nous Portal."""
-    from prometheus_cli.auth import AuthError, resolve_nous_access_token
+    """Register a self-hosted dashboard OAuth client with Prometheus Portal."""
+    from prometheus_cli.auth import AuthError, resolve_prometheus_access_token
     from prometheus_cli.config import get_env_value, is_managed, save_env_value
 
     # Managed (Docker/hosted) installs get their dashboard OAuth client_id
@@ -244,19 +244,19 @@ def cmd_dashboard_register(args) -> None:
         )
         sys.exit(1)
 
-    # 1. Resolve a fresh Nous access token (refreshes if near expiry). Fail fast
+    # 1. Resolve a fresh Prometheus access token (refreshes if near expiry). Fail fast
     #    with a setup hint when the user isn't logged in.
     try:
-        access_token = resolve_nous_access_token()
+        access_token = resolve_prometheus_access_token()
     except AuthError as exc:
         if getattr(exc, "relogin_required", False):
-            print("✗ You're not logged into Nous Portal.")
-            print("  Run `prometheus setup` (or `prometheus auth add nous`) first, then retry.")
+            print("✗ You're not logged into Prometheus Portal.")
+            print("  Run `prometheus setup` (or `prometheus auth add prometheus`) first, then retry.")
         else:
-            print(f"✗ Could not resolve a Nous Portal access token: {exc}")
+            print(f"✗ Could not resolve a Prometheus Portal access token: {exc}")
         sys.exit(1)
     except Exception as exc:
-        print(f"✗ Could not resolve a Nous Portal access token: {exc}")
+        print(f"✗ Could not resolve a Prometheus Portal access token: {exc}")
         sys.exit(1)
 
     # Portal override: explicit --portal-url flag wins, else the
@@ -352,7 +352,7 @@ def cmd_dashboard_register(args) -> None:
     #      don't clutter .env for the common production case and don't alter an
     #      existing entry unexpectedly.
     wrote_portal_url = False
-    default_portal = "https://portal.nousresearch.com"
+    default_portal = "https://geohot0199.github.io/prometheus-agent/portal"
     existing_portal = None
     try:
         existing_portal = get_env_value("PROMETHEUS_DASHBOARD_PORTAL_URL")

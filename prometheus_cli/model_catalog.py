@@ -2,7 +2,7 @@
 
 The Prometheus docs site hosts a JSON manifest of curated models for providers
 we want to update without shipping a release (currently OpenRouter and
-Nous Portal). This module fetches, validates, and caches that manifest,
+Prometheus Portal). This module fetches, validates, and caches that manifest,
 falling back to the in-repo hardcoded lists when the network is unavailable.
 
 Pipeline
@@ -13,7 +13,7 @@ Pipeline
    - Fetches the master URL if disk cache is stale or missing.
    - On any fetch failure, keeps using the stale cache (or empty dict).
 
-2. ``get_curated_openrouter_models()`` / ``get_curated_nous_models()`` —
+2. ``get_curated_openrouter_models()`` / ``get_curated_prometheus_models()`` —
    thin accessors returning the shapes existing callers expect. Each
    falls back to the in-repo hardcoded list on any lookup failure.
 
@@ -33,7 +33,7 @@ Schema (version 1)
              "metadata": {...}}          # free-form, model-level
           ]
         },
-        "nous": {...}
+        "prometheus": {...}
       }
     }
 
@@ -72,7 +72,7 @@ DEFAULT_CATALOG_URL = (
 # is the same manifest published from the same repo and is not bot-gated,
 # so we fall through to it whenever the primary URL fails.
 DEFAULT_CATALOG_FALLBACK_URLS: tuple[str, ...] = (
-    "https://raw.githubusercontent.com/NousResearch/prometheus-agent/main/website/static/api/model-catalog.json",
+    "https://raw.githubusercontent.com/geohot0199/Prometheus-agent/main/website/static/api/model-catalog.json",
 )
 DEFAULT_TTL_HOURS = 1
 DEFAULT_FETCH_TIMEOUT = 8.0
@@ -301,7 +301,7 @@ def get_catalog(*, force_refresh: bool = False) -> dict[str, Any]:
 
     # Stale-while-revalidate: an expired disk copy is served immediately and
     # refreshed off-thread, so interactive surfaces (the /model picker calls
-    # this via get_curated_nous_model_ids on every open) never block on the
+    # this via get_curated_prometheus_model_ids on every open) never block on the
     # manifest fetch. Only a cold cache (no disk copy at all) still blocks.
     if not force_refresh and disk_data is not None:
         _catalog_cache = disk_data
@@ -381,12 +381,12 @@ def get_curated_openrouter_models() -> list[tuple[str, str]] | None:
     return out or None
 
 
-def get_curated_nous_models() -> list[str] | None:
-    """Return Nous Portal's curated list of model ids from the manifest.
+def get_curated_prometheus_models() -> list[str] | None:
+    """Return Prometheus Portal's curated list of model ids from the manifest.
 
     Returns ``None`` when the manifest is unavailable.
     """
-    block = _get_provider_block("nous")
+    block = _get_provider_block("prometheus")
     if not block:
         return None
     out: list[str] = []

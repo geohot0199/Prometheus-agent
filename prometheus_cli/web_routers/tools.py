@@ -62,7 +62,7 @@ async def get_toolsets(profile: Optional[str] = None):
         _get_platform_tools,
         _toolset_configuration_platform,
         _toolset_has_keys,
-        get_nous_subscription_features,
+        get_prometheus_subscription_features,
         gui_toolset_label,
     )
     from prometheus_cli.platforms import platform_label
@@ -83,7 +83,7 @@ async def get_toolsets(profile: Optional[str] = None):
                 )
                 for platform in target_platforms
             }
-            features = get_nous_subscription_features(config)
+            features = get_prometheus_subscription_features(config)
         return config, toolset_rows, enabled_by_platform, features
 
     config, toolset_rows, enabled_by_platform, features = await asyncio.to_thread(_read)
@@ -244,7 +244,7 @@ async def get_toolset_config(name: str, profile: Optional[str] = None):
         web_provider_capabilities,
     )
     from prometheus_cli.config import get_env_value
-    from prometheus_cli.nous_subscription import get_nous_subscription_features
+    from prometheus_cli.prometheus_subscription import get_prometheus_subscription_features
 
     valid = {ts_key for ts_key, _, _ in _get_effective_configurable_toolsets()}
     if name not in valid:
@@ -262,7 +262,7 @@ async def get_toolset_config(name: str, profile: Optional[str] = None):
                 # Fetch portal/entitlement state once for the whole matrix — the
                 # per-provider readiness computation below reuses it instead of
                 # re-probing per row.
-                features = get_nous_subscription_features(config, force_fresh=True)
+                features = get_prometheus_subscription_features(config, force_fresh=True)
                 for prov in _visible_providers(cat, config, force_fresh=True):
                     env_vars = [
                         {
@@ -287,11 +287,11 @@ async def get_toolset_config(name: str, profile: Optional[str] = None):
                         "tag": prov.get("tag", ""),
                         "env_vars": env_vars,
                         "post_setup": prov.get("post_setup"),
-                        "requires_nous_auth": bool(prov.get("requires_nous_auth")),
+                        "requires_prometheus_auth": bool(prov.get("requires_prometheus_auth")),
                         "is_active": is_active,
                         # Honest server-side readiness. The GUI's old client-side
                         # heuristic showed "Ready" for every zero-env-var row —
-                        # including logged-out Nous Subscription rows and never-run
+                        # including logged-out Prometheus Subscription rows and never-run
                         # post_setup installs (see provider_readiness_status).
                         "status": provider_readiness_status(
                             prov, config, features=features, is_active=is_active
@@ -479,14 +479,14 @@ async def select_toolset_provider(
     extract backend). Omitting ``capability`` keeps the legacy whole-provider
     behavior (writes ``web.backend``).
 
-    Managed Nous rows (``managed_nous_feature``) additionally report the
+    Managed Prometheus rows (``managed_prometheus_feature``) additionally report the
     Portal entitlement state: the CLI flow gates these selections on
-    ``ensure_nous_portal_access`` (inline login), but the GUI has no inline
+    ``ensure_prometheus_portal_access`` (inline login), but the GUI has no inline
     prompt, so selecting one while logged out / unentitled used to write the
     config keys and then never activate (``_is_provider_active`` requires
-    ``managed_by_nous``). The response now carries an additive
-    ``needs_nous_auth: true`` + ``feature`` so the client can drive the
-    existing Nous Portal OAuth flow (``POST /api/providers/oauth/nous/start``)
+    ``managed_by_prometheus``). The response now carries an additive
+    ``needs_prometheus_auth: true`` + ``feature`` so the client can drive the
+    existing Prometheus Portal OAuth flow (``POST /api/providers/oauth/prometheus/start``)
     and refetch.
     """
     from prometheus_cli.tools_config import (
@@ -496,9 +496,9 @@ async def select_toolset_provider(
         _get_effective_configurable_toolsets,
         _visible_providers,
     )
-    from prometheus_cli.nous_subscription import (
+    from prometheus_cli.prometheus_subscription import (
         MANAGED_FEATURE_COVERAGE_CATEGORY,
-        get_nous_subscription_features,
+        get_prometheus_subscription_features,
     )
 
     valid = {ts_key for ts_key, _, _ in _get_effective_configurable_toolsets()}
@@ -560,8 +560,8 @@ async def select_toolset_provider(
                 if body.capability is not None:
                     response["capability"] = body.capability
 
-            # Entitlement check for managed Nous rows — mirrors the gate the CLI
-            # applies via ensure_nous_portal_access at selection time. This hits
+            # Entitlement check for managed Prometheus rows — mirrors the gate the CLI
+            # applies via ensure_prometheus_portal_access at selection time. This hits
             # the network (Portal), so it runs AFTER releasing the mutation lock:
             # holding a process-wide config-write lock across a network fetch
             # would stall every other config writer behind a slow Portal call.
@@ -577,9 +577,9 @@ async def select_toolset_provider(
                     ),
                     None,
                 )
-            managed_feature = (row or {}).get("managed_nous_feature")
+            managed_feature = (row or {}).get("managed_prometheus_feature")
             if managed_feature:
-                features = get_nous_subscription_features(config, force_fresh=True)
+                features = get_prometheus_subscription_features(config, force_fresh=True)
                 acct = features.account_info
                 category = MANAGED_FEATURE_COVERAGE_CATEGORY.get(managed_feature)
                 entitled = bool(
@@ -592,7 +592,7 @@ async def select_toolset_provider(
                     )
                 )
                 if not entitled:
-                    response["needs_nous_auth"] = True
+                    response["needs_prometheus_auth"] = True
                     response["feature"] = managed_feature
         return response
 

@@ -803,9 +803,9 @@ class TestModelsEndpoint:
 
         ctx = object()
         payload = {
-            "providers": [{"slug": "nous", "name": "Nous Portal", "models": ["gpt-5.5"]}],
+            "providers": [{"slug": "prometheus", "name": "Prometheus Portal", "models": ["gpt-5.5"]}],
             "model": "gpt-5.5",
-            "provider": "nous",
+            "provider": "prometheus",
         }
         seen = {"thread_calls": 0}
 
@@ -921,7 +921,7 @@ class TestToolsetsEndpoint:
             "prometheus_cli.tools_config._get_platform_tools",
             return_value={"default"},
         ), patch(
-            "prometheus_cli.tools_config.get_nous_subscription_features",
+            "prometheus_cli.tools_config.get_prometheus_subscription_features",
             return_value=feature_snapshot,
         ) as resolve_features, patch(
             "prometheus_cli.tools_config._toolset_has_keys",

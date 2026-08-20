@@ -237,7 +237,7 @@ export interface Translations {
   }
 
   billingBlock: {
-    titleNous: string
+    titlePrometheus: string
     titleProvider: (provider: string) => string
     fallbackMessage: string
     openBilling: string
@@ -979,13 +979,13 @@ export interface Translations {
       activeBackend: string
       activeBackendHint: string
       useBackend: string
-      nousIncluded: string
-      nousAuthNeededTitle: string
-      nousAuthNeededMessage: (provider: string) => string
-      nousAuthSignIn: string
-      nousAuthDoneTitle: string
-      nousAuthDoneMessage: string
-      nousAuthFailed: string
+      prometheusIncluded: string
+      prometheusAuthNeededTitle: string
+      prometheusAuthNeededMessage: (provider: string) => string
+      prometheusAuthSignIn: string
+      prometheusAuthDoneTitle: string
+      prometheusAuthDoneMessage: string
+      prometheusAuthFailed: string
       noApiKeyRequired: string
       postSetupHint: (step: string) => string
       postSetupInstalledHint: string

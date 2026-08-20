@@ -10,7 +10,7 @@ Full docs: https://github.com/geohot0199/Prometheus-agent/docs/integrations/prov
 |----------|------|----------------|
 | openrouter | API key | `OPENROUTER_API_KEY` |
 | anthropic | API key | `ANTHROPIC_API_KEY` (also `CLAUDE_CODE_OAUTH_TOKEN`) |
-| nous | OAuth device code | `prometheus auth add nous` (or `NOUS_API_KEY`) |
+| prometheus | OAuth device code | `prometheus auth add prometheus` (or `PROMETHEUS_API_KEY`) |
 | openai-codex | OAuth | `prometheus auth add openai-codex` |
 | qwen-oauth | OAuth | `prometheus auth add qwen-oauth` |
 | minimax-oauth | OAuth | `prometheus auth add minimax-oauth` |

@@ -66,10 +66,10 @@ from tools.fal_common import (
 )
 from tools.managed_tool_gateway import resolve_managed_tool_gateway
 from tools.tool_backend_helpers import (
-    NOUS_MANAGED_PROVIDER,
+    PROMETHEUS_MANAGED_PROVIDER,
     fal_key_is_configured,
-    managed_nous_tools_enabled,
-    nous_tool_gateway_unavailable_message,
+    managed_prometheus_tools_enabled,
+    prometheus_tool_gateway_unavailable_message,
     read_selection,
     selection_error,
 )
@@ -207,7 +207,7 @@ FAL_MODELS: Dict[str, Dict[str, Any]] = {
             "output_format": "png",
             "safety_tolerance": "5",
             # "1K" is the cheapest tier; 4K doubles the per-image cost.
-            # Users on Nous Subscription should stay at 1K for predictable billing.
+            # Users on Prometheus Subscription should stay at 1K for predictable billing.
             "resolution": "1K",
         },
         "supports": {
@@ -308,7 +308,7 @@ FAL_MODELS: Dict[str, Dict[str, Any]] = {
             "portrait": "portrait_4_3",       # 768x1024
         },
         "defaults": {
-            # Same quality pinning as gpt-image-1.5: medium keeps Nous
+            # Same quality pinning as gpt-image-1.5: medium keeps Prometheus
             # Portal billing predictable. "high" is 3-4x the per-image
             # cost at the same size; "low" is too rough for production use.
             "quality": "medium",
@@ -731,13 +731,13 @@ _managed_fal_client_lock = threading.Lock()
 
 
 # ---------------------------------------------------------------------------
-# Managed FAL gateway (Nous Subscription)
+# Managed FAL gateway (Prometheus Subscription)
 # ---------------------------------------------------------------------------
 def _resolve_managed_fal_gateway():
     """Resolve the FAL route from the stored `prometheus tools` selection.
 
     Dispatch is a plain switch on the stored ``image_gen`` provider string:
-    - ``"nous"`` (or legacy ``use_gateway: true``) → managed fal-queue
+    - ``"prometheus"`` (or legacy ``use_gateway: true``) → managed fal-queue
       gateway ONLY; unentitled/unreachable is a selection-naming error
       (never a silent fall back to FAL_KEY).
     - any other stored provider (``"fal"``, ...) → direct FAL ONLY; a
@@ -751,13 +751,13 @@ def _resolve_managed_fal_gateway():
     selection cannot run.
     """
     selected = read_selection("image_gen")
-    if selected == NOUS_MANAGED_PROVIDER:
+    if selected == PROMETHEUS_MANAGED_PROVIDER:
         gateway = resolve_managed_tool_gateway("fal-queue")
         if gateway is None:
             raise ValueError(selection_error(
                 "image_gen",
-                NOUS_MANAGED_PROVIDER,
-                "the Nous Tool Gateway is not available (not entitled or "
+                PROMETHEUS_MANAGED_PROVIDER,
+                "the Prometheus Tool Gateway is not available (not entitled or "
                 "unreachable)",
             ))
         return gateway
@@ -781,7 +781,7 @@ def _get_managed_fal_client(managed_gateway):
 
     client_config = (
         managed_gateway.gateway_origin.rstrip("/"),
-        managed_gateway.nous_user_token,
+        managed_gateway.prometheus_user_token,
     )
     with _managed_fal_client_lock:
         if _managed_fal_client is not None and _managed_fal_client_config == client_config:
@@ -792,7 +792,7 @@ def _get_managed_fal_client(managed_gateway):
         _load_fal_client()
         _managed_fal_client = _ManagedFalSyncClient(
             fal_client,
-            key=managed_gateway.nous_user_token,
+            key=managed_gateway.prometheus_user_token,
             queue_run_origin=managed_gateway.gateway_origin,
         )
         _managed_fal_client_config = client_config
@@ -866,15 +866,15 @@ def _submit_fal_request(model: str, arguments: Dict[str, Any]):
             if status in {401, 402, 403}:
                 gateway_message = (
                     "\n\n"
-                    + nous_tool_gateway_unavailable_message(
+                    + prometheus_tool_gateway_unavailable_message(
                         "managed FAL image generation",
                         force_fresh=True,
                     )
                 )
             raise ValueError(
-                f"Nous Subscription gateway rejected model '{model}' "
+                f"Prometheus Subscription gateway rejected model '{model}' "
                 f"(HTTP {status}). This model may not yet be enabled on "
-                f"the Nous Portal's FAL proxy. Either:\n"
+                f"the Prometheus Portal's FAL proxy. Either:\n"
                 f"  • Set FAL_KEY in your environment to use FAL.ai directly, or\n"
                 f"  • Pick a different model via `prometheus tools` → Image Generation."
                 f"{gateway_message}"
@@ -1419,7 +1419,7 @@ def check_fal_api_key() -> bool:
     ``_resolve_managed_fal_gateway``.
     """
     selected = read_selection("image_gen")
-    if selected == NOUS_MANAGED_PROVIDER:
+    if selected == PROMETHEUS_MANAGED_PROVIDER:
         return bool(resolve_managed_tool_gateway("fal-queue"))
     if selected is not None:
         return fal_key_is_configured()
@@ -1431,19 +1431,19 @@ def _build_no_backend_setup_message() -> str:
 
     Used by the in-tree FAL path. Mentions:
       - FAL_KEY signup link
-      - managed-gateway status (if Nous tools are enabled)
+      - managed-gateway status (if Prometheus tools are enabled)
       - plugin alternative pointer (so users on a stale ``image_gen.provider``
         know the registry exists and how to inspect it)
     """
     lines = ["Image generation is unavailable in this environment.", ""]
     lines.append("Missing requirements:")
-    if managed_nous_tools_enabled():
+    if managed_prometheus_tools_enabled():
         lines.append(
             "  - FAL_KEY is not set and the managed FAL gateway is unreachable"
         )
     else:
         lines.append("  - FAL_KEY environment variable is not set")
-        gateway_message = nous_tool_gateway_unavailable_message(
+        gateway_message = prometheus_tool_gateway_unavailable_message(
             "managed FAL image generation",
         )
         if gateway_message:
@@ -1454,9 +1454,9 @@ def _build_no_backend_setup_message() -> str:
         "  1. Get a free API key at https://fal.ai and set "
         "FAL_KEY=<your-key> (then restart the session)"
     )
-    if managed_nous_tools_enabled():
+    if managed_prometheus_tools_enabled():
         lines.append(
-            "  2. Sign in to a Nous account that has the managed FAL "
+            "  2. Sign in to a Prometheus account that has the managed FAL "
             "gateway enabled (`prometheus setup`)"
         )
     lines.append(
@@ -1481,7 +1481,7 @@ def check_image_generation_requirements() -> bool:
         pass
 
     configured = _read_configured_image_provider()
-    if not configured or configured in ("fal", NOUS_MANAGED_PROVIDER):
+    if not configured or configured in ("fal", PROMETHEUS_MANAGED_PROVIDER):
         return False
 
     # Probe only the explicitly selected plugin. Merely possessing a cloud
@@ -1679,9 +1679,9 @@ def _dispatch_to_plugin_provider(
     ignore it via their ``**kwargs`` (the ABC contract).
     """
     configured = _read_configured_image_provider()
-    if not configured or configured in ("fal", NOUS_MANAGED_PROVIDER):
-        # Unset/explicit FAL keeps the legacy FAL path; "nous" (managed
-        # Nous Subscription selection) also runs the legacy pipeline, which
+    if not configured or configured in ("fal", PROMETHEUS_MANAGED_PROVIDER):
+        # Unset/explicit FAL keeps the legacy FAL path; "prometheus" (managed
+        # Prometheus Subscription selection) also runs the legacy pipeline, which
         # routes through the managed fal-queue gateway.
         return None
 
@@ -1839,12 +1839,12 @@ def _maybe_route_managed_krea(
     Direct/BYO users (no managed gateway) fall through untouched.
     """
     # Strict selection rule: an explicitly stored ``image_gen.provider``
-    # (other than the managed "nous" selection, which IS a managed-mode
+    # (other than the managed "prometheus" selection, which IS a managed-mode
     # opt-in) disables the model-driven managed interception — the user's
     # picker choice dispatches normally. Interception is permitted only on
     # never-configured installs or under the managed selection.
     configured_provider = _read_configured_image_provider()
-    if configured_provider is not None and configured_provider != NOUS_MANAGED_PROVIDER:
+    if configured_provider is not None and configured_provider != PROMETHEUS_MANAGED_PROVIDER:
         return None
 
     normalized = _normalize_krea_model(_read_configured_image_model())

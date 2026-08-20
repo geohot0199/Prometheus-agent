@@ -92,7 +92,7 @@ test('buildNativeAuthorizeUrl encodes params and honours a path prefix', () => {
     challenge: 'CHAL',
     redirectUri: 'http://127.0.0.1:51000/callback',
     state: 'STATE',
-    provider: 'nous'
+    provider: 'prometheus'
   })
 
   const parsed = new URL(url)
@@ -103,7 +103,7 @@ test('buildNativeAuthorizeUrl encodes params and honours a path prefix', () => {
   assert.equal(parsed.searchParams.get('code_challenge_method'), 'S256')
   assert.equal(parsed.searchParams.get('redirect_uri'), 'http://127.0.0.1:51000/callback')
   assert.equal(parsed.searchParams.get('state'), 'STATE')
-  assert.equal(parsed.searchParams.get('provider'), 'nous')
+  assert.equal(parsed.searchParams.get('provider'), 'prometheus')
 })
 
 test('buildNativeAuthorizeUrl omits provider when not given and preserves prefix', () => {
@@ -155,14 +155,14 @@ test('parseTokenResponse maps a well-formed body', () => {
     refresh_token: 'RT',
     token_type: 'Bearer',
     expires_at: 1893456000,
-    provider: 'nous',
+    provider: 'prometheus',
     user_id: 'u-1'
   })
 
   assert.equal(t.accessToken, 'AT')
   assert.equal(t.refreshToken, 'RT')
   assert.equal(t.expiresAt, 1893456000)
-  assert.equal(t.provider, 'nous')
+  assert.equal(t.provider, 'prometheus')
   assert.equal(t.userId, 'u-1')
 })
 
@@ -199,7 +199,7 @@ test('parseTokenResponse cannot read a persisted set (the reload bug #73271)', (
   // parser throws — which is exactly why the stored path must use
   // parseStoredTokenSet instead.
   const persisted = JSON.parse(
-    JSON.stringify({ accessToken: 'AT', refreshToken: 'RT', expiresAt: 1, provider: 'nous', userId: 'u' })
+    JSON.stringify({ accessToken: 'AT', refreshToken: 'RT', expiresAt: 1, provider: 'prometheus', userId: 'u' })
   )
 
   assert.throws(() => parseTokenResponse(persisted), /missing access_token/i)

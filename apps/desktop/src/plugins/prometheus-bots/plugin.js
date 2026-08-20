@@ -5565,7 +5565,7 @@ function ModelPicker({ value, onChange, placeholderModel = 'gateway default' }) 
         labeled(
           'Provider',
           jsx(Input, {
-            placeholder: 'omnirouter / 9router / nous \u2026',
+            placeholder: 'omnirouter / 9router / prometheus \u2026',
             value: value.provider,
             onChange: event => onChange({ provider: event.target.value })
           })

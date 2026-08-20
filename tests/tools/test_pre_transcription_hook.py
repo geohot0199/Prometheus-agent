@@ -35,7 +35,7 @@ import prometheus_cli.plugins as plugins_mod
 from tools import transcription_tools
 
 
-PROMPT = "Prometheus, Teknium, Nous Research, kanban"
+PROMPT = "Prometheus, Teknium, Prometheus, kanban"
 
 
 # ---------------------------------------------------------------------------

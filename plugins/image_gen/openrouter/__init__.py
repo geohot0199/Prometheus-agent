@@ -1,16 +1,16 @@
-"""OpenRouter-compatible image generation backend (OpenRouter + Nous Portal).
+"""OpenRouter-compatible image generation backend (OpenRouter + Prometheus Portal).
 
-Both OpenRouter and the Nous Portal inference endpoint speak the same
+Both OpenRouter and the Prometheus Portal inference endpoint speak the same
 OpenAI-style ``/chat/completions`` image-generation protocol: send
 ``modalities: ["image", "text"]`` with an image-output model (e.g.
 ``google/gemini-3-pro-image``), pass reference images as ``image_url``
 content parts for grounding, and read the generated images back from
 ``choices[0].message.images[].image_url.url`` (a ``data:image/...;base64`` URI).
 
-Nous Portal proxies OpenRouter, so one implementation services both — we only
+Prometheus Portal proxies OpenRouter, so one implementation services both — we only
 swap the resolved ``(base_url, api_key)``. Credentials are resolved through the
 agent's existing :func:`~prometheus_cli.runtime_provider.resolve_runtime_provider`,
-which already understands OpenRouter's key pool and the Nous OAuth device-code
+which already understands OpenRouter's key pool and the Prometheus OAuth device-code
 token, so this plugin never reinvents auth.
 
 Reference grounding is the reason pet sprite generation cares about this
@@ -54,9 +54,9 @@ On the Image API path the request gains exact per-model aspect ratios plus
 ``resolution`` / ``quality`` / ``background`` / ``seed`` / ``n`` /
 ``output_compression``, and up to 16 reference images instead of 3.
 
-The Image API is OpenRouter-only: Nous Portal proxies the chat-completions
+The Image API is OpenRouter-only: Prometheus Portal proxies the chat-completions
 protocol and has no ``/images/generations`` route, so the second surface is
-enabled per provider (see ``supports_image_api``) and stays off for Nous.
+enabled per provider (see ``supports_image_api``) and stays off for Prometheus.
 """
 
 from __future__ import annotations
@@ -795,7 +795,7 @@ def _save_image_api_entry(entry: Dict[str, Any], prefix: str) -> Optional[str]:
 class OpenRouterCompatImageProvider(ImageGenProvider):
     """Image generation over an OpenRouter-compatible chat-completions endpoint.
 
-    Instantiated once per backend (OpenRouter, Nous Portal). The two differ only
+    Instantiated once per backend (OpenRouter, Prometheus Portal). The two differ only
     in which runtime provider supplies ``(base_url, api_key)`` and in the config
     namespace used for the model override.
     """
@@ -819,7 +819,7 @@ class OpenRouterCompatImageProvider(ImageGenProvider):
         self._setup_schema = setup_schema
         self._live_models_cache: Optional[tuple] = None
         self._image_api_models_cache: Optional[tuple] = None
-        # OpenRouter only: Nous Portal proxies the chat-completions protocol
+        # OpenRouter only: Prometheus Portal proxies the chat-completions protocol
         # and has no /images/generations route, so routing a model there would
         # turn a working setup into a 404.
         self._supports_image_api = supports_image_api
@@ -870,7 +870,7 @@ class OpenRouterCompatImageProvider(ImageGenProvider):
         dedicated ``GET /images/models`` catalog (40+ models: Seedream, Flux,
         Recraft, Qwen, MAI, Krea, ...) and the chat-completions image models,
         so every image model the endpoint serves — including ones released
-        after this code shipped — is selectable in ``prometheus tools``. Nous
+        after this code shipped — is selectable in ``prometheus tools``. Prometheus
         Portal (no ``/images`` route) lists the chat-completions catalog only.
         Offline fallback: the static default chain plus the curated Image API
         snapshot.
@@ -1263,7 +1263,7 @@ class OpenRouterCompatImageProvider(ImageGenProvider):
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
-            # OpenRouter attribution headers (harmless against Nous Portal).
+            # OpenRouter attribution headers (harmless against Prometheus Portal).
             "HTTP-Referer": "https://github.com/geohot0199/Prometheus-agent",
             "X-Title": "Prometheus Agent",
         }
@@ -1463,23 +1463,23 @@ def _build_providers() -> List[OpenRouterCompatImageProvider]:
             },
         ),
         OpenRouterCompatImageProvider(
-            provider_name="nous",
-            display_name="Nous Portal",
-            runtime_name="nous",
-            config_key="nous",
-            model_env_var="NOUS_IMAGE_MODEL",
+            provider_name="prometheus",
+            display_name="Prometheus Portal",
+            runtime_name="prometheus",
+            config_key="prometheus",
+            model_env_var="PROMETHEUS_IMAGE_MODEL",
             setup_schema={
-                "name": "Nous Portal (image)",
+                "name": "Prometheus Portal (image)",
                 "badge": "subscription",
-                "tag": "Reference-grounded image generation via Nous Portal (OpenRouter-backed)",
+                "tag": "Reference-grounded image generation via Prometheus Portal (OpenRouter-backed)",
                 "env_vars": [],
-                "requires_nous_auth": True,
+                "requires_prometheus_auth": True,
             },
         ),
     ]
 
 
 def register(ctx: Any) -> None:
-    """Register the OpenRouter + Nous Portal image gen providers."""
+    """Register the OpenRouter + Prometheus Portal image gen providers."""
     for provider in _build_providers():
         ctx.register_image_gen_provider(provider)

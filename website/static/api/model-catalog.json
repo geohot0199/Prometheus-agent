@@ -179,10 +179,10 @@
         }
       ]
     },
-    "nous": {
+    "prometheus": {
       "metadata": {
-        "display_name": "Nous Portal",
-        "note": "Free-tier gating is determined live via Portal pricing (partition_nous_models_by_tier), not this manifest. The entry labeled \"default\": true is the model Prometheus silently lands on when the user never picked one."
+        "display_name": "Prometheus Portal",
+        "note": "Free-tier gating is determined live via Portal pricing (partition_prometheus_models_by_tier), not this manifest. The entry labeled \"default\": true is the model Prometheus silently lands on when the user never picked one."
       },
       "models": [
         {

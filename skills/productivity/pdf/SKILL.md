@@ -2,7 +2,7 @@
 name: pdf
 description: Create, read, merge, fill, and secure PDF files.
 version: 1.0.0
-author: Nous Research
+author: Prometheus
 license: MIT
 platforms: [linux, macos, windows]
 metadata:

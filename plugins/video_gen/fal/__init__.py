@@ -35,7 +35,7 @@ Selection precedence for the active family:
        or a full endpoint path that contains a family ID)
     5. ``DEFAULT_MODEL``
 
-Authentication via ``FAL_KEY`` or the managed Nous gateway. Output is an
+Authentication via ``FAL_KEY`` or the managed Prometheus gateway. Output is an
 HTTPS URL from FAL's CDN; the gateway downloads and delivers it.
 """
 
@@ -521,7 +521,7 @@ def _load_fal_client() -> Any:
 
 
 # ---------------------------------------------------------------------------
-# Managed FAL gateway (Nous Subscription)
+# Managed FAL gateway (Prometheus Subscription)
 # ---------------------------------------------------------------------------
 
 _managed_fal_video_client: Any = None
@@ -533,27 +533,27 @@ def _resolve_managed_fal_video_gateway():
     """Resolve the FAL video route from the stored selection.
 
     Plain switch on the stored ``video_gen`` provider string — mirrors the
-    image FAL resolver: ``"nous"`` (or legacy ``use_gateway: true``) →
+    image FAL resolver: ``"prometheus"`` (or legacy ``use_gateway: true``) →
     managed only (unentitled ⇒ selection-naming error); any other stored
     provider → direct only (missing FAL_KEY ⇒ selection-naming error);
     never-configured category → legacy credential autodetect.
     """
     from tools.managed_tool_gateway import resolve_managed_tool_gateway
     from tools.tool_backend_helpers import (
-        NOUS_MANAGED_PROVIDER,
+        PROMETHEUS_MANAGED_PROVIDER,
         fal_key_is_configured,
         read_selection,
         selection_error,
     )
 
     selected = read_selection("video_gen")
-    if selected == NOUS_MANAGED_PROVIDER:
+    if selected == PROMETHEUS_MANAGED_PROVIDER:
         gateway = resolve_managed_tool_gateway("fal-queue")
         if gateway is None:
             raise ValueError(selection_error(
                 "video_gen",
-                NOUS_MANAGED_PROVIDER,
-                "the Nous Tool Gateway is not available (not entitled or "
+                PROMETHEUS_MANAGED_PROVIDER,
+                "the Prometheus Tool Gateway is not available (not entitled or "
                 "unreachable)",
             ))
         return gateway
@@ -578,7 +578,7 @@ def _get_managed_fal_video_client(managed_gateway):
 
     client_config = (
         managed_gateway.gateway_origin.rstrip("/"),
-        managed_gateway.nous_user_token,
+        managed_gateway.prometheus_user_token,
     )
     with _managed_fal_video_client_lock:
         if _managed_fal_video_client is not None and _managed_fal_video_client_config == client_config:
@@ -587,7 +587,7 @@ def _get_managed_fal_video_client(managed_gateway):
         _load_fal_client()
         _managed_fal_video_client = _ManagedFalSyncClient(
             _fal_client,
-            key=managed_gateway.nous_user_token,
+            key=managed_gateway.prometheus_user_token,
             queue_run_origin=managed_gateway.gateway_origin,
         )
         _managed_fal_video_client_config = client_config
@@ -618,9 +618,9 @@ def _submit_fal_video_request(endpoint: str, arguments: Dict[str, Any]):
         status = _extract_http_status(exc)
         if status is not None and 400 <= status < 500:
             raise ValueError(
-                f"Nous Subscription gateway rejected endpoint '{endpoint}' "
+                f"Prometheus Subscription gateway rejected endpoint '{endpoint}' "
                 f"(HTTP {status}). This model may not yet be enabled on "
-                f"the Nous Portal's FAL proxy. Either:\n"
+                f"the Prometheus Portal's FAL proxy. Either:\n"
                 f"  • Set FAL_KEY in your environment to use FAL.ai directly, or\n"
                 f"  • Pick a different model via `prometheus tools` → Video Generation."
             ) from exc
@@ -637,13 +637,13 @@ def _check_fal_video_available() -> bool:
     """
     from tools.managed_tool_gateway import resolve_managed_tool_gateway
     from tools.tool_backend_helpers import (
-        NOUS_MANAGED_PROVIDER,
+        PROMETHEUS_MANAGED_PROVIDER,
         fal_key_is_configured,
         read_selection,
     )
 
     selected = read_selection("video_gen")
-    if selected == NOUS_MANAGED_PROVIDER:
+    if selected == PROMETHEUS_MANAGED_PROVIDER:
         return resolve_managed_tool_gateway("fal-queue") is not None
     if selected is not None:
         return fal_key_is_configured()
@@ -830,7 +830,7 @@ class FALVideoGenProvider(VideoGenProvider):
                 error=(
                     "No FAL backend available. Either set FAL_KEY "
                     "(run `prometheus tools` → Video Generation → FAL to configure) "
-                    "or sign in to Nous (`prometheus setup`) for managed gateway access."
+                    "or sign in to Prometheus (`prometheus setup`) for managed gateway access."
                 ),
                 error_type="auth_required",
                 provider="fal",

@@ -42,13 +42,13 @@ def _make_profile_home(tmp_path, monkeypatch, profile="coder"):
     return profile_home
 
 
-def _fake_nous_device_data():
+def _fake_prometheus_device_data():
     return {
         "device_code": "device-code",
-        "user_code": "NOUS-1234",
-        "verification_uri": "https://portal.nousresearch.com/device",
+        "user_code": "PROMETHEUS-1234",
+        "verification_uri": "https://geohot0199.github.io/prometheus-agent/portal/device",
         "verification_uri_complete": (
-            "https://portal.nousresearch.com/device?user_code=NOUS-1234"
+            "https://geohot0199.github.io/prometheus-agent/portal/device?user_code=PROMETHEUS-1234"
         ),
         "expires_in": 600,
         "interval": 5,
@@ -56,7 +56,7 @@ def _fake_nous_device_data():
 
 
 def _invoke_scope_refusal():
-    request = httpx.Request("POST", "https://portal.nousresearch.com/oauth/device/code")
+    request = httpx.Request("POST", "https://geohot0199.github.io/prometheus-agent/portal/oauth/device/code")
     response = httpx.Response(
         400,
         json={
@@ -428,28 +428,28 @@ def test_cancel_oauth_session_marks_dict_cancelled_before_popping():
     assert worker_ref["cancelled"] is True
 
 
-def test_nous_dashboard_poller_preserves_effective_scope_when_token_omits_scope(monkeypatch):
+def test_prometheus_dashboard_poller_preserves_effective_scope_when_token_omits_scope(monkeypatch):
     from prometheus_cli import auth as auth_mod
     from prometheus_cli import web_server as ws
 
-    session_id = "nous-effective-scope-test"
+    session_id = "prometheus-effective-scope-test"
     ws._oauth_sessions[session_id] = {
         "session_id": session_id,
-        "provider": "nous",
+        "provider": "prometheus",
         "flow": "device_code",
         "created_at": time.time(),
         "status": "pending",
         "error_message": None,
-        "portal_base_url": "https://portal.nousresearch.com",
+        "portal_base_url": "https://geohot0199.github.io/prometheus-agent/portal",
         "client_id": "prometheus-cli",
         "device_code": "device-code",
         "interval": 5,
         "expires_at": time.time() + 600,
-        "scope": auth_mod.DEFAULT_NOUS_SCOPE,
+        "scope": auth_mod.DEFAULT_PROMETHEUS_SCOPE,
     }
     captured_state = {}
 
-    def fake_refresh_nous_oauth_from_state(state, **kwargs):
+    def fake_refresh_prometheus_oauth_from_state(state, **kwargs):
         captured_state.update(state)
         return {**state, "agent_key": "jwt-agent-key"}
 
@@ -465,14 +465,14 @@ def test_nous_dashboard_poller_preserves_effective_scope_when_token_omits_scope(
     )
     monkeypatch.setattr(
         auth_mod,
-        "refresh_nous_oauth_from_state",
-        fake_refresh_nous_oauth_from_state,
+        "refresh_prometheus_oauth_from_state",
+        fake_refresh_prometheus_oauth_from_state,
     )
-    monkeypatch.setattr(auth_mod, "persist_nous_credentials", lambda state: None)
+    monkeypatch.setattr(auth_mod, "persist_prometheus_credentials", lambda state: None)
 
     try:
-        ws._nous_poller(session_id)
-        assert captured_state["scope"] == auth_mod.DEFAULT_NOUS_SCOPE
+        ws._prometheus_poller(session_id)
+        assert captured_state["scope"] == auth_mod.DEFAULT_PROMETHEUS_SCOPE
         assert ws._oauth_sessions[session_id]["status"] == "approved"
     finally:
         ws._oauth_sessions.pop(session_id, None)

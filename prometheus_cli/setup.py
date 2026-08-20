@@ -22,8 +22,8 @@ import copy
 from pathlib import Path
 from typing import Optional, Dict, Any
 
-from prometheus_cli.nous_subscription import get_nous_subscription_features
-from tools.tool_backend_helpers import managed_nous_tools_enabled
+from prometheus_cli.prometheus_subscription import get_prometheus_subscription_features
+from tools.tool_backend_helpers import managed_prometheus_tools_enabled
 from prometheus_constants import get_optional_skills_dir
 
 logger = logging.getLogger(__name__)
@@ -414,14 +414,14 @@ def _print_setup_summary(config: dict, prometheus_home):
         print_warning("No inference provider is configured — Prometheus cannot chat yet.")
         print_info("  Finish this one step with either of:")
         print_info("    prometheus model            (pick any provider/model)")
-        print_info("    prometheus setup --portal   (Nous Portal OAuth, no API key)")
+        print_info("    prometheus setup --portal   (Prometheus Portal OAuth, no API key)")
 
     # Tool availability summary
     print()
     print_header("Tool Availability Summary")
 
     tool_status = []
-    subscription_features = get_nous_subscription_features(config)
+    subscription_features = get_prometheus_subscription_features(config)
 
     # Vision — use the same runtime resolver as the actual vision tools
     try:
@@ -438,8 +438,8 @@ def _print_setup_summary(config: dict, prometheus_home):
 
 
     # Web tools (Exa, Parallel, Firecrawl, or Tavily)
-    if subscription_features.web.managed_by_nous:
-        tool_status.append(("Web Search & Extract (Nous subscription)", True, None))
+    if subscription_features.web.managed_by_prometheus:
+        tool_status.append(("Web Search & Extract (Prometheus subscription)", True, None))
     elif subscription_features.web.available:
         label = "Web Search & Extract"
         if subscription_features.web.current_provider:
@@ -450,8 +450,8 @@ def _print_setup_summary(config: dict, prometheus_home):
 
     # Browser tools (local Chromium, Camofox, Browserbase, Browser Use, or Firecrawl)
     browser_provider = subscription_features.browser.current_provider
-    if subscription_features.browser.managed_by_nous:
-        tool_status.append(("Browser Automation (Nous Browser Use)", True, None))
+    if subscription_features.browser.managed_by_prometheus:
+        tool_status.append(("Browser Automation (Prometheus Browser Use)", True, None))
     elif subscription_features.browser.available:
         label = "Browser Automation"
         if browser_provider:
@@ -478,10 +478,10 @@ def _print_setup_summary(config: dict, prometheus_home):
             ("Browser Automation", False, missing_browser_hint)
         )
 
-    # Image generation — FAL (direct or via Nous), or any plugin-registered
+    # Image generation — FAL (direct or via Prometheus), or any plugin-registered
     # provider (OpenAI, etc.)
-    if subscription_features.image_gen.managed_by_nous:
-        tool_status.append(("Image Generation (Nous subscription)", True, None))
+    if subscription_features.image_gen.managed_by_prometheus:
+        tool_status.append(("Image Generation (Prometheus subscription)", True, None))
     elif subscription_features.image_gen.available:
         tool_status.append(("Image Generation", True, None))
     else:
@@ -512,8 +512,8 @@ def _print_setup_summary(config: dict, prometheus_home):
     # Video generation — opt-in via `prometheus tools` → Video Generation.
     # Only show the row when a plugin reports available so we don't badger
     # users who don't care about video gen with a "missing" status line.
-    if subscription_features.video_gen.managed_by_nous:
-        tool_status.append(("Video Generation (FAL via Nous subscription)", True, None))
+    if subscription_features.video_gen.managed_by_prometheus:
+        tool_status.append(("Video Generation (FAL via Prometheus subscription)", True, None))
     else:
         try:
             from agent.video_gen_registry import list_providers as _list_video_providers
@@ -534,8 +534,8 @@ def _print_setup_summary(config: dict, prometheus_home):
 
     # TTS — show configured provider
     tts_provider = cfg_get(config, "tts", "provider", default="edge")
-    if subscription_features.tts.managed_by_nous:
-        tool_status.append(("Text-to-Speech (OpenAI via Nous subscription)", True, None))
+    if subscription_features.tts.managed_by_prometheus:
+        tool_status.append(("Text-to-Speech (OpenAI via Prometheus subscription)", True, None))
     elif tts_provider == "elevenlabs" and get_env_value("ELEVENLABS_API_KEY"):
         tool_status.append(("Text-to-Speech (ElevenLabs)", True, None))
     elif tts_provider == "openai" and (
@@ -572,8 +572,8 @@ def _print_setup_summary(config: dict, prometheus_home):
     # STT — show configured provider
     stt_provider = cfg_get(config, "stt", "provider", default="local") or "local"
     _stt_feature = subscription_features.features.get("stt")
-    if _stt_feature is not None and _stt_feature.managed_by_nous:
-        tool_status.append(("Speech-to-Text (OpenAI via Nous subscription)", True, None))
+    if _stt_feature is not None and _stt_feature.managed_by_prometheus:
+        tool_status.append(("Speech-to-Text (OpenAI via Prometheus subscription)", True, None))
     elif stt_provider == "openai" and (
         get_env_value("VOICE_TOOLS_OPENAI_KEY") or get_env_value("OPENAI_API_KEY")
     ):
@@ -598,15 +598,15 @@ def _print_setup_summary(config: dict, prometheus_home):
                 ("Speech-to-Text (Local Whisper — not installed)", False, "run 'prometheus tools' → Speech-to-Text")
             )
 
-    if subscription_features.modal.managed_by_nous:
-        tool_status.append(("Modal Execution (Nous subscription)", True, None))
+    if subscription_features.modal.managed_by_prometheus:
+        tool_status.append(("Modal Execution (Prometheus subscription)", True, None))
     elif cfg_get(config, "terminal", "backend") == "modal":
         if subscription_features.modal.direct_override:
             tool_status.append(("Modal Execution (direct Modal)", True, None))
         else:
             tool_status.append(("Modal Execution", False, "run 'prometheus setup terminal'"))
-    elif managed_nous_tools_enabled() and subscription_features.nous_auth_present:
-        tool_status.append(("Modal Execution (optional via Nous subscription)", True, None))
+    elif managed_prometheus_tools_enabled() and subscription_features.prometheus_auth_present:
+        tool_status.append(("Modal Execution (optional via Prometheus subscription)", True, None))
 
     # Home Assistant
     if get_env_value("HASS_TOKEN"):
@@ -920,7 +920,7 @@ def setup_model_provider(config: dict, *, quick: bool = False):
     # `prometheus setup tts`. This keeps both quick and full setup thin.
 
 
-    # Tool Gateway prompt is already shown by _model_flow_nous() above.
+    # Tool Gateway prompt is already shown by _model_flow_prometheus() above.
     save_config(config)
 
 
@@ -1080,7 +1080,7 @@ def _setup_tts_provider(config: dict):
     """Interactive TTS provider selection with install flow for NeuTTS."""
     tts_config = config.get("tts", {})
     current_provider = tts_config.get("provider", "edge")
-    subscription_features = get_nous_subscription_features(config)
+    subscription_features = get_prometheus_subscription_features(config)
 
     provider_labels = {
         "edge": "Edge TTS",
@@ -1102,9 +1102,9 @@ def _setup_tts_provider(config: dict):
 
     choices = []
     providers = []
-    if managed_nous_tools_enabled() and subscription_features.nous_auth_present:
-        choices.append("Nous Subscription (managed OpenAI TTS, billed to your subscription)")
-        providers.append("nous-openai")
+    if managed_prometheus_tools_enabled() and subscription_features.prometheus_auth_present:
+        choices.append("Prometheus Subscription (managed OpenAI TTS, billed to your subscription)")
+        providers.append("prometheus-openai")
     choices.extend(
         [
             "Edge TTS (free, cloud-based, no setup needed)",
@@ -1127,10 +1127,10 @@ def _setup_tts_provider(config: dict):
         return
 
     selected = providers[idx]
-    selected_via_nous = selected == "nous-openai"
-    if selected == "nous-openai":
+    selected_via_prometheus = selected == "prometheus-openai"
+    if selected == "prometheus-openai":
         selected = "openai"
-        print_info("OpenAI TTS will use the managed Nous gateway and bill to your subscription.")
+        print_info("OpenAI TTS will use the managed Prometheus gateway and bill to your subscription.")
         if get_env_value("VOICE_TOOLS_OPENAI_KEY") or get_env_value("OPENAI_API_KEY"):
             print_warning(
                 "Direct OpenAI credentials are still configured and may take precedence until removed from ~/.prometheus/.env."
@@ -1171,7 +1171,7 @@ def _setup_tts_provider(config: dict):
                 print_warning("No API key provided. Falling back to Edge TTS.")
                 selected = "edge"
 
-    elif selected == "openai" and not selected_via_nous:
+    elif selected == "openai" and not selected_via_prometheus:
         existing = get_env_value("VOICE_TOOLS_OPENAI_KEY") or get_env_value("OPENAI_API_KEY")
         if not existing:
             print()
@@ -1441,16 +1441,16 @@ def setup_terminal_backend(config: dict):
         from tools.tool_backend_helpers import normalize_modal_mode
 
         managed_modal_available = bool(
-            managed_nous_tools_enabled()
+            managed_prometheus_tools_enabled()
             and
-            get_nous_subscription_features(config).nous_auth_present
+            get_prometheus_subscription_features(config).prometheus_auth_present
             and is_managed_tool_gateway_ready("modal")
         )
         modal_mode = normalize_modal_mode(cfg_get(config, "terminal", "modal_mode"))
         use_managed_modal = False
         if managed_modal_available:
             modal_choices = [
-                "Use my Nous subscription",
+                "Use my Prometheus subscription",
                 "Use my own Modal account",
             ]
             if modal_mode == "managed":
@@ -1468,7 +1468,7 @@ def setup_terminal_backend(config: dict):
 
         if use_managed_modal:
             config["terminal"]["modal_mode"] = "managed"
-            print_info("Modal execution will use the managed Nous gateway and bill to your subscription.")
+            print_info("Modal execution will use the managed Prometheus gateway and bill to your subscription.")
             if get_env_value("MODAL_TOKEN_ID") or get_env_value("MODAL_TOKEN_SECRET"):
                 print_info(
                     "Direct Modal credentials are still configured, but this backend is pinned to managed mode."
@@ -2357,7 +2357,7 @@ def _model_section_has_credentials(config: dict) -> bool:
       * ``PROVIDER_REGISTRY`` in ``prometheus_cli.auth`` — lists every supported
         provider along with its ``api_key_env_vars``.
       * ``active_provider`` in the auth store — covers OAuth device-code /
-        external-OAuth providers (Nous, Codex, Qwen, Gemini CLI, ...).
+        external-OAuth providers (Prometheus, Codex, Qwen, Gemini CLI, ...).
       * The legacy OpenRouter aggregator env vars, which route generic
         ``OPENAI_API_KEY`` / ``OPENROUTER_API_KEY`` values through OpenRouter.
     """
@@ -2759,21 +2759,21 @@ SETUP_SECTIONS = [
 
 
 def _run_portal_one_shot(config: dict) -> None:
-    """One-shot Nous Portal setup — OAuth + model pick + provider + Tool Gateway.
+    """One-shot Prometheus Portal setup — OAuth + model pick + provider + Tool Gateway.
 
     Wired into ``prometheus setup --portal`` and ``prometheus portal``. This is the
-    Nous-Portal slice of the first-time quick setup, collapsed into a single
+    Prometheus-Portal slice of the first-time quick setup, collapsed into a single
     shareable command so a brand-new user goes from zero to a fully working
     Prometheus session — model selected, provider set, and web/image/tts/browser
     tools routed via their Portal sub — without being told to run
     ``prometheus setup`` and hunt for the quick-setup option.
 
     The login + model selection + provider switch + Tool Gateway opt-in are all
-    delegated to ``_model_flow_nous`` — the exact same flow quick setup uses
+    delegated to ``_model_flow_prometheus`` — the exact same flow quick setup uses
     (``_run_first_time_quick_setup``) and the same one ``prometheus model`` runs
-    when you pick Nous. Routing through it (instead of hand-rolling the auth +
+    when you pick Prometheus. Routing through it (instead of hand-rolling the auth +
     provider write here) means ``prometheus portal`` always offers a model picker,
-    and there is a single source of truth for the Nous onboarding steps.
+    and there is a single source of truth for the Prometheus onboarding steps.
     """
     from prometheus_cli.config import load_config
 
@@ -2784,7 +2784,7 @@ def _run_portal_one_shot(config: dict) -> None:
             Colors.MAGENTA,
         )
     )
-    print(color("│     ⚕ Prometheus Setup — Nous Portal (one-shot)             │", Colors.MAGENTA))
+    print(color("│     ⚕ Prometheus Setup — Prometheus Portal (one-shot)             │", Colors.MAGENTA))
     print(
         color(
             "└─────────────────────────────────────────────────────────┘",
@@ -2794,23 +2794,23 @@ def _run_portal_one_shot(config: dict) -> None:
     print()
     print_info("  One subscription, 300+ models, plus the Tool Gateway:")
     print_info("    web search, image generation, TTS, browser automation")
-    print_info("    — all routed through your Nous Portal sub.")
+    print_info("    — all routed through your Prometheus Portal sub.")
     print()
-    print_info("  Sign up: https://portal.nousresearch.com/manage-subscription")
+    print_info("  Sign up: https://geohot0199.github.io/prometheus-agent/portal/manage-subscription")
     print()
 
-    # _model_flow_nous handles BOTH the logged-out path (device-code OAuth,
+    # _model_flow_prometheus handles BOTH the logged-out path (device-code OAuth,
     # which selects a model internally) and the already-logged-in path (curated
-    # Nous model picker), then offers the Tool Gateway opt-in and sets
-    # provider=nous via the login/model save. This is the same routine quick
-    # setup calls, so `prometheus portal` == quick setup's Nous step.
+    # Prometheus model picker), then offers the Tool Gateway opt-in and sets
+    # provider=prometheus via the login/model save. This is the same routine quick
+    # setup calls, so `prometheus portal` == quick setup's Prometheus step.
     try:
-        from prometheus_cli.main import _model_flow_nous
+        from prometheus_cli.main import _model_flow_prometheus
 
-        _model_flow_nous(config)
+        _model_flow_prometheus(config)
     except (KeyboardInterrupt, EOFError, SystemExit):
-        # _login_nous raises SystemExit(130)/(1) on cancel/failure; the
-        # logged-out path inside _model_flow_nous catches it, but the
+        # _login_prometheus raises SystemExit(130)/(1) on cancel/failure; the
+        # logged-out path inside _model_flow_prometheus catches it, but the
         # expired-session re-login path only catches Exception, so a
         # SystemExit there would otherwise escape and kill the whole CLI.
         # Treat all of these as a graceful cancel/abort for the portal flow.
@@ -2819,13 +2819,13 @@ def _run_portal_one_shot(config: dict) -> None:
         print_info("  You can retry later with `prometheus portal`.")
         return
     except Exception as exc:
-        logger.debug("_model_flow_nous error during `prometheus portal`: %s", exc)
+        logger.debug("_model_flow_prometheus error during `prometheus portal`: %s", exc)
         print()
-        print_error(f"  Nous Portal setup encountered an error: {exc}")
+        print_error(f"  Prometheus Portal setup encountered an error: {exc}")
         print_info("  You can retry later with `prometheus portal`.")
         return
 
-    # Re-sync the in-memory config from disk — _model_flow_nous (and the
+    # Re-sync the in-memory config from disk — _model_flow_prometheus (and the
     # underlying login/model save) write via their own load/save cycle, so any
     # later save_config(config) by a caller must not clobber those values.
     try:
@@ -2898,7 +2898,7 @@ def run_setup_wizard(args):
         )
         return
 
-    # --portal: one-shot Nous Portal setup. Skips the rest of the wizard.
+    # --portal: one-shot Prometheus Portal setup. Skips the rest of the wizard.
     if bool(getattr(args, "portal", False)):
         _run_portal_one_shot(config)
         return
@@ -3018,7 +3018,7 @@ def run_setup_wizard(args):
         setup_mode = prompt_choice(
             "How would you like to set up Prometheus?",
             [
-                "Quick Setup (Nous Portal) — free OAuth login, no API keys, model + tools (recommended)",
+                "Quick Setup (Prometheus Portal) — free OAuth login, no API keys, model + tools (recommended)",
                 "Full setup — configure every provider, tool & option yourself (bring your own keys)",
                 "Blank Slate — everything off except the bare minimum; opt in to each capability",
             ],
@@ -3084,38 +3084,38 @@ def run_setup_wizard(args):
 
 
 def _run_first_time_quick_setup(config: dict, prometheus_home, is_existing: bool):
-    """Streamlined first-time setup via Nous Portal: OAuth, model, terminal & messaging.
+    """Streamlined first-time setup via Prometheus Portal: OAuth, model, terminal & messaging.
 
-    Routes straight to the Nous Portal provider — runs the device-code OAuth
-    login, picks a Nous model, then configures the terminal backend and (optionally)
+    Routes straight to the Prometheus Portal provider — runs the device-code OAuth
+    login, picks a Prometheus model, then configures the terminal backend and (optionally)
     a messaging platform. Applies sensible defaults for everything else (agent
     settings, tools); the user can customize later via ``prometheus setup <section>``
     or switch providers with ``prometheus model``.
     """
     from prometheus_cli.config import load_config
 
-    # Step 1: Nous Portal — OAuth login + model selection.
-    # _model_flow_nous() handles both the logged-out path (device-code OAuth,
+    # Step 1: Prometheus Portal — OAuth login + model selection.
+    # _model_flow_prometheus() handles both the logged-out path (device-code OAuth,
     # which selects a model internally) and the already-logged-in path (curated
-    # Nous model picker). Provider is set to "nous" by the login/model save.
+    # Prometheus model picker). Provider is set to "prometheus" by the login/model save.
     print()
-    print_header("Nous Portal")
+    print_header("Prometheus Portal")
     print_info("One subscription, 300+ models, plus the Tool Gateway:")
     print_info("  web search, image generation, TTS, browser automation.")
-    print_info("Sign up: https://portal.nousresearch.com/manage-subscription")
+    print_info("Sign up: https://geohot0199.github.io/prometheus-agent/portal/manage-subscription")
     print()
     try:
-        from prometheus_cli.main import _model_flow_nous
-        _model_flow_nous(config)
+        from prometheus_cli.main import _model_flow_prometheus
+        _model_flow_prometheus(config)
     except (KeyboardInterrupt, EOFError):
         print()
-        print_info("Nous Portal setup cancelled.")
+        print_info("Prometheus Portal setup cancelled.")
     except Exception as exc:
-        logger.debug("_model_flow_nous error during quick setup: %s", exc)
-        print_warning(f"Nous Portal setup encountered an error: {exc}")
+        logger.debug("_model_flow_prometheus error during quick setup: %s", exc)
+        print_warning(f"Prometheus Portal setup encountered an error: {exc}")
         print_info("You can try again later with: prometheus model")
 
-    # Re-sync the wizard's config dict from disk — _model_flow_nous (and the
+    # Re-sync the wizard's config dict from disk — _model_flow_prometheus (and the
     # underlying login/model save) write via their own load/save cycle, and the
     # wizard's later save_config(config) must not clobber those values (#4172).
     _refreshed = load_config()

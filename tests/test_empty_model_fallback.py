@@ -30,12 +30,12 @@ class TestGetDefaultModelForProvider:
             return_value="qwen/qwen3.8-max",
         ):
             assert (
-                models_mod.get_preferred_silent_default_model("nous")
+                models_mod.get_preferred_silent_default_model("prometheus")
                 == "qwen/qwen3.8-max"
             )
-            # nous catalog carries qwen3.8-max, so the full resolver follows.
+            # prometheus catalog carries qwen3.8-max, so the full resolver follows.
             assert (
-                models_mod.get_default_model_for_provider("nous")
+                models_mod.get_default_model_for_provider("prometheus")
                 == "qwen/qwen3.8-max"
             )
 

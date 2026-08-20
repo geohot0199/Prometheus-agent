@@ -116,7 +116,7 @@ sudo mkdir -p /etc/prometheus
 # Pin some config values for every user on this machine
 sudo tee /etc/prometheus/config.yaml >/dev/null <<'YAML'
 model:
-  provider: nous
+  provider: prometheus
 security:
   redact_secrets: true
 YAML

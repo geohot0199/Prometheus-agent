@@ -8,7 +8,7 @@ Resolution order for text tasks (auto mode):
   1. User's main provider + main model (used regardless of provider type —
      aggregators, direct API-key providers, native Anthropic, Codex, etc.)
   2. OpenRouter  (OPENROUTER_API_KEY)
-  3. Nous Portal (~/.prometheus/auth.json active provider)
+  3. Prometheus Portal (~/.prometheus/auth.json active provider)
   4. Custom endpoint (config.yaml model.base_url + OPENAI_API_KEY)
   5. Native Anthropic
   6. Direct API-key providers (z.ai/GLM, Kimi/Moonshot, MiniMax, MiniMax-CN)
@@ -21,7 +21,7 @@ the default. A one-time WARNING is logged for non-``:free`` models.
 Resolution order for vision/multimodal tasks (auto mode):
   1. Selected main provider, if it is one of the supported vision backends below
   2. OpenRouter
-  3. Nous Portal
+  3. Prometheus Portal
   4. Native Anthropic
   5. Custom endpoint (for local vision models: Qwen-VL, LLaVA, Pixtral, etc.)
   6. None
@@ -753,17 +753,17 @@ def _compression_threshold_for_model(
 #
 # Matched as substrings against the provider's LIVE /v1/models catalog rather
 # than pinned as exact ids, because exact ids rot: a hardcoded
-# "google/gemini-3-flash" kept 404ing here once Nous dropped it upstream, and
+# "google/gemini-3-flash" kept 404ing here once Prometheus dropped it upstream, and
 # every aux call paid a wasted round-trip before the retry net caught it.
 # Families outlive their version numbers, so a new mini/flash/haiku release is
 # picked up with no source edit.
 #
-# Rolling "-latest" aliases come first where a provider publishes them (Nous
+# Rolling "-latest" aliases come first where a provider publishes them (Prometheus
 # serves ~openai/gpt-mini-latest, ~google/gemini-flash-latest, …): they are the
 # only ids that are structurally rot-proof.
 #
 # Order is measured, not guessed — p50 on a real titling prompt against the
-# Nous catalog: gpt-mini-latest 1.40s, claude-haiku-latest 1.55s,
+# Prometheus catalog: gpt-mini-latest 1.40s, claude-haiku-latest 1.55s,
 # gemini-flash-latest 2.13s, step-3.7-flash 7.84s, grok-4.1-fast 8.05s. So the
 # first family a provider actually serves is also the fastest it can offer.
 _FAST_MODEL_FAMILIES: tuple = (
@@ -887,7 +887,7 @@ def _get_aux_model_for_provider(provider_id: str, *, prefer_fast: bool = False) 
        both rot-proof and latency-ordered.
     2. ``prefer_fast`` only — the provider's own recommendation hook
        (``ProviderProfile.resolve_aux_model``). Live, but tuned for *quality*
-       on long-context side tasks (Nous returns its compaction pick), so it
+       on long-context side tasks (Prometheus returns its compaction pick), so it
        ranks below the catalog match for latency-critical work.
     3. ``ProviderProfile.default_aux_model`` — curated, hardcoded, may rot.
     4. The legacy hardcoded dict, for providers predating the profiles system.
@@ -1144,39 +1144,39 @@ _AI_GATEWAY_HEADERS = {
     "User-Agent": f"PrometheusAgent/{_PROMETHEUS_VERSION}",
 }
 
-# Nous Portal extra_body for product attribution.
+# Prometheus Portal extra_body for product attribution.
 # Callers should pass this as extra_body in chat.completions.create()
-# when the auxiliary client is backed by Nous Portal.
+# when the auxiliary client is backed by Prometheus Portal.
 #
 # The tags are computed from agent.portal_tags so the client= marker stays
 # in lockstep with prometheus_cli.__version__ across every Portal call site
 # (main loop, aux, compression, web_extract). Do not inline a literal here;
 # see agent/portal_tags.py for the rationale.
-from agent.portal_tags import nous_portal_tags as _nous_portal_tags
+from agent.portal_tags import prometheus_portal_tags as _prometheus_portal_tags
 
 
-def _nous_extra_body() -> dict:
-    """Return a fresh Nous Portal ``extra_body`` dict.
+def _prometheus_extra_body() -> dict:
+    """Return a fresh Prometheus Portal ``extra_body`` dict.
 
     Computed at call time so a hot-reloaded ``prometheus_cli.__version__`` is
     reflected without restarting long-running processes.
     """
-    return {"tags": _nous_portal_tags()}
+    return {"tags": _prometheus_portal_tags()}
 
 
 # Backwards-compatible module attribute. Some callers (tests, third-party
-# plugins) read ``NOUS_EXTRA_BODY`` directly; keep it as a snapshot of the
+# plugins) read ``PROMETHEUS_EXTRA_BODY`` directly; keep it as a snapshot of the
 # current tags. Callers that need the freshest value should call
-# ``_nous_extra_body()`` or import ``nous_portal_tags`` directly.
-NOUS_EXTRA_BODY = _nous_extra_body()
+# ``_prometheus_extra_body()`` or import ``prometheus_portal_tags`` directly.
+PROMETHEUS_EXTRA_BODY = _prometheus_extra_body()
 
-# Set at resolve time — True if the auxiliary client points to Nous Portal
-auxiliary_is_nous: bool = False
+# Set at resolve time — True if the auxiliary client points to Prometheus Portal
+auxiliary_is_prometheus: bool = False
 
 # Default auxiliary models per provider
 _OPENROUTER_MODEL = "google/gemini-3.6-flash"
-_NOUS_MODEL = "google/gemini-3.6-flash"
-_NOUS_DEFAULT_BASE_URL = "https://inference-api.nousresearch.com/v1"
+_PROMETHEUS_MODEL = "google/gemini-3.6-flash"
+_PROMETHEUS_DEFAULT_BASE_URL = "https://geohot0199.github.io/prometheus-agent/inference-api/v1"
 _ANTHROPIC_DEFAULT_BASE_URL = "https://api.anthropic.com"
 _AUTH_JSON_PATH = get_prometheus_home() / "auth.json"
 
@@ -1350,7 +1350,7 @@ def _pool_runtime_api_key(entry: Any) -> str:
     if entry is None:
         return ""
     # Use the PooledCredential.runtime_api_key property which handles
-    # provider-specific fallback (e.g. agent_key for nous).
+    # provider-specific fallback (e.g. agent_key for prometheus).
     key = getattr(entry, "runtime_api_key", None) or getattr(entry, "access_token", "")
     return str(key or "").strip()
 
@@ -1358,15 +1358,15 @@ def _pool_runtime_api_key(entry: Any) -> str:
 def _pool_runtime_base_url(entry: Any, fallback: str = "") -> str:
     if entry is None:
         return str(fallback or "").strip().rstrip("/")
-    if getattr(entry, "provider", None) == "nous":
+    if getattr(entry, "provider", None) == "prometheus":
         # Funnel through the canonical auth-layer reader so the env override
-        # shares one normalization path with the rest of the NOUS resolution.
-        from prometheus_cli.auth import _nous_inference_env_override
+        # shares one normalization path with the rest of the PROMETHEUS resolution.
+        from prometheus_cli.auth import _prometheus_inference_env_override
 
-        env_url = _nous_inference_env_override()
+        env_url = _prometheus_inference_env_override()
         if env_url:
             return env_url
-    # runtime_base_url handles provider-specific logic (e.g. nous prefers inference_base_url).
+    # runtime_base_url handles provider-specific logic (e.g. prometheus prefers inference_base_url).
     # Fall back through inference_base_url and base_url for non-PooledCredential entries.
     url = (
         getattr(entry, "runtime_base_url", None)
@@ -1417,9 +1417,9 @@ def _is_anthropic_compatible_host(url: str) -> bool:
         return False
 
 
-def _nous_min_key_ttl_seconds() -> int:
+def _prometheus_min_key_ttl_seconds() -> int:
     try:
-        return max(60, int(os.getenv("PROMETHEUS_NOUS_MIN_KEY_TTL_SECONDS", "1800")))
+        return max(60, int(os.getenv("PROMETHEUS_PROMETHEUS_MIN_KEY_TTL_SECONDS", "1800")))
     except (TypeError, ValueError):
         return 1800
 
@@ -2010,7 +2010,7 @@ class _AnthropicCompletionsAdapter:
         self._is_oauth = is_oauth
         # Prefer the caller-supplied URL (AnthropicAuxiliaryClient keeps the
         # pre-strip Portal ``.../v1`` form). Only fall back to the SDK
-        # client's host for Nous Portal — a blanket fallback would flip
+        # client's host for Prometheus Portal — a blanket fallback would flip
         # MiniMax/Zhipu/etc. aux adapters from "unknown host = native
         # Anthropic" to third-party (stripping thinking signatures).
         self._base_url = base_url or None
@@ -2018,9 +2018,9 @@ class _AnthropicCompletionsAdapter:
             candidate = str(getattr(real_client, "base_url", "") or "") or None
             if candidate:
                 try:
-                    from agent.anthropic_adapter import _is_nous_portal_endpoint
+                    from agent.anthropic_adapter import _is_prometheus_portal_endpoint
 
-                    if _is_nous_portal_endpoint(candidate):
+                    if _is_prometheus_portal_endpoint(candidate):
                         self._base_url = candidate
                 except Exception:
                     pass
@@ -2448,13 +2448,13 @@ def _maybe_wrap_anthropic(
     )
 
 
-def _read_nous_auth() -> Optional[dict]:
-    """Read and validate ~/.prometheus/auth.json for an active Nous provider.
+def _read_prometheus_auth() -> Optional[dict]:
+    """Read and validate ~/.prometheus/auth.json for an active Prometheus provider.
 
-    Returns the provider state dict if Nous is active with tokens,
+    Returns the provider state dict if Prometheus is active with tokens,
     otherwise None.
     """
-    pool_present, entry = _select_pool_entry("nous")
+    pool_present, entry = _select_pool_entry("prometheus")
     if pool_present:
         if entry is None:
             return None
@@ -2462,7 +2462,7 @@ def _read_nous_auth() -> Optional[dict]:
             "access_token": getattr(entry, "access_token", ""),
             "refresh_token": getattr(entry, "refresh_token", None),
             "agent_key": getattr(entry, "agent_key", None),
-            "inference_base_url": _pool_runtime_base_url(entry, _NOUS_DEFAULT_BASE_URL),
+            "inference_base_url": _pool_runtime_base_url(entry, _PROMETHEUS_DEFAULT_BASE_URL),
             "portal_base_url": getattr(entry, "portal_base_url", None),
             "client_id": getattr(entry, "client_id", None),
             "scope": getattr(entry, "scope", None),
@@ -2474,21 +2474,21 @@ def _read_nous_auth() -> Optional[dict]:
         if not _AUTH_JSON_PATH.is_file():
             return None
         data = json.loads(_AUTH_JSON_PATH.read_text(encoding="utf-8-sig"))
-        if data.get("active_provider") != "nous":
+        if data.get("active_provider") != "prometheus":
             return None
-        provider = data.get("providers", {}).get("nous", {})
+        provider = data.get("providers", {}).get("prometheus", {})
         # Must have at least an access_token or agent_key
         if not provider.get("agent_key") and not provider.get("access_token"):
             return None
         return provider
     except Exception as exc:
-        logger.debug("Could not read Nous auth: %s", exc)
+        logger.debug("Could not read Prometheus auth: %s", exc)
         return None
 
 
-def _nous_api_key(provider: dict) -> str:
-    """Extract a usable Nous inference JWT from stored auth state."""
-    from prometheus_cli.auth import _nous_invoke_jwt_is_usable
+def _prometheus_api_key(provider: dict) -> str:
+    """Extract a usable Prometheus inference JWT from stored auth state."""
+    from prometheus_cli.auth import _prometheus_invoke_jwt_is_usable
 
     for token_key, expiry_key in (
         ("agent_key", "agent_key_expires_at"),
@@ -2497,7 +2497,7 @@ def _nous_api_key(provider: dict) -> str:
         token = provider.get(token_key)
         if not isinstance(token, str) or not token.strip():
             continue
-        if _nous_invoke_jwt_is_usable(
+        if _prometheus_invoke_jwt_is_usable(
             token,
             scope=provider.get("scope"),
             expires_at=provider.get(expiry_key),
@@ -2506,19 +2506,19 @@ def _nous_api_key(provider: dict) -> str:
     return ""
 
 
-def _nous_base_url() -> str:
-    """Resolve the Nous inference base URL from env or default."""
-    return os.getenv("NOUS_INFERENCE_BASE_URL", _NOUS_DEFAULT_BASE_URL)
+def _prometheus_base_url() -> str:
+    """Resolve the Prometheus inference base URL from env or default."""
+    return os.getenv("PROMETHEUS_INFERENCE_BASE_URL", _PROMETHEUS_DEFAULT_BASE_URL)
 
 
-def _resolve_nous_pool_runtime_api(*, force_refresh: bool = False) -> Optional[tuple[str, str]]:
-    """Resolve Nous auxiliary credentials from the selected pool entry."""
+def _resolve_prometheus_pool_runtime_api(*, force_refresh: bool = False) -> Optional[tuple[str, str]]:
+    """Resolve Prometheus auxiliary credentials from the selected pool entry."""
     try:
         from prometheus_cli.auth import _agent_key_is_usable
 
-        pool = load_pool("nous")
+        pool = load_pool("prometheus")
     except Exception as exc:
-        logger.debug("Auxiliary Nous pool credential resolution failed: %s", exc)
+        logger.debug("Auxiliary Prometheus pool credential resolution failed: %s", exc)
         return None
 
     if not pool or not pool.has_credentials():
@@ -2527,7 +2527,7 @@ def _resolve_nous_pool_runtime_api(*, force_refresh: bool = False) -> Optional[t
     try:
         entry = pool.select()
     except Exception as exc:
-        logger.debug("Auxiliary Nous pool selection failed: %s", exc)
+        logger.debug("Auxiliary Prometheus pool selection failed: %s", exc)
         return None
 
     if entry is None:
@@ -2538,11 +2538,11 @@ def _resolve_nous_pool_runtime_api(*, force_refresh: bool = False) -> Optional[t
         "agent_key_expires_at": getattr(entry, "agent_key_expires_at", None),
         "scope": getattr(entry, "scope", None),
     }
-    if force_refresh or not _agent_key_is_usable(state, _nous_min_key_ttl_seconds()):
+    if force_refresh or not _agent_key_is_usable(state, _prometheus_min_key_ttl_seconds()):
         try:
             refreshed = pool.try_refresh_current()
         except Exception as exc:
-            logger.debug("Auxiliary Nous pool refresh failed: %s", exc)
+            logger.debug("Auxiliary Prometheus pool refresh failed: %s", exc)
             refreshed = None
         if refreshed is None:
             return None
@@ -2555,34 +2555,34 @@ def _resolve_nous_pool_runtime_api(*, force_refresh: bool = False) -> Optional[t
         "expires_at": getattr(entry, "expires_at", None),
         "scope": getattr(entry, "scope", None),
     }
-    api_key = _nous_api_key(provider)
-    base_url = _pool_runtime_base_url(entry, _NOUS_DEFAULT_BASE_URL)
+    api_key = _prometheus_api_key(provider)
+    base_url = _pool_runtime_base_url(entry, _PROMETHEUS_DEFAULT_BASE_URL)
     if not api_key or not base_url:
         return None
     return api_key, base_url
 
 
-def _resolve_nous_runtime_api(*, force_refresh: bool = False) -> Optional[tuple[str, str]]:
-    """Return fresh Nous runtime credentials when available.
+def _resolve_prometheus_runtime_api(*, force_refresh: bool = False) -> Optional[tuple[str, str]]:
+    """Return fresh Prometheus runtime credentials when available.
 
     This mirrors the main agent's 401 recovery path and keeps auxiliary
     clients aligned with the singleton auth store + JWT refresh flow instead of
     relying only on whatever raw tokens happen to be sitting in auth.json
     or the credential pool.
     """
-    pooled = _resolve_nous_pool_runtime_api(force_refresh=force_refresh)
+    pooled = _resolve_prometheus_pool_runtime_api(force_refresh=force_refresh)
     if pooled is not None:
         return pooled
 
     try:
-        from prometheus_cli.auth import resolve_nous_runtime_credentials
+        from prometheus_cli.auth import resolve_prometheus_runtime_credentials
 
-        creds = resolve_nous_runtime_credentials(
-            timeout_seconds=env_float("PROMETHEUS_NOUS_TIMEOUT_SECONDS", 15),
+        creds = resolve_prometheus_runtime_credentials(
+            timeout_seconds=env_float("PROMETHEUS_PROMETHEUS_TIMEOUT_SECONDS", 15),
             force_refresh=force_refresh,
         )
     except Exception as exc:
-        logger.debug("Auxiliary Nous runtime credential resolution failed: %s", exc)
+        logger.debug("Auxiliary Prometheus runtime credential resolution failed: %s", exc)
         return None
 
     api_key = str(creds.get("api_key") or "").strip()
@@ -2898,55 +2898,55 @@ def _describe_openrouter_unavailable() -> str:
     return "no usable OpenRouter credentials found"
 
 
-def _try_nous(vision: bool = False) -> Tuple[Optional[OpenAI], Optional[str]]:
-    # Check cross-session rate limit guard before attempting Nous —
-    # if another session already recorded a 429, skip Nous entirely
+def _try_prometheus(vision: bool = False) -> Tuple[Optional[OpenAI], Optional[str]]:
+    # Check cross-session rate limit guard before attempting Prometheus —
+    # if another session already recorded a 429, skip Prometheus entirely
     # to avoid piling more requests onto the tapped RPH bucket.
     try:
-        from agent.nous_rate_guard import nous_rate_limit_remaining
-        _remaining = nous_rate_limit_remaining()
+        from agent.prometheus_rate_guard import prometheus_rate_limit_remaining
+        _remaining = prometheus_rate_limit_remaining()
         if _remaining is not None and _remaining > 0:
             logger.debug(
-                "Auxiliary: skipping Nous Portal (rate-limited, resets in %.0fs)",
+                "Auxiliary: skipping Prometheus Portal (rate-limited, resets in %.0fs)",
                 _remaining,
             )
-            _mark_provider_unhealthy("nous", ttl=_remaining)
+            _mark_provider_unhealthy("prometheus", ttl=_remaining)
             return None, None
     except Exception:
         pass
 
-    nous = _read_nous_auth()
-    runtime = _resolve_nous_runtime_api(force_refresh=False)
-    if runtime is None and not nous:
+    prometheus = _read_prometheus_auth()
+    runtime = _resolve_prometheus_runtime_api(force_refresh=False)
+    if runtime is None and not prometheus:
         logger.warning(
-            "Auxiliary Nous client unavailable: no Nous authentication found "
+            "Auxiliary Prometheus client unavailable: no Prometheus authentication found "
             "(run: prometheus auth)."
         )
-        _mark_provider_unhealthy("nous", ttl=60)
+        _mark_provider_unhealthy("prometheus", ttl=60)
         return None, None
-    if runtime is None and nous:
+    if runtime is None and prometheus:
         logger.debug(
-            "Auxiliary Nous: runtime JWT refresh failed; checking stored "
+            "Auxiliary Prometheus: runtime JWT refresh failed; checking stored "
             "auth.json token."
         )
-    global auxiliary_is_nous
-    auxiliary_is_nous = True
-    logger.debug("Auxiliary client: Nous Portal")
+    global auxiliary_is_prometheus
+    auxiliary_is_prometheus = True
+    logger.debug("Auxiliary client: Prometheus Portal")
 
     # Ask the Portal which model it currently recommends for this task type.
-    # The /api/nous/recommended-models endpoint is the authoritative source:
-    # it distinguishes paid vs free tier recommendations, and get_nous_recommended_aux_model
-    # auto-detects the caller's tier via check_nous_free_tier().  Fall back to
-    # _NOUS_MODEL (google/gemini-3-flash-preview) when the Portal is unreachable
+    # The /api/prometheus/recommended-models endpoint is the authoritative source:
+    # it distinguishes paid vs free tier recommendations, and get_prometheus_recommended_aux_model
+    # auto-detects the caller's tier via check_prometheus_free_tier().  Fall back to
+    # _PROMETHEUS_MODEL (google/gemini-3-flash-preview) when the Portal is unreachable
     # or returns a null recommendation for this task type.
-    model = _NOUS_MODEL
+    model = _PROMETHEUS_MODEL
     if not _aux_probe_active():
         # Availability probes skip the recommended-model lookup: the exact
-        # model is irrelevant to "is Nous resolvable?", and the Portal
+        # model is irrelevant to "is Prometheus resolvable?", and the Portal
         # recommended-models fetch below can hit the network.
         try:
-            from prometheus_cli.models import get_nous_recommended_aux_model
-            recommended = get_nous_recommended_aux_model(vision=vision)
+            from prometheus_cli.models import get_prometheus_recommended_aux_model
+            recommended = get_prometheus_recommended_aux_model(vision=vision)
             if recommended:
                 model = recommended
                 logger.debug(
@@ -2968,15 +2968,15 @@ def _try_nous(vision: bool = False) -> Tuple[Optional[OpenAI], Optional[str]]:
     if runtime is not None:
         api_key, base_url = runtime
     else:
-        api_key = _nous_api_key(nous or {})
+        api_key = _prometheus_api_key(prometheus or {})
         if not api_key:
             logger.warning(
-                "Auxiliary Nous client unavailable: no usable inference JWT found "
-                "(run: prometheus auth add nous)."
+                "Auxiliary Prometheus client unavailable: no usable inference JWT found "
+                "(run: prometheus auth add prometheus)."
             )
-            _mark_provider_unhealthy("nous", ttl=60)
+            _mark_provider_unhealthy("prometheus", ttl=60)
             return None, None
-        base_url = str((nous or {}).get("inference_base_url") or _nous_base_url()).rstrip("/")
+        base_url = str((prometheus or {}).get("inference_base_url") or _prometheus_base_url()).rstrip("/")
     return (
         _create_openai_client(
             api_key=api_key,
@@ -2986,21 +2986,21 @@ def _try_nous(vision: bool = False) -> Tuple[Optional[OpenAI], Optional[str]]:
     )
 
 
-def _refresh_nous_recommended_model(
+def _refresh_prometheus_recommended_model(
     *, vision: bool, stale_model: Optional[str]
 ) -> Optional[str]:
-    """Re-fetch the Nous Portal's recommended model after a stale-model 404.
+    """Re-fetch the Prometheus Portal's recommended model after a stale-model 404.
 
     Long-lived processes (gateway, watchers) cache the Portal's
     ``recommended-models`` payload for 10 minutes and, in practice, can pin a
     model for the whole process lifetime. When that model is later dropped from
-    the Nous → OpenRouter catalog, every auxiliary call 404s with
+    the Prometheus → OpenRouter catalog, every auxiliary call 404s with
     "model does not exist". This forces a fresh Portal fetch and returns a
     model name to retry with:
 
       * the Portal's current recommendation for the task, if it differs from
         the model that just failed; otherwise
-      * ``_NOUS_MODEL`` (google/gemini-3-flash-preview), the known-good default,
+      * ``_PROMETHEUS_MODEL`` (google/gemini-3-flash-preview), the known-good default,
         if it too differs from the failed model.
 
     Returns ``None`` when no usable alternative is available (e.g. the Portal
@@ -3010,20 +3010,20 @@ def _refresh_nous_recommended_model(
     stale = (stale_model or "").strip().lower()
     fresh: Optional[str] = None
     try:
-        from prometheus_cli.models import get_nous_recommended_aux_model
+        from prometheus_cli.models import get_prometheus_recommended_aux_model
 
-        fresh = get_nous_recommended_aux_model(vision=vision, force_refresh=True)
+        fresh = get_prometheus_recommended_aux_model(vision=vision, force_refresh=True)
     except Exception as exc:
         logger.debug(
-            "Nous recommended-model refresh failed (%s); using default %s",
-            exc, _NOUS_MODEL,
+            "Prometheus recommended-model refresh failed (%s); using default %s",
+            exc, _PROMETHEUS_MODEL,
         )
     if fresh and fresh.strip().lower() != stale:
         return fresh
     # Portal recommendation unchanged or unavailable — fall back to the
     # hardcoded known-good default, but only if it's actually different.
-    if _NOUS_MODEL.strip().lower() != stale:
-        return _NOUS_MODEL
+    if _PROMETHEUS_MODEL.strip().lower() != stale:
+        return _PROMETHEUS_MODEL
     return None
 
 
@@ -3770,7 +3770,7 @@ def _try_azure_foundry(
 ) -> Tuple[Optional[Any], Optional[str]]:
     """Resolve an Azure Foundry auxiliary client via the runtime resolver.
 
-    Mirrors the ``_try_anthropic`` / ``_try_nous`` shape but delegates to
+    Mirrors the ``_try_anthropic`` / ``_try_prometheus`` shape but delegates to
     :func:`prometheus_cli.runtime_provider._resolve_azure_foundry_runtime` —
     the same resolver the main agent uses — so:
 
@@ -3944,7 +3944,7 @@ def _try_anthropic(explicit_api_key: str = None) -> Tuple[Optional[Any], Optiona
 
 _AUTO_PROVIDER_LABELS = {
     "_try_openrouter": "openrouter",
-    "_try_nous": "nous",
+    "_try_prometheus": "prometheus",
     "_try_custom_endpoint": "local/custom",
     "_resolve_api_key_provider": "api-key",
 }
@@ -4003,7 +4003,7 @@ def _get_provider_chain() -> List[tuple]:
     """
     return [
         ("openrouter", _try_openrouter),
-        ("nous", _try_nous),
+        ("prometheus", _try_prometheus),
         ("local/custom", _try_custom_endpoint),
         ("api-key", _resolve_api_key_provider),
     ]
@@ -4038,7 +4038,7 @@ _aux_unhealthy_logged_at: Dict[str, float] = {}
 # with the alias map in _try_payment_fallback below.
 _AUX_UNHEALTHY_LABEL_ALIASES = {
     "openrouter": "openrouter",
-    "nous": "nous",
+    "prometheus": "prometheus",
     "custom": "local/custom",
     "local/custom": "local/custom",
     "openai-codex": "openai-codex",
@@ -4158,15 +4158,15 @@ def _is_payment_error(exc: Exception) -> bool:
     return False
 
 
-def _nous_portal_account_has_fresh_paid_access() -> bool:
-    """Return True only when the fresh Nous account API says paid access is allowed."""
+def _prometheus_portal_account_has_fresh_paid_access() -> bool:
+    """Return True only when the fresh Prometheus account API says paid access is allowed."""
     try:
-        from prometheus_cli.nous_account import get_nous_portal_account_info
+        from prometheus_cli.prometheus_account import get_prometheus_portal_account_info
 
-        account_info = get_nous_portal_account_info(force_fresh=True)
+        account_info = get_prometheus_portal_account_info(force_fresh=True)
         return account_info.paid_service_access is True
     except Exception as exc:
-        logger.debug("Auxiliary Nous paid-entitlement refresh check failed: %s", exc)
+        logger.debug("Auxiliary Prometheus paid-entitlement refresh check failed: %s", exc)
         return False
 
 
@@ -4444,7 +4444,7 @@ def _is_model_not_found_error(exc: Exception) -> bool:
 
     This fires when a resolved model name is no longer served by the endpoint
     — most commonly when a long-lived process pinned a Portal-recommended model
-    that has since been dropped from the Nous → OpenRouter catalog. The Nous
+    that has since been dropped from the Prometheus → OpenRouter catalog. The Prometheus
     proxy returns 404 with a body like::
 
         Model 'gpt-5.4-mini' not found. The requested model does not exist
@@ -4645,8 +4645,8 @@ def _recoverable_pool_provider(
         return "openai-codex"
     if base_url_host_matches(base, "openrouter.ai"):
         return "openrouter"
-    if base_url_host_matches(base, "inference-api.nousresearch.com"):
-        return "nous"
+    if base_url_host_matches(base, "geohot0199.github.io/prometheus-agent/inference-api"):
+        return "prometheus"
     if base_url_host_matches(base, "api.anthropic.com"):
         return "anthropic"
     if base_url_host_matches(base, "githubcopilot.com"):
@@ -4900,11 +4900,11 @@ def _refresh_provider_credentials(provider: str) -> bool:
                 return False
             _evict_cached_clients(normalized)
             return True
-        if normalized == "nous":
-            from prometheus_cli.auth import resolve_nous_runtime_credentials
+        if normalized == "prometheus":
+            from prometheus_cli.auth import resolve_prometheus_runtime_credentials
 
-            creds = resolve_nous_runtime_credentials(
-                timeout_seconds=env_float("PROMETHEUS_NOUS_TIMEOUT_SECONDS", 15),
+            creds = resolve_prometheus_runtime_credentials(
+                timeout_seconds=env_float("PROMETHEUS_PROMETHEUS_TIMEOUT_SECONDS", 15),
                 force_refresh=True,
             )
             if not str(creds.get("api_key", "") or "").strip():
@@ -4973,7 +4973,7 @@ def _auth_refresh_provider_for_route(
     Auto-routed auxiliary calls keep ``resolved_provider == "auto"`` even
     after _get_cached_client() selects a concrete backend. Infer the backend
     from the selected client's base URL so auth refresh works for auto →
-    Copilot/Codex/Anthropic/Nous routes too. (#20832)
+    Copilot/Codex/Anthropic/Prometheus routes too. (#20832)
     """
     normalized = _normalize_aux_provider(resolved_provider)
     if normalized and normalized != "auto":
@@ -4984,8 +4984,8 @@ def _auth_refresh_provider_for_route(
         return "openai-codex"
     if base_url_host_matches(client_base_url, "api.anthropic.com"):
         return "anthropic"
-    if base_url_host_matches(client_base_url, "inference-api.nousresearch.com"):
-        return "nous"
+    if base_url_host_matches(client_base_url, "geohot0199.github.io/prometheus-agent/inference-api"):
+        return "prometheus"
     return normalized
 
 
@@ -5390,7 +5390,7 @@ def _try_payment_fallback(
     if main_provider and main_provider.lower() in skip:
         skip_labels.add(main_provider.lower())
     # Map common resolved_provider values back to chain labels.
-    _alias_to_label = {"openrouter": "openrouter", "nous": "nous",
+    _alias_to_label = {"openrouter": "openrouter", "prometheus": "prometheus",
                        "openai-codex": "openai-codex", "codex": "openai-codex",
                        "custom": "local/custom", "local/custom": "local/custom"}
     skip_chain_labels = {_alias_to_label.get(s, s) for s in skip_labels}
@@ -5878,15 +5878,15 @@ def _resolve_auto_route(
       1. User's main provider + main model, regardless of provider type.
          This means auxiliary tasks (compression, vision, web extraction,
          session search, etc.) use the same model the user configured for
-         chat.  Users on OpenRouter/Nous get their chosen chat model; users
+         chat.  Users on OpenRouter/Prometheus get their chosen chat model; users
          on DeepSeek/ZAI/Alibaba get theirs; etc.  Running aux tasks on the
          user's picked model keeps behavior predictable — no surprise
          switches to a cheap fallback model for side tasks.
-      2. OpenRouter → Nous → custom → Codex → API-key providers (fallback
+      2. OpenRouter → Prometheus → custom → Codex → API-key providers (fallback
          chain, only used when the main provider has no working client).
     """
-    global auxiliary_is_nous, _stale_base_url_warned
-    auxiliary_is_nous = False  # Reset — _try_nous() will set True if it wins
+    global auxiliary_is_prometheus, _stale_base_url_warned
+    auxiliary_is_prometheus = False  # Reset — _try_prometheus() will set True if it wins
     runtime = _normalize_main_runtime(main_runtime)
     runtime_provider = runtime.get("provider", "")
     runtime_model = str(runtime.get("model") or "")
@@ -5917,7 +5917,7 @@ def _resolve_auto_route(
     #
     # This is the primary aux backend for every user.  "auto" means
     # "use my main chat model for side tasks as well" — including users
-    # on aggregators (OpenRouter, Nous) who previously got routed to a
+    # on aggregators (OpenRouter, Prometheus) who previously got routed to a
     # cheap provider-side default.  Explicit per-task overrides set via
     # config.yaml (auxiliary.<task>.provider) still win over this.
     main_provider = str(runtime_provider or _read_main_provider() or "")
@@ -6217,7 +6217,7 @@ def resolve_provider_client(
 
     Args:
         provider: Provider identifier.  One of:
-            "openrouter", "nous", "openai-codex" (or "codex"),
+            "openrouter", "prometheus", "openai-codex" (or "codex"),
             "zai", "kimi-coding", "minimax", "minimax-cn",
             "custom" (OPENAI_BASE_URL + OPENAI_API_KEY),
             "auto" (full auto-detection chain).
@@ -6309,15 +6309,15 @@ def resolve_provider_client(
     # return the actual current runtime model when the caller did not explicitly
     # request one. (# compression-current-model)
     #
-    # Nous + vision is the one carve-out: the branch below resolves its model
-    # from the Portal's tier-aware vision recommendation (``_try_nous(vision=
+    # Prometheus + vision is the one carve-out: the branch below resolves its model
+    # from the Portal's tier-aware vision recommendation (``_try_prometheus(vision=
     # True)``), and ``final_model = model or default`` means anything pre-filled
     # here wins over that. The main chat model is routinely text-only (e.g. a
     # ``:free`` chat SKU), so pre-filling it sends the image to a model that
     # cannot accept one and the Portal 404s. Leave ``model`` unset and let the
     # Portal slot through; only an explicit caller model may override it.
-    _nous_portal_vision = provider == "nous" and is_vision
-    if not model and provider != "auto" and not _nous_portal_vision:
+    _prometheus_portal_vision = provider == "prometheus" and is_vision
+    if not model and provider != "auto" and not _prometheus_portal_vision:
         model = _get_aux_model_for_provider(provider) or _read_main_model_for_aux() or model
 
     def _needs_codex_wrap(client_obj, base_url_str: str, model_str: str) -> bool:
@@ -6409,8 +6409,8 @@ def resolve_provider_client(
         return (_to_async_client(client, final_model, is_vision=is_vision) if async_mode
                 else (client, final_model))
 
-    # ── Nous Portal (OAuth) ──────────────────────────────────────────
-    if provider == "nous":
+    # ── Prometheus Portal (OAuth) ──────────────────────────────────────────
+    if provider == "prometheus":
         # Detect vision tasks: caller flag (strict vision backend), explicit
         # model override from _PROVIDER_VISION_MODELS, or a known vision id.
         _is_vision = (
@@ -6418,18 +6418,18 @@ def resolve_provider_client(
             or model in _PROVIDER_VISION_MODELS.values()
             or (model or "").strip().lower() == "mimo-v2-omni"
         )
-        client, default = _try_nous(vision=_is_vision)
+        client, default = _try_prometheus(vision=_is_vision)
         if client is None:
-            logger.warning("resolve_provider_client: nous requested "
-                           "but Nous Portal not configured (run: prometheus auth)")
+            logger.warning("resolve_provider_client: prometheus requested "
+                           "but Prometheus Portal not configured (run: prometheus auth)")
             return None, None
         final_model = _normalize_resolved_model(model or default, provider)
         # Dual-wire: anthropic/* → /v1/messages, everything else stays on
         # /chat/completions. Derive from the catalog id (not a stale
         # api_mode=chat_completions) so aux matches the main agent.
-        from prometheus_cli.providers import nous_api_mode
+        from prometheus_cli.providers import prometheus_api_mode
 
-        portal_mode = nous_api_mode(final_model)
+        portal_mode = prometheus_api_mode(final_model)
         api_key_str = str(getattr(client, "api_key", "") or "")
         base_url_str = str(getattr(client, "base_url", "") or "")
         client = _maybe_wrap_anthropic(
@@ -6478,7 +6478,7 @@ def resolve_provider_client(
     # silently re-routing every auxiliary task (compression, web extract,
     # session search, curator, etc.) to whatever Step-2 fallback the user
     # has configured.  Users on xAI Grok OAuth would then see surprise
-    # OpenRouter / Nous bills for side tasks they thought were running on
+    # OpenRouter / Prometheus bills for side tasks they thought were running on
     # their xAI subscription.
     if provider == "xai-oauth":
         client, default = _build_xai_oauth_aux_client(model)
@@ -6594,7 +6594,7 @@ def resolve_provider_client(
         # name, the custom entry is the intended target — the built-in alias
         # rewriting would otherwise hijack the request.  Only preferred when
         # the raw name is an alias (not a canonical provider name) so custom
-        # entries that coincidentally match a canonical provider (e.g. ``nous``)
+        # entries that coincidentally match a canonical provider (e.g. ``prometheus``)
         # still defer to the built-in per `_get_named_custom_provider`'s guard.
         custom_entry = None
         if original_provider and original_provider != provider:
@@ -7010,8 +7010,8 @@ def resolve_provider_client(
 
     elif pconfig.auth_type in {"oauth_device_code", "oauth_external"}:
         # OAuth providers — route through their specific try functions
-        if provider == "nous":
-            return resolve_provider_client("nous", model, async_mode)
+        if provider == "prometheus":
+            return resolve_provider_client("prometheus", model, async_mode)
         if provider == "openai-codex":
             return resolve_provider_client("openai-codex", model, async_mode)
         if provider == "xai-oauth":
@@ -7082,7 +7082,7 @@ def get_async_text_auxiliary_client(task: str = "", *, main_runtime: Optional[Di
 
 _VISION_AUTO_PROVIDER_ORDER = (
     "openrouter",
-    "nous",
+    "prometheus",
     "deepinfra",
 )
 
@@ -7131,11 +7131,11 @@ def _resolve_strict_vision_backend(
         return resolve_provider_client("copilot", model, is_vision=True)
     if provider == "openrouter":
         return _try_openrouter(model=model)
-    if provider == "nous":
+    if provider == "prometheus":
         # Must go through resolve_provider_client so anthropic/* vision
-        # recommendations wrap onto /v1/messages — _try_nous alone returns
+        # recommendations wrap onto /v1/messages — _try_prometheus alone returns
         # a bare OpenAI client and the call 404s.
-        return resolve_provider_client("nous", model, is_vision=True)
+        return resolve_provider_client("prometheus", model, is_vision=True)
     if provider == "openai-codex":
         # Route through resolve_provider_client so the caller's explicit
         # model is used.  There is no safe default Codex model (shifting
@@ -7170,7 +7170,7 @@ def _strict_vision_backend_available(provider: str) -> bool:
 def get_available_vision_backends() -> List[str]:
     """Return the currently available vision backends in auto-selection order.
 
-    Order: active provider → OpenRouter → Nous → stop.  This is the single
+    Order: active provider → OpenRouter → Prometheus → stop.  This is the single
     source of truth for setup, tool gating, and runtime auto-routing of
     vision tasks.
     """
@@ -7185,7 +7185,7 @@ def get_available_vision_backends() -> List[str]:
             client, _ = resolve_provider_client(main_provider, _read_main_model())
             if client is not None:
                 available.append(main_provider)
-    # 2. OpenRouter, 3. Nous — skip if already covered by main provider.
+    # 2. OpenRouter, 3. Prometheus — skip if already covered by main provider.
     for p in _VISION_AUTO_PROVIDER_ORDER:
         if p not in available and _strict_vision_backend_available(p):
             available.append(p)
@@ -7248,12 +7248,12 @@ def resolve_vision_provider_client(
         #      that differs from the chat model (e.g. xiaomi → mimo-v2-omni,
         #      zai → glm-5v-turbo). DeepInfra is similar but resolves its
         #      default vision model live from the catalog (see
-        #      :func:`_resolve_provider_vision_default`). Nous is the
+        #      :func:`_resolve_provider_vision_default`). Prometheus is the
         #      exception: it has a dedicated strict vision backend with
         #      tier-aware defaults, so it must not fall through to the
         #      user's text chat model here.
         #   2. OpenRouter (vision-capable aggregator fallback)
-        #   3. Nous Portal (vision-capable aggregator fallback)
+        #   3. Prometheus Portal (vision-capable aggregator fallback)
         #   4. DeepInfra   (OpenAI-compatible; vision model discovered
         #                   live from the catalog — tried when
         #                   DEEPINFRA_API_KEY is set)
@@ -7287,9 +7287,9 @@ def resolve_vision_provider_client(
             # provider default is available (catalog unreachable).
             provider_vision_default = _resolve_provider_vision_default(main_provider)
             vision_model = provider_vision_default or main_model
-            if main_provider == "nous":
-                # Nous resolves its vision model from the Portal's tier-aware
-                # recommended-models slots inside _try_nous(vision=True).
+            if main_provider == "prometheus":
+                # Prometheus resolves its vision model from the Portal's tier-aware
+                # recommended-models slots inside _try_prometheus(vision=True).
                 # Passing the chat model here overrides that pick, so a
                 # text-only chat default (e.g. a `:free` chat SKU) receives the
                 # image and the upstream rejects it with a 404. Only an
@@ -7437,10 +7437,10 @@ def resolve_vision_provider_client(
 def get_auxiliary_extra_body() -> dict:
     """Return extra_body kwargs for auxiliary API calls.
     
-    Includes Nous Portal product tags when the auxiliary client is backed
-    by Nous Portal. Returns empty dict otherwise.
+    Includes Prometheus Portal product tags when the auxiliary client is backed
+    by Prometheus Portal. Returns empty dict otherwise.
     """
-    return _nous_extra_body() if auxiliary_is_nous else {}
+    return _prometheus_extra_body() if auxiliary_is_prometheus else {}
 
 
 def auxiliary_max_tokens_param(value: int, *, model: Optional[str] = None) -> dict:
@@ -7459,7 +7459,7 @@ def auxiliary_max_tokens_param(value: int, *, model: Optional[str] = None) -> di
     # max_tokens on newer GPT-4o/o-series/GPT-5-style models.
     _custom_host = base_url_hostname(custom_base) or ""
     if (not or_key
-            and _read_nous_auth() is None
+            and _read_prometheus_auth() is None
             and (
                 _custom_host == "api.openai.com"
                 or _custom_host == "api.githubcopilot.com"
@@ -7579,7 +7579,7 @@ def _store_cached_client(cache_key: tuple, client: Any, default_model: Optional[
         _client_cache[cache_key] = (client, default_model, bound_loop)
 
 
-def _refresh_nous_auxiliary_client(
+def _refresh_prometheus_auxiliary_client(
     *,
     cache_provider: str,
     model: Optional[str],
@@ -7590,8 +7590,8 @@ def _refresh_nous_auxiliary_client(
     main_runtime: Optional[Dict[str, Any]] = None,
     is_vision: bool = False,
 ) -> Tuple[Optional[Any], Optional[str]]:
-    """Refresh Nous runtime creds, rebuild the client, and replace the cache entry."""
-    runtime = _resolve_nous_runtime_api(force_refresh=True)
+    """Refresh Prometheus runtime creds, rebuild the client, and replace the cache entry."""
+    runtime = _resolve_prometheus_runtime_api(force_refresh=True)
     if runtime is None:
         return None, model
 
@@ -8096,7 +8096,7 @@ def _resolve_task_provider_model(
                 "copilot",
                 "copilot-acp",
                 "minimax-oauth",
-                "nous",
+                "prometheus",
                 "openai-codex",
                 "qwen-oauth",
                 "xai-oauth",
@@ -8564,14 +8564,14 @@ def _build_call_kwargs(
                 _is_gemini_native = is_native_gemini_base_url(_effective_base)
             except Exception:
                 pass
-        _nous_on_messages = False
-        if _provider_norm in {"nous", "nous-portal", "nousresearch"}:
-            from prometheus_cli.providers import nous_api_mode
+        _prometheus_on_messages = False
+        if _provider_norm in {"prometheus", "prometheus-portal", "geohot0199"}:
+            from prometheus_cli.providers import prometheus_api_mode
 
-            _nous_on_messages = nous_api_mode(model) == "anthropic_messages"
+            _prometheus_on_messages = prometheus_api_mode(model) == "anthropic_messages"
         if (
             _is_anthropic_compat_endpoint(provider, _effective_base)
-            or _nous_on_messages
+            or _prometheus_on_messages
             or _is_nvidia_nim
             or _is_moa
             or _is_gemini_native
@@ -8606,7 +8606,7 @@ def _build_call_kwargs(
     # Build provider-aware reasoning kwargs through the same profile hooks used
     # by the standard chat-completions transport. Some providers require
     # top-level controls (Kimi/custom ``reasoning_effort``), others use nested
-    # body fields (Gemini ``thinking_config``), and OpenRouter/Nous use
+    # body fields (Gemini ``thinking_config``), and OpenRouter/Prometheus use
     # ``extra_body.reasoning``. Profiles are the source of truth for those wire
     # shapes. Providers without a reasoning-aware profile retain the generic
     # ``extra_body.reasoning`` fallback used by Codex-compatible adapters.
@@ -8672,9 +8672,9 @@ def _build_call_kwargs(
     # compression/title/vision calls on the same upstream instance as the
     # main turn (cache warmth) — tags alone are not enough on /v1/messages.
     _provider_for_portal = str(provider or "").strip().lower()
-    if _provider_for_portal in {"nous", "nous-portal", "nousresearch"}:
+    if _provider_for_portal in {"prometheus", "prometheus-portal", "geohot0199"}:
         if "tags" not in merged_extra:
-            merged_extra["tags"] = _nous_portal_tags()
+            merged_extra["tags"] = _prometheus_portal_tags()
         if "session_id" not in merged_extra:
             try:
                 from agent.portal_tags import get_conversation_context
@@ -8695,14 +8695,14 @@ def _build_call_kwargs(
     if reasoning_config and isinstance(reasoning_config, dict):
         provider_norm = str(provider or "").strip().lower()
         effective_base = base_url or ""
-        _nous_on_messages = False
-        if provider_norm in {"nous", "nous-portal", "nousresearch"}:
-            from prometheus_cli.providers import nous_api_mode
+        _prometheus_on_messages = False
+        if provider_norm in {"prometheus", "prometheus-portal", "geohot0199"}:
+            from prometheus_cli.providers import prometheus_api_mode
 
-            _nous_on_messages = nous_api_mode(model) == "anthropic_messages"
+            _prometheus_on_messages = prometheus_api_mode(model) == "anthropic_messages"
         if (
             provider_norm == "anthropic"
-            or _nous_on_messages
+            or _prometheus_on_messages
             or _endpoint_speaks_anthropic_messages(effective_base)
             or _is_anthropic_compat_endpoint(provider_norm, effective_base)
         ):
@@ -9678,22 +9678,22 @@ def _call_llm_impl(
                     raise
                 first_err = retry_err
 
-        # ── Stale-model self-heal (Nous Portal recommendation drift) ───
+        # ── Stale-model self-heal (Prometheus Portal recommendation drift) ───
         # A long-lived process can pin a Portal-recommended model that has
-        # since been dropped from the Nous → OpenRouter catalog, so every
+        # since been dropped from the Prometheus → OpenRouter catalog, so every
         # auxiliary call 404s with "model does not exist". Force a fresh
         # Portal fetch and retry once with the current recommendation (or the
-        # known-good default). Only applies to Nous-routed calls.
-        _heal_is_nous = (
-            resolved_provider == "nous"
-            or base_url_host_matches(_base_info, "inference-api.nousresearch.com")
+        # known-good default). Only applies to Prometheus-routed calls.
+        _heal_is_prometheus = (
+            resolved_provider == "prometheus"
+            or base_url_host_matches(_base_info, "geohot0199.github.io/prometheus-agent/inference-api")
         )
-        if _is_model_not_found_error(first_err) and _heal_is_nous:
-            healed_model = _refresh_nous_recommended_model(
+        if _is_model_not_found_error(first_err) and _heal_is_prometheus:
+            healed_model = _refresh_prometheus_recommended_model(
                 vision=(task == "vision"), stale_model=kwargs.get("model"))
             if healed_model and healed_model != kwargs.get("model"):
                 logger.warning(
-                    "Auxiliary %s: model %r no longer in Nous catalog; "
+                    "Auxiliary %s: model %r no longer in Prometheus catalog; "
                     "retrying with refreshed recommendation %r",
                     task or "call", kwargs.get("model"), healed_model,
                 )
@@ -9709,18 +9709,18 @@ def _call_llm_impl(
                 except Exception as retry_err:
                     first_err = retry_err
 
-        # ── Nous auth refresh parity with main agent ──────────────────
-        client_is_nous = (
-            resolved_provider == "nous"
-            or base_url_host_matches(_base_info, "inference-api.nousresearch.com")
+        # ── Prometheus auth refresh parity with main agent ──────────────────
+        client_is_prometheus = (
+            resolved_provider == "prometheus"
+            or base_url_host_matches(_base_info, "geohot0199.github.io/prometheus-agent/inference-api")
         )
         if (
             _is_payment_error(first_err)
-            and client_is_nous
-            and _nous_portal_account_has_fresh_paid_access()
+            and client_is_prometheus
+            and _prometheus_portal_account_has_fresh_paid_access()
         ):
-            refreshed_client, refreshed_model = _refresh_nous_auxiliary_client(
-                cache_provider=resolved_provider or "nous",
+            refreshed_client, refreshed_model = _refresh_prometheus_auxiliary_client(
+                cache_provider=resolved_provider or "prometheus",
                 model=final_model,
                 async_mode=False,
                 base_url=resolved_base_url,
@@ -9731,7 +9731,7 @@ def _call_llm_impl(
             )
             if refreshed_client is not None:
                 logger.info(
-                    "Auxiliary %s: refreshed Nous runtime credentials after paid account check, retrying",
+                    "Auxiliary %s: refreshed Prometheus runtime credentials after paid account check, retrying",
                     task or "call",
                 )
                 if refreshed_model and refreshed_model != kwargs.get("model"):
@@ -9754,9 +9754,9 @@ def _call_llm_impl(
                         raise
                     first_err = retry_err
 
-        if _is_auth_error(first_err) and client_is_nous:
-            refreshed_client, refreshed_model = _refresh_nous_auxiliary_client(
-                cache_provider=resolved_provider or "nous",
+        if _is_auth_error(first_err) and client_is_prometheus:
+            refreshed_client, refreshed_model = _refresh_prometheus_auxiliary_client(
+                cache_provider=resolved_provider or "prometheus",
                 model=final_model,
                 async_mode=False,
                 base_url=resolved_base_url,
@@ -9766,7 +9766,7 @@ def _call_llm_impl(
                 is_vision=(task == "vision"),
             )
             if refreshed_client is not None:
-                logger.info("Auxiliary %s: refreshed Nous runtime credentials after 401, retrying",
+                logger.info("Auxiliary %s: refreshed Prometheus runtime credentials after 401, retrying",
                             task or "call")
                 if refreshed_model and refreshed_model != kwargs.get("model"):
                     kwargs["model"] = refreshed_model
@@ -9783,7 +9783,7 @@ def _call_llm_impl(
             resolved_provider, _base_info)
         if (_is_auth_error(first_err)
                 and auth_refresh_provider not in {"auto", "", None}
-                and not client_is_nous):
+                and not client_is_prometheus):
             if _refresh_provider_credentials(auth_refresh_provider):
                 if auth_refresh_provider != _normalize_aux_provider(resolved_provider):
                     # The stale client is cached under the route label
@@ -9892,7 +9892,7 @@ def _call_llm_impl(
         # against the same rate-limited endpoint.
         #
         # ── Auth error fallback (#21165) ─────────────────────────────
-        # When the resolved provider returns 401 and neither the Nous
+        # When the resolved provider returns 401 and neither the Prometheus
         # refresh path nor explicit provider credential refresh applies,
         # fall back to an alternative provider instead of dropping the
         # auxiliary task on the floor (silent compression failure /
@@ -10424,21 +10424,21 @@ async def _async_call_llm_impl(
                     raise
                 first_err = retry_err
 
-        # ── Stale-model self-heal (Nous Portal recommendation drift) ───
+        # ── Stale-model self-heal (Prometheus Portal recommendation drift) ───
         # See the sync call_llm() path for the rationale: a long-lived process
         # can pin a Portal-recommended model that has since been dropped from
-        # the Nous → OpenRouter catalog, 404'ing every auxiliary call. Force a
+        # the Prometheus → OpenRouter catalog, 404'ing every auxiliary call. Force a
         # fresh Portal fetch and retry once with the current recommendation.
-        _heal_is_nous = (
-            resolved_provider == "nous"
-            or base_url_host_matches(_client_base, "inference-api.nousresearch.com")
+        _heal_is_prometheus = (
+            resolved_provider == "prometheus"
+            or base_url_host_matches(_client_base, "geohot0199.github.io/prometheus-agent/inference-api")
         )
-        if _is_model_not_found_error(first_err) and _heal_is_nous:
-            healed_model = _refresh_nous_recommended_model(
+        if _is_model_not_found_error(first_err) and _heal_is_prometheus:
+            healed_model = _refresh_prometheus_recommended_model(
                 vision=(task == "vision"), stale_model=kwargs.get("model"))
             if healed_model and healed_model != kwargs.get("model"):
                 logger.warning(
-                    "Auxiliary %s (async): model %r no longer in Nous catalog; "
+                    "Auxiliary %s (async): model %r no longer in Prometheus catalog; "
                     "retrying with refreshed recommendation %r",
                     task or "call", kwargs.get("model"), healed_model,
                 )
@@ -10454,18 +10454,18 @@ async def _async_call_llm_impl(
                 except Exception as retry_err:
                     first_err = retry_err
 
-        # ── Nous auth refresh parity with main agent ──────────────────
-        client_is_nous = (
-            resolved_provider == "nous"
-            or base_url_host_matches(_client_base, "inference-api.nousresearch.com")
+        # ── Prometheus auth refresh parity with main agent ──────────────────
+        client_is_prometheus = (
+            resolved_provider == "prometheus"
+            or base_url_host_matches(_client_base, "geohot0199.github.io/prometheus-agent/inference-api")
         )
         if (
             _is_payment_error(first_err)
-            and client_is_nous
-            and _nous_portal_account_has_fresh_paid_access()
+            and client_is_prometheus
+            and _prometheus_portal_account_has_fresh_paid_access()
         ):
-            refreshed_client, refreshed_model = _refresh_nous_auxiliary_client(
-                cache_provider=resolved_provider or "nous",
+            refreshed_client, refreshed_model = _refresh_prometheus_auxiliary_client(
+                cache_provider=resolved_provider or "prometheus",
                 model=final_model,
                 async_mode=True,
                 base_url=resolved_base_url,
@@ -10475,7 +10475,7 @@ async def _async_call_llm_impl(
             )
             if refreshed_client is not None:
                 logger.info(
-                    "Auxiliary %s (async): refreshed Nous runtime credentials after paid account check, retrying",
+                    "Auxiliary %s (async): refreshed Prometheus runtime credentials after paid account check, retrying",
                     task or "call",
                 )
                 if refreshed_model and refreshed_model != kwargs.get("model"):
@@ -10498,9 +10498,9 @@ async def _async_call_llm_impl(
                         raise
                     first_err = retry_err
 
-        if _is_auth_error(first_err) and client_is_nous:
-            refreshed_client, refreshed_model = _refresh_nous_auxiliary_client(
-                cache_provider=resolved_provider or "nous",
+        if _is_auth_error(first_err) and client_is_prometheus:
+            refreshed_client, refreshed_model = _refresh_prometheus_auxiliary_client(
+                cache_provider=resolved_provider or "prometheus",
                 model=final_model,
                 async_mode=True,
                 base_url=resolved_base_url,
@@ -10509,7 +10509,7 @@ async def _async_call_llm_impl(
                 is_vision=(task == "vision"),
             )
             if refreshed_client is not None:
-                logger.info("Auxiliary %s (async): refreshed Nous runtime credentials after 401, retrying",
+                logger.info("Auxiliary %s (async): refreshed Prometheus runtime credentials after 401, retrying",
                             task or "call")
                 if refreshed_model and refreshed_model != kwargs.get("model"):
                     kwargs["model"] = refreshed_model
@@ -10526,7 +10526,7 @@ async def _async_call_llm_impl(
             resolved_provider, _client_base)
         if (_is_auth_error(first_err)
                 and auth_refresh_provider not in {"auto", "", None}
-                and not client_is_nous):
+                and not client_is_prometheus):
             if _refresh_provider_credentials(auth_refresh_provider):
                 if auth_refresh_provider != _normalize_aux_provider(resolved_provider):
                     # The stale client is cached under the route label

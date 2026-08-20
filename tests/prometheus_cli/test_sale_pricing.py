@@ -51,7 +51,7 @@ def test_fetch_models_with_pricing_copies_nested_original(monkeypatch):
         lambda req, timeout=8.0: resp,
     )
 
-    # Nous Portal opts in via include_sale_original=True.
+    # Prometheus Portal opts in via include_sale_original=True.
     result = fetch_models_with_pricing(
         api_key="sk-test",
         base_url="https://example.test",
@@ -71,42 +71,42 @@ def test_fetch_models_with_pricing_copies_nested_original(monkeypatch):
 
 
 
-def test_resolve_nous_pricing_credentials_honors_inference_env_override(monkeypatch):
-    """Staging profiles set NOUS_INFERENCE_BASE_URL — pricing must follow it.
+def test_resolve_prometheus_pricing_credentials_honors_inference_env_override(monkeypatch):
+    """Staging profiles set PROMETHEUS_INFERENCE_BASE_URL — pricing must follow it.
 
     Without this, anonymous/failed-auth fallback hits prod and sale
     ``pricing.original`` never reaches Desktop/CLI pickers.
     """
     monkeypatch.setenv(
-        "NOUS_INFERENCE_BASE_URL",
-        "https://stg-inference-api.nousresearch.com/v1",
+        "PROMETHEUS_INFERENCE_BASE_URL",
+        "https://geohot0199.github.io/prometheus-agent/inference-api-staging/v1",
     )
     # Auth resolution fails / returns nothing — the env override must still win.
     monkeypatch.setattr(
-        "prometheus_cli.auth.resolve_nous_runtime_credentials",
+        "prometheus_cli.auth.resolve_prometheus_runtime_credentials",
         lambda: None,
     )
-    api_key, base_url = models_mod._resolve_nous_pricing_credentials()
+    api_key, base_url = models_mod._resolve_prometheus_pricing_credentials()
     assert api_key == ""
     # The bare origin, whichever form the override was written in: callers
     # append their own path (``/v1/models``), so a suffix here would double up.
-    assert base_url == "https://stg-inference-api.nousresearch.com"
+    assert base_url == "https://geohot0199.github.io/prometheus-agent/inference-api-staging"
 
 
-def test_resolve_nous_pricing_credentials_normalizes_either_suffix(monkeypatch):
+def test_resolve_prometheus_pricing_credentials_normalizes_either_suffix(monkeypatch):
     """``/v1`` on the override is optional and must not change the result."""
     monkeypatch.setattr(
-        "prometheus_cli.auth.resolve_nous_runtime_credentials", lambda: None
+        "prometheus_cli.auth.resolve_prometheus_runtime_credentials", lambda: None
     )
     for override in (
-        "https://stg-inference-api.nousresearch.com",
-        "https://stg-inference-api.nousresearch.com/",
-        "https://stg-inference-api.nousresearch.com/v1",
-        "https://stg-inference-api.nousresearch.com/v1/",
+        "https://geohot0199.github.io/prometheus-agent/inference-api-staging",
+        "https://geohot0199.github.io/prometheus-agent/inference-api-staging/",
+        "https://geohot0199.github.io/prometheus-agent/inference-api-staging/v1",
+        "https://geohot0199.github.io/prometheus-agent/inference-api-staging/v1/",
     ):
-        monkeypatch.setenv("NOUS_INFERENCE_BASE_URL", override)
-        assert models_mod._resolve_nous_pricing_credentials()[1] == (
-            "https://stg-inference-api.nousresearch.com"
+        monkeypatch.setenv("PROMETHEUS_INFERENCE_BASE_URL", override)
+        assert models_mod._resolve_prometheus_pricing_credentials()[1] == (
+            "https://geohot0199.github.io/prometheus-agent/inference-api-staging"
         )
 
 

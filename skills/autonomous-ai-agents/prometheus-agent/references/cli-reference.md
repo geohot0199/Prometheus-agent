@@ -107,7 +107,7 @@ prometheus profile rename A B | alias NAME | export NAME | import FILE
 
 ```
 prometheus auth                 Interactive credential manager
-prometheus auth add [PROVIDER]  Add OAuth or API-key credential (nous, openai-codex, qwen-oauth, …)
+prometheus auth add [PROVIDER]  Add OAuth or API-key credential (prometheus, openai-codex, qwen-oauth, …)
 prometheus auth list|remove P IDX|reset PROVIDER|status
 ```
 Multiple credentials per provider form a pool that rotates automatically and skips exhausted keys.
@@ -118,7 +118,7 @@ Multiple credentials per provider form a pool that rotates automatically and ski
 prometheus desktop / gui        Native desktop app
 prometheus dashboard            Web admin panel + embedded chat (--stop / --status)
 prometheus proxy                OpenAI-compatible local proxy backed by an OAuth provider
-prometheus portal               Quick setup / sign in via Nous Portal
+prometheus portal               Quick setup / sign in via Prometheus Portal
 prometheus kanban <verb>        Multi-agent work-queue board
 prometheus project              Named multi-folder workspaces
 prometheus skin list|use|set    Switch/tweak skins (see references/themes.md)

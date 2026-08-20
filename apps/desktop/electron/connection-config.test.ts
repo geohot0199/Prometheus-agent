@@ -197,12 +197,12 @@ test('profileRemoteOverride treats a cloud entry as a remote override', () => {
   // entry would (Q6) — the override must be returned, not dropped.
   const config = {
     profiles: {
-      coder: { mode: 'cloud', url: 'https://agent-1.agents.nousresearch.com', authMode: 'oauth' }
+      coder: { mode: 'cloud', url: 'https://geohot0199.github.io/prometheus-agent/agent-1', authMode: 'oauth' }
     }
   }
 
   assert.deepEqual(profileRemoteOverride(config, 'coder'), {
-    url: 'https://agent-1.agents.nousresearch.com',
+    url: 'https://geohot0199.github.io/prometheus-agent/agent-1',
     authMode: 'oauth',
     token: undefined
   })
@@ -687,12 +687,12 @@ test('resolveProfileApiRequest uses exact method and path eligibility for mixed 
     { backendProfile: 'iris', requestPath: '/api/config/defaults' }
   )
   assert.deepEqual(
-    resolveProfileApiRequest('iris', '/api/model/recommended-default?provider=nous', {
+    resolveProfileApiRequest('iris', '/api/model/recommended-default?provider=prometheus', {
       requestMethod: 'GET'
     }),
     {
       backendProfile: 'iris',
-      requestPath: '/api/model/recommended-default?provider=nous'
+      requestPath: '/api/model/recommended-default?provider=prometheus'
     }
   )
 })
@@ -860,7 +860,7 @@ test('buildGatewayWsUrlWithTicket url-encodes the ticket', () => {
 // --- authModeFromStatus ---
 
 test('authModeFromStatus returns oauth when auth_required is true', () => {
-  assert.equal(authModeFromStatus({ auth_required: true, auth_providers: ['nous'] }), 'oauth')
+  assert.equal(authModeFromStatus({ auth_required: true, auth_providers: ['prometheus'] }), 'oauth')
 })
 
 test('authModeFromStatus returns token when auth_required is false/missing', () => {
@@ -975,7 +975,7 @@ test('cookiesHaveLiveSession is false for unrelated cookies and non-arrays', () 
   assert.equal(cookiesHaveLiveSession([]), false)
 })
 
-// --- cookiesHavePrivySession (Nous portal / Privy auth, NOT gateway cookies) ---
+// --- cookiesHavePrivySession (Prometheus portal / Privy auth, NOT gateway cookies) ---
 
 test('cookiesHavePrivySession detects the privy-token access cookie', () => {
   assert.equal(cookiesHavePrivySession([{ name: 'privy-token', value: 'jwt' }]), true)

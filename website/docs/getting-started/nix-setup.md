@@ -42,17 +42,17 @@ No clone needed. Nix fetches, builds, and runs everything:
 
 ```bash
 # Run the desktop app
-nix run github:NousResearch/prometheus-agent#desktop
+nix run github:geohot0199/Prometheus-agent#desktop
 
 # Or install persistently
-nix profile install github:NousResearch/prometheus-agent#desktop
+nix profile install github:geohot0199/Prometheus-agent#desktop
 
 # run the tui
-nix run github:NousResearch/prometheus-agent -- setup
-nix run github:NousResearch/prometheus-agent -- --tui
+nix run github:geohot0199/Prometheus-agent -- setup
+nix run github:geohot0199/Prometheus-agent -- --tui
 
 # or install it in your profile
-nix profile install github:NousResearch/prometheus-agent
+nix profile install github:geohot0199/Prometheus-agent
 prometheus setup
 prometheus --tui
 ```
@@ -95,7 +95,7 @@ This module needs NixOS. Prometheus is an agent for one person. If you want an a
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    prometheus-agent.url = "github:NousResearch/prometheus-agent";
+    prometheus-agent.url = "github:geohot0199/Prometheus-agent";
   };
 
   outputs = { nixpkgs, prometheus-agent, ... }: {
@@ -611,7 +611,7 @@ The option set is the same set that the NixOS module uses. It is `services.prome
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
-    prometheus-agent.url = "github:NousResearch/prometheus-agent";
+    prometheus-agent.url = "github:geohot0199/Prometheus-agent";
   };
 }
 ```
@@ -859,7 +859,7 @@ External flakes can override the package directly:
 
 ```nix
 {
-  inputs.prometheus-agent.url = "github:NousResearch/prometheus-agent";
+  inputs.prometheus-agent.url = "github:geohot0199/Prometheus-agent";
   outputs = { prometheus-agent, nixpkgs, ... }: {
     nixpkgs.overlays = [ prometheus-agent.overlays.default ];
     # Then:

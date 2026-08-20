@@ -24,8 +24,8 @@ Before using voice features, make sure you have:
 The `~/.prometheus/` directory and default `config.yaml` are created automatically the first time you run `prometheus`. You only need to create `~/.prometheus/.env` manually for API keys.
 :::
 
-:::tip Nous Portal covers both
-A paid [Nous Portal](/user-guide/features/tool-gateway) subscription supplies the LLM (step 2) **and** OpenAI TTS via the Tool Gateway — no separate OpenAI key needed. On a fresh install, `prometheus setup --portal` wires both up at once.
+:::tip Prometheus Portal covers both
+A paid [Prometheus Portal](/user-guide/features/tool-gateway) subscription supplies the LLM (step 2) **and** OpenAI TTS via the Tool Gateway — no separate OpenAI key needed. On a fresh install, `prometheus setup --portal` wires both up at once.
 :::
 
 ## Overview

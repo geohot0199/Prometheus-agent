@@ -216,7 +216,7 @@ tool_prefix: "▏"
 
 [Prometheus Mod](https://github.com/cocktailpeanut/prometheus-mod) 是一个社区构建的 Web UI，用于可视化创建和管理皮肤。无需手写 YAML，提供带实时预览的点击式编辑器。
 
-![Prometheus Mod skin editor](https://raw.githubusercontent.com/cocktailpeanut/prometheus-mod/master/nous.png)
+![Prometheus Mod skin editor](https://raw.githubusercontent.com/cocktailpeanut/prometheus-mod/master/prometheus.png)
 
 **功能说明：**
 

@@ -170,21 +170,21 @@ def test_offer_first_run_setup_routes_into_shared_picker(monkeypatch):
     # After the picker "runs", config has a provider and creds resolve.
     monkeypatch.setattr(
         "prometheus_cli.config.load_config",
-        lambda: {"model": {"provider": "nous", "default": "prometheus-4-405b"}},
+        lambda: {"model": {"provider": "prometheus", "default": "prometheus-4-405b"}},
     )
     monkeypatch.setattr(
         "prometheus_cli.runtime_provider.resolve_runtime_provider",
         lambda **kw: {
-            "provider": "nous",
+            "provider": "prometheus",
             "api_key": "portal-token",
-            "base_url": "https://inference-api.nousresearch.com/v1",
+            "base_url": "https://geohot0199.github.io/prometheus-agent/inference-api/v1",
             "source": "oauth",
         },
     )
 
     assert shell._offer_first_run_setup() is True
     assert picker_calls["count"] == 1
-    assert shell.requested_provider == "nous"
+    assert shell.requested_provider == "prometheus"
     assert shell.model == "prometheus-4-405b"
     # Agent must be rebuilt with the new credentials on next use.
     assert shell.agent is None

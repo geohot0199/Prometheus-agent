@@ -4,9 +4,9 @@ import { resolvePluginSourceLinks } from './plugin-source-urls'
 
 describe('resolvePluginSourceLinks', () => {
   it('maps owner/repo to github browse and clone urls', () => {
-    expect(resolvePluginSourceLinks('NousResearch/prometheus-example-plugins')).toEqual({
-      gitUrl: 'https://github.com/NousResearch/prometheus-example-plugins.git',
-      browseUrl: 'https://github.com/NousResearch/prometheus-example-plugins',
+    expect(resolvePluginSourceLinks('geohot0199/prometheus-example-plugins')).toEqual({
+      gitUrl: 'https://github.com/geohot0199/prometheus-example-plugins.git',
+      browseUrl: 'https://github.com/geohot0199/prometheus-example-plugins',
       subdir: null
     })
   })

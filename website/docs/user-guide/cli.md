@@ -9,7 +9,7 @@ description: "Master the Prometheus Agent terminal interface — commands, keybi
 Prometheus Agent's CLI is a full terminal user interface (TUI) — not a web UI. It features multiline editing, slash-command autocomplete, conversation history, interrupt-and-redirect, and streaming tool output. Built for people who live in the terminal.
 
 :::tip First-time setup
-One command — `prometheus setup --portal` — and you're ready to `prometheus chat`. See [Nous Portal](/integrations/nous-portal).
+One command — `prometheus setup --portal` — and you're ready to `prometheus chat`. See [Prometheus Portal](/integrations/prometheus-portal).
 :::
 
 :::tip
@@ -34,7 +34,7 @@ prometheus chat --query-file - < prompt.txt
 prometheus chat --model "anthropic/claude-sonnet-4"
 
 # With a specific provider
-prometheus chat --provider nous        # Use Nous Portal
+prometheus chat --provider prometheus        # Use Prometheus Portal
 prometheus chat --provider openrouter  # Force OpenRouter
 
 # With specific toolsets

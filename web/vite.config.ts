@@ -64,9 +64,9 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
       "@prometheus/shared": path.resolve(__dirname, "../apps/shared/src"),
     },
-    // When @nous-research/ui is symlinked via `file:../../design-language`,
+    // When @prometheus/ui is symlinked via `file:../../vendor/prometheus-ui`,
     // Node's module resolution would pick up shared deps from
-    // design-language/node_modules/*, giving us two copies + breaking
+    // vendor/prometheus-ui/node_modules/*, giving us two copies + breaking
     // hooks (useRef-of-null), webgl contexts, etc. Force everything that
     // exists in BOTH places to use the dashboard's copy.
     //
@@ -121,7 +121,7 @@ export default defineConfig({
             },
             {
               name: "ui",
-              test: /node_modules[\\/]@nous-research[\\/]ui([\\/]|$)/,
+              test: /node_modules[\\/]@prometheus[\\/]ui([\\/]|$)/,
             },
             {
               name: "vendor",

@@ -1,10 +1,10 @@
-"""Client for uploading ``prometheus debug share`` bundles to Nous-internal S3.
+"""Client for uploading ``prometheus debug share`` bundles to Prometheus-internal S3.
 
-This is the opt-in (``--nous``) destination for ``prometheus debug share``.
-Unlike the public paste.rs path, bundles uploaded here go to a Nous-owned
-S3 bucket via a short-lived signed URL minted by the Nous account service
+This is the opt-in (``--prometheus``) destination for ``prometheus debug share``.
+Unlike the public paste.rs path, bundles uploaded here go to a Prometheus-owned
+S3 bucket via a short-lived signed URL minted by the Prometheus account service
 (NAS).  The bucket auto-expires objects after 14 days, and the contents are
-only viewable by Nous staff (and allowlisted Discord mods) through a
+only viewable by Prometheus staff (and allowlisted Discord mods) through a
 Google-OAuth-gated viewer.
 
 Flow:
@@ -24,11 +24,11 @@ import json
 import os
 import urllib.request
 
-# Base URL of the Nous account service that mints the signed upload URL.
+# Base URL of the Prometheus account service that mints the signed upload URL.
 # Overridable via env so the feature can be pointed at staging / a local dev
 # NAS instance during testing.
 NAS_BASE = os.environ.get(
-    "PROMETHEUS_DIAGNOSTICS_BASE_URL", "https://portal.nousresearch.com"
+    "PROMETHEUS_DIAGNOSTICS_BASE_URL", "https://geohot0199.github.io/prometheus-agent/portal"
 )
 
 # Network timeout for each request (seconds). The upload itself can be larger
@@ -119,8 +119,8 @@ def put_bundle(
             raise RuntimeError(f"diagnostics bundle PUT failed: HTTP {status}")
 
 
-def share_to_nous(report_bundle: bytes) -> dict:
-    """Orchestrate the full Nous-S3 upload of a gzipped *report_bundle*.
+def share_to_prometheus(report_bundle: bytes) -> dict:
+    """Orchestrate the full Prometheus-S3 upload of a gzipped *report_bundle*.
 
     Two steps: mint a presigned PUT URL (sending the exact ``sizeBytes`` NAS
     signs into the URL's ``ContentLength``), then PUT the bundle. NAS is

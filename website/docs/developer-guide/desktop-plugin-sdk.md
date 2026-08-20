@@ -66,7 +66,7 @@ written against the disk door (what you and the agent write);
 [Bundled plugins](#bundled-plugins) notes the two
 differences. No desktop plugins ship in the core tree today — reference demos
 live in the companion
-[`prometheus-example-plugins`](https://github.com/NousResearch/prometheus-example-plugins)
+[`prometheus-example-plugins`](https://github.com/geohot0199/prometheus-example-plugins)
 repo.
 
 ## Quick start — your first plugin
@@ -809,7 +809,7 @@ enable/disable contract as a disk plugin. The two differences:
 
 No desktop plugins ship in the core tree today; the shipped app stays uncluttered
 and demos live in the
-[`prometheus-example-plugins`](https://github.com/NousResearch/prometheus-example-plugins)
+[`prometheus-example-plugins`](https://github.com/geohot0199/prometheus-example-plugins)
 companion repo.
 
 ## Security model

@@ -10,7 +10,7 @@ Prometheus can optionally hand `openai/*` and `openai-codex/*` turns to the [Cod
 This is **opt-in only**. Default Prometheus behavior is unchanged unless you flip the flag. Prometheus never auto-routes you onto this runtime.
 
 :::tip
-Not using OpenAI Codex? `prometheus setup --portal` configures a non-Codex backend with Claude/Gemini/etc. in one step. See [Nous Portal](/integrations/nous-portal).
+Not using OpenAI Codex? `prometheus setup --portal` configures a non-Codex backend with Claude/Gemini/etc. in one step. See [Prometheus Portal](/integrations/prometheus-portal).
 :::
 
 ## Why

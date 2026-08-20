@@ -19,7 +19,7 @@
     <assemblyIdentity
         version="0.0.1.0"
         processorArchitecture="*"
-        name="NousResearch.Prometheus.Setup"
+        name="geohot0199.Prometheus.Setup"
         type="win32"
     />
     <description>Prometheus Setup</description>

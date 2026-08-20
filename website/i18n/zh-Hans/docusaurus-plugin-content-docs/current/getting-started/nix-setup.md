@@ -35,11 +35,11 @@ Prometheus Agent 提供了一个 Nix flake，支持三个层级的集成：
 
 ```bash
 # 直接运行（首次使用时构建，之后使用缓存）
-nix run github:NousResearch/prometheus-agent -- setup
-nix run github:NousResearch/prometheus-agent -- chat
+nix run github:geohot0199/Prometheus-agent -- setup
+nix run github:geohot0199/Prometheus-agent -- chat
 
 # 或持久化安装
-nix profile install github:NousResearch/prometheus-agent
+nix profile install github:geohot0199/Prometheus-agent
 prometheus setup
 prometheus chat
 ```
@@ -75,7 +75,7 @@ nix build
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    prometheus-agent.url = "github:NousResearch/prometheus-agent";
+    prometheus-agent.url = "github:geohot0199/Prometheus-agent";
   };
 
   outputs = { nixpkgs, prometheus-agent, ... }: {
@@ -685,7 +685,7 @@ services.prometheus-agent = {
 
 ```nix
 {
-  inputs.prometheus-agent.url = "github:NousResearch/prometheus-agent";
+  inputs.prometheus-agent.url = "github:geohot0199/Prometheus-agent";
   outputs = { prometheus-agent, nixpkgs, ... }: {
     nixpkgs.overlays = [ prometheus-agent.overlays.default ];
     # 然后：

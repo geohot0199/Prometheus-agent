@@ -1,7 +1,7 @@
 """Tests for inventory._apply_pricing — the pricing/tier enrichment that
 
 feeds the desktop GUI model picker (and onboarding) so it can show $/Mtok
-columns + Free/Pro badges and gate paid models on free Nous accounts, the
+columns + Free/Pro badges and gate paid models on free Prometheus accounts, the
 same way the `prometheus model` CLI picker does.
 """
 
@@ -11,9 +11,9 @@ import prometheus_cli.models as models_mod
 
 def _patch_pricing(monkeypatch, *, free_tier, pricing, unavailable=None):
     monkeypatch.setattr(models_mod, "get_pricing_for_provider", lambda slug, **kw: pricing.get(slug, {}))
-    monkeypatch.setattr(models_mod, "check_nous_free_tier", lambda *, force_fresh=False: free_tier)
+    monkeypatch.setattr(models_mod, "check_prometheus_free_tier", lambda *, force_fresh=False: free_tier)
     monkeypatch.setattr(
-        models_mod, "partition_nous_models_by_tier",
+        models_mod, "partition_prometheus_models_by_tier",
         lambda ids, pr, free_tier: (
             [m for m in ids if m not in (unavailable or [])],
             list(unavailable or []),
@@ -48,7 +48,7 @@ def test_apply_pricing_omits_sale_for_free_models_even_with_original(monkeypatch
         monkeypatch,
         free_tier=False,
         pricing={
-            "nous": {
+            "prometheus": {
                 "a/free": {
                     "prompt": "0",
                     "completion": "0",
@@ -60,7 +60,7 @@ def test_apply_pricing_omits_sale_for_free_models_even_with_original(monkeypatch
             }
         },
     )
-    rows = [{"slug": "nous", "models": ["a/free"]}]
+    rows = [{"slug": "prometheus", "models": ["a/free"]}]
     inv._apply_pricing(rows)
     free = rows[0]["pricing"]["a/free"]
     assert free["free"] is True
@@ -74,7 +74,7 @@ def test_apply_pricing_omits_sale_when_original_not_cheaper(monkeypatch):
         monkeypatch,
         free_tier=False,
         pricing={
-            "nous": {
+            "prometheus": {
                 "a/eq": {
                     "prompt": "0.000002",
                     "completion": "0.00001",
@@ -86,7 +86,7 @@ def test_apply_pricing_omits_sale_when_original_not_cheaper(monkeypatch):
             }
         },
     )
-    rows = [{"slug": "nous", "models": ["a/eq"]}]
+    rows = [{"slug": "prometheus", "models": ["a/eq"]}]
     inv._apply_pricing(rows)
     assert "discount_percent" not in rows[0]["pricing"]["a/eq"]
 

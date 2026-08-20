@@ -129,10 +129,10 @@ def test_provider_flag_uses_named_custom_default_model(monkeypatch):
     monkeypatch.setitem(
         cli.CLI_CONFIG,
         "model",
-        {"default": "tencent/hy3:free", "provider": "nous"},
+        {"default": "tencent/hy3:free", "provider": "prometheus"},
     )
     config = {
-        "model": {"default": "tencent/hy3:free", "provider": "nous"},
+        "model": {"default": "tencent/hy3:free", "provider": "prometheus"},
         "providers": {
             "gmk-lan": {
                 "name": "GMK Local",
@@ -157,10 +157,10 @@ def test_explicit_model_wins_over_provider_default_model(monkeypatch):
     monkeypatch.setitem(
         cli.CLI_CONFIG,
         "model",
-        {"default": "tencent/hy3:free", "provider": "nous"},
+        {"default": "tencent/hy3:free", "provider": "prometheus"},
     )
     config = {
-        "model": {"default": "tencent/hy3:free", "provider": "nous"},
+        "model": {"default": "tencent/hy3:free", "provider": "prometheus"},
         "providers": {
             "gmk-lan": {
                 "name": "GMK Local",
@@ -189,7 +189,7 @@ def test_provider_flag_logs_when_custom_default_model_cannot_resolve(monkeypatch
     monkeypatch.setitem(
         cli.CLI_CONFIG,
         "model",
-        {"default": "tencent/hy3:free", "provider": "nous"},
+        {"default": "tencent/hy3:free", "provider": "prometheus"},
     )
 
     def _boom(_name):
@@ -285,7 +285,7 @@ def test_cli_turn_routing_uses_primary_when_disabled(monkeypatch):
 
 
 
-def test_model_flow_nous_does_not_restore_stale_custom_api_key(tmp_path, monkeypatch):
+def test_model_flow_prometheus_does_not_restore_stale_custom_api_key(tmp_path, monkeypatch):
     import yaml
 
     config_home = tmp_path / "prometheus"
@@ -314,23 +314,23 @@ def test_model_flow_nous_does_not_restore_stale_custom_api_key(tmp_path, monkeyp
     monkeypatch.setattr(
         "prometheus_cli.auth.get_provider_auth_state",
         lambda provider: {
-            "access_token": "nous-token",
+            "access_token": "prometheus-token",
             "portal_base_url": "https://portal.example.com",
         },
     )
     monkeypatch.setattr(
-        "prometheus_cli.auth.resolve_nous_runtime_credentials",
+        "prometheus_cli.auth.resolve_prometheus_runtime_credentials",
         lambda *args, **kwargs: {
-            "base_url": "https://inference-api.nousresearch.com/v1",
-            "api_key": "nous-key",
+            "base_url": "https://geohot0199.github.io/prometheus-agent/inference-api/v1",
+            "api_key": "prometheus-key",
         },
     )
     monkeypatch.setattr(
-        "prometheus_cli.models.get_curated_nous_model_ids",
+        "prometheus_cli.models.get_curated_prometheus_model_ids",
         lambda: [selected_model],
     )
     monkeypatch.setattr("prometheus_cli.models.get_pricing_for_provider", lambda provider: {})
-    monkeypatch.setattr("prometheus_cli.models.check_nous_free_tier", lambda **kwargs: False)
+    monkeypatch.setattr("prometheus_cli.models.check_prometheus_free_tier", lambda **kwargs: False)
     monkeypatch.setattr(
         "prometheus_cli.models.union_with_portal_paid_recommendations",
         lambda model_ids, pricing, portal_url: (model_ids, pricing),
@@ -340,17 +340,17 @@ def test_model_flow_nous_does_not_restore_stale_custom_api_key(tmp_path, monkeyp
         lambda *args, **kwargs: selected_model,
     )
     monkeypatch.setattr(
-        "prometheus_cli.nous_subscription.prompt_enable_tool_gateway",
+        "prometheus_cli.prometheus_subscription.prompt_enable_tool_gateway",
         lambda config: None,
     )
 
-    prometheus_main._model_flow_nous(stale_config, current_model="glm-5.2")
+    prometheus_main._model_flow_prometheus(stale_config, current_model="glm-5.2")
 
     config = yaml.safe_load(config_path.read_text()) or {}
     model = config.get("model")
-    assert model["provider"] == "nous"
+    assert model["provider"] == "prometheus"
     assert model["default"] == selected_model
-    assert model["base_url"] == "https://inference-api.nousresearch.com/v1"
+    assert model["base_url"] == "https://geohot0199.github.io/prometheus-agent/inference-api/v1"
     assert "api_key" not in model
     assert "api_mode" not in model
 
@@ -548,16 +548,16 @@ def test_model_flow_custom_persists_selected_api_mode(monkeypatch):
     assert saved_env[key_env] == "test-key"
 
 
-def test_cmd_model_forwards_nous_login_tls_options(monkeypatch):
+def test_cmd_model_forwards_prometheus_login_tls_options(monkeypatch):
     monkeypatch.setattr(prometheus_main, "_require_tty", lambda *a: None)
     monkeypatch.setattr(
         "prometheus_cli.config.load_config",
-        lambda: {"model": {"default": "gpt-5", "provider": "nous"}},
+        lambda: {"model": {"default": "gpt-5", "provider": "prometheus"}},
     )
     monkeypatch.setattr("prometheus_cli.config.save_config", lambda cfg: None)
     monkeypatch.setattr("prometheus_cli.config.get_env_value", lambda key: "")
     monkeypatch.setattr("prometheus_cli.config.save_env_value", lambda key, value: None)
-    monkeypatch.setattr("prometheus_cli.auth.resolve_provider", lambda requested, **kwargs: "nous")
+    monkeypatch.setattr("prometheus_cli.auth.resolve_provider", lambda requested, **kwargs: "prometheus")
     monkeypatch.setattr("prometheus_cli.auth.get_provider_auth_state", lambda provider_id: None)
     monkeypatch.setattr(prometheus_main, "_prompt_provider_choice", lambda choices, **kwargs: 0)
 
@@ -573,12 +573,12 @@ def test_cmd_model_forwards_nous_login_tls_options(monkeypatch):
         captured["ca_bundle"] = login_args.ca_bundle
         captured["insecure"] = login_args.insecure
 
-    monkeypatch.setattr("prometheus_cli.auth._login_nous", _fake_login)
+    monkeypatch.setattr("prometheus_cli.auth._login_prometheus", _fake_login)
 
     prometheus_main.cmd_model(
         SimpleNamespace(
-            portal_url="https://portal.nousresearch.com",
-            inference_url="https://inference.nousresearch.com/v1",
+            portal_url="https://geohot0199.github.io/prometheus-agent/portal",
+            inference_url="https://geohot0199.github.io/prometheus-agent/inference/v1",
             client_id="prometheus-local",
             scope="openid profile",
             no_browser=True,
@@ -589,8 +589,8 @@ def test_cmd_model_forwards_nous_login_tls_options(monkeypatch):
     )
 
     assert captured == {
-        "portal_url": "https://portal.nousresearch.com",
-        "inference_url": "https://inference.nousresearch.com/v1",
+        "portal_url": "https://geohot0199.github.io/prometheus-agent/portal",
+        "inference_url": "https://geohot0199.github.io/prometheus-agent/inference/v1",
         "client_id": "prometheus-local",
         "scope": "openid profile",
         "no_browser": True,

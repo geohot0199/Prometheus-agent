@@ -8514,7 +8514,7 @@ class GatewayRunner(GatewayAuthorizationMixin, GatewayKanbanWatchersMixin, Gatew
     # ── scale-to-zero idle detection / dormant-quiesce (Phase 0) ──────────────
     # The gateway-side BEHAVIOUR that consumes the relay scale-to-zero primitives
     # (gateway-gateway Phase 5). Pure logic lives in gateway/scale_to_zero.py; the
-    # methods here bind it to the live runner/transport. See ~/nous/specs/
+    # methods here bind it to the live runner/transport. See ~/prometheus/specs/
     # scale-to-zero (decisions.md) for the design + the F12/F14 distinctions.
 
     def _scale_to_zero_has_live_background_work(self) -> bool:
@@ -30565,11 +30565,11 @@ async def start_gateway(config: Optional[GatewayConfig] = None, replace: bool = 
         logger.debug("Lifecycle ledger startup record failed: %s", _lc_exc)
 
     try:
-        from prometheus_cli.nous_auth_keepalive import start_nous_auth_keepalive
+        from prometheus_cli.prometheus_auth_keepalive import start_prometheus_auth_keepalive
 
-        start_nous_auth_keepalive()
+        start_prometheus_auth_keepalive()
     except Exception as exc:
-        logger.debug("Nous auth keepalive did not start: %s", exc)
+        logger.debug("Prometheus auth keepalive did not start: %s", exc)
 
     _ensure_windows_gateway_venv_imports()
 
@@ -30751,9 +30751,9 @@ async def start_gateway(config: Optional[GatewayConfig] = None, replace: bool = 
     await runner.wait_for_shutdown()
 
     try:
-        from prometheus_cli.nous_auth_keepalive import stop_nous_auth_keepalive
+        from prometheus_cli.prometheus_auth_keepalive import stop_prometheus_auth_keepalive
 
-        stop_nous_auth_keepalive()
+        stop_prometheus_auth_keepalive()
     except Exception:
         pass
 

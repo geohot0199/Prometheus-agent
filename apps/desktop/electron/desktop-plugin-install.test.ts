@@ -22,8 +22,8 @@ function mkdtemp(prefix: string) {
 
 describe('resolvePluginGitUrl', () => {
   it('maps owner/repo shorthand to github git url', () => {
-    expect(resolvePluginGitUrl('NousResearch/prometheus-example-plugins')).toEqual({
-      gitUrl: 'https://github.com/NousResearch/prometheus-example-plugins.git',
+    expect(resolvePluginGitUrl('geohot0199/prometheus-example-plugins')).toEqual({
+      gitUrl: 'https://github.com/geohot0199/prometheus-example-plugins.git',
       subdir: null
     })
   })

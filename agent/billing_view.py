@@ -354,7 +354,7 @@ def build_billing_state(*, timeout: float = 15.0) -> BillingState:
         return fixture
 
     try:
-        from prometheus_cli.nous_billing import (
+        from prometheus_cli.prometheus_billing import (
             BillingAuthError,
             BillingError,
             _absolutize_portal_url,
@@ -420,7 +420,7 @@ def _dev_fixture_billing_state() -> Optional[BillingState]:
 
     # Shared fixture portal host (matches subscription_view._DEV_FIXTURE_PORTAL —
     # prod host, not staging; the ?topup=open suffix is the /topup deep-link).
-    portal = "https://portal.nousresearch.com/billing?topup=open"
+    portal = "https://geohot0199.github.io/prometheus-agent/portal/billing?topup=open"
     common: dict[str, Any] = dict(
         org_id="org_acme",
         org_slug="acme",

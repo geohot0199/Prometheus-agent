@@ -82,7 +82,7 @@ class TestCliSkinPromptIntegration:
 
 class TestCompactBannerSkinIntegration:
 
-    def test_poseidon_compact_banner_uses_skin_branding_instead_of_nous_prometheus(self):
+    def test_poseidon_compact_banner_uses_skin_branding_instead_of_prometheus_prometheus(self):
         set_active_skin("poseidon")
 
         with patch("cli.shutil.get_terminal_size", return_value=SimpleNamespace(columns=90)), \
@@ -90,7 +90,7 @@ class TestCompactBannerSkinIntegration:
             banner = _build_compact_banner()
 
         assert "Poseidon Agent" in banner
-        assert "NOUS PROMETHEUS" not in banner
+        assert "PROMETHEUS PROMETHEUS" not in banner
 
     def test_poseidon_compact_banner_uses_skin_colors(self):
         set_active_skin("poseidon")

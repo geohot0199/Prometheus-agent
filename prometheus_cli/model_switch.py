@@ -356,22 +356,22 @@ def _fetch_picker_live_models(
 # ---------------------------------------------------------------------------
 
 _PROMETHEUS_MODEL_WARNING = (
-    "Nous Research Prometheus 3 & 4 models are NOT agentic and are not designed "
+    "Prometheus Prometheus 3 & 4 models are NOT agentic and are not designed "
     "for use with Prometheus Agent. They lack the tool-calling capabilities "
     "required for agent workflows. Consider using an agentic model instead "
     "(Claude, GPT, Gemini, DeepSeek, etc.)."
 )
 
-# Match only the real Nous Research Prometheus 3 / Prometheus 4 chat families.
+# Match only the real Prometheus Prometheus 3 / Prometheus 4 chat families.
 # The previous substring check (`"prometheus" in name.lower()`) false-positived on
 # unrelated local Modelfiles like ``prometheus-brain:qwen3-14b-ctx16k`` that just
 # happen to carry "prometheus" in their tag but are fully tool-capable.
 #
 # Positive examples the regex must match:
-#   NousResearch/Prometheus-3-Llama-3.1-70B, prometheus-4-405b, openrouter/prometheus3:70b
+#   geohot0199/Prometheus-3-Llama-3.1-70B, prometheus-4-405b, openrouter/prometheus3:70b
 # Negative examples it must NOT match:
 #   prometheus-brain:qwen3-14b-ctx16k, qwen3:14b, claude-opus-4-6
-_NOUS_PROMETHEUS_NON_AGENTIC_RE = re.compile(
+_PROMETHEUS_PROMETHEUS_NON_AGENTIC_RE = re.compile(
     r"(?:^|[/:])prometheus[-_ ]?[34](?:[-_.:]|$)",
     re.IGNORECASE,
 )
@@ -422,8 +422,8 @@ def format_model_for_display(model_name: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-def is_nous_prometheus_non_agentic(model_name: str) -> bool:
-    """Return True if *model_name* is a real Nous Prometheus 3/4 chat model.
+def is_prometheus_prometheus_non_agentic(model_name: str) -> bool:
+    """Return True if *model_name* is a real Prometheus Prometheus 3/4 chat model.
 
     Used to decide whether to surface the non-agentic warning at startup.
     Callers in :mod:`cli.py` and here should go through this single helper
@@ -431,12 +431,12 @@ def is_nous_prometheus_non_agentic(model_name: str) -> bool:
     """
     if not model_name:
         return False
-    return bool(_NOUS_PROMETHEUS_NON_AGENTIC_RE.search(model_name))
+    return bool(_PROMETHEUS_PROMETHEUS_NON_AGENTIC_RE.search(model_name))
 
 
 def _check_prometheus_model_warning(model_name: str) -> str:
-    """Return a warning string if *model_name* is a Nous Prometheus 3/4 chat model."""
-    if is_nous_prometheus_non_agentic(model_name):
+    """Return a warning string if *model_name* is a Prometheus Prometheus 3/4 chat model."""
+    if is_prometheus_prometheus_non_agentic(model_name):
         return _PROMETHEUS_MODEL_WARNING
     return ""
 
@@ -1210,10 +1210,10 @@ def _resolve_alias_fallback(
 ) -> Optional[tuple[str, str, str]]:
     """Try to resolve an alias on the user's authenticated providers.
 
-    Falls back to ``("openrouter", "nous")`` only when no authenticated
+    Falls back to ``("openrouter", "prometheus")`` only when no authenticated
     providers are supplied (backwards compat for non-interactive callers).
     """
-    providers = authenticated_providers or ("openrouter", "nous")
+    providers = authenticated_providers or ("openrouter", "prometheus")
     for provider in providers:
         # AmbiguousAliasError propagates: the alias exists on this provider,
         # the user just has to choose — trying the next provider instead
@@ -1242,7 +1242,7 @@ def resolve_display_context_length(
     but provider-enforced limits can be lower (e.g. Codex OAuth caps the
     same slug at 272k). The authoritative source is
     ``agent.model_metadata.get_model_context_length`` which already knows
-    about Codex OAuth, Copilot, Nous, and falls back to models.dev for the
+    about Codex OAuth, Copilot, Prometheus, and falls back to models.dev for the
     rest.
 
     When ``custom_providers`` is provided, per-model ``context_length``
@@ -1307,7 +1307,7 @@ async def resolve_display_context_length_async(
     The sync version runs two blocking chains: the route comparison in
     ``should_clear_context_pin`` and the full provider probe ladder in
     ``get_model_context_length`` (blocking ``requests`` calls to Anthropic
-    ``/v1/models``, Copilot, Nous, Codex, GMI, Ollama, models.dev and
+    ``/v1/models``, Copilot, Prometheus, Codex, GMI, Ollama, models.dev and
     OpenRouter).  Async gateway handlers must not run either on the event
     loop — see ``agent.model_metadata.get_model_context_length_async`` and
     ``prometheus_cli.route_identity.should_clear_context_pin_async``, which
@@ -2137,15 +2137,15 @@ def switch_model(
     if target_provider in {"opencode-zen", "opencode-go", "opencode"}:
         api_mode = opencode_model_api_mode(target_provider, new_model)
 
-    # --- Nous Portal dual-wire override ---
+    # --- Prometheus Portal dual-wire override ---
     # Portal serves anthropic/* on /v1/messages and everything else on
     # /chat/completions. resolve_runtime_provider already sets this when it
     # succeeds; always re-derive from the *final* (post-normalize) model so
     # alias clears / empty fallbacks cannot leave Claude on the OpenAI wire.
-    if target_provider in {"nous", "nous-portal", "nousresearch"}:
-        from prometheus_cli.providers import nous_api_mode
+    if target_provider in {"prometheus", "prometheus-portal", "geohot0199"}:
+        from prometheus_cli.providers import prometheus_api_mode
 
-        api_mode = nous_api_mode(new_model)
+        api_mode = prometheus_api_mode(new_model)
 
     # --- Determine api_mode if not already set ---
     if not api_mode:
@@ -2573,7 +2573,7 @@ def list_authenticated_providers(
     user_providers: dict = None,
     custom_providers: list | None = None,
     *,
-    force_fresh_nous_tier: bool = False,
+    force_fresh_prometheus_tier: bool = False,
     max_models: int | None = None,
     current_model: str = "",
     refresh: bool = False,
@@ -2598,7 +2598,7 @@ def list_authenticated_providers(
       - source: str — "built-in", "models.dev", "user-config"
 
     Only includes providers that have API keys set or are user-defined endpoints.
-    ``force_fresh_nous_tier`` bypasses the short Nous tier cache for explicit
+    ``force_fresh_prometheus_tier`` bypasses the short Prometheus tier cache for explicit
     account-sensitive flows. UI picker opens should leave it false so they do
     not block on fresh Portal/account checks every time.
 
@@ -2628,7 +2628,7 @@ def list_authenticated_providers(
     from prometheus_cli.models import (
         OPENROUTER_MODELS, _PROVIDER_MODELS,
         _MODELS_DEV_PREFERRED, _merge_with_models_dev, cached_provider_model_ids,
-        clear_provider_models_cache, get_curated_nous_model_ids,
+        clear_provider_models_cache, get_curated_prometheus_model_ids,
     )
 
     # Explicit refresh: drop every provider's cached model-id list so the
@@ -2731,12 +2731,12 @@ def list_authenticated_providers(
     # Build curated model lists keyed by prometheus provider ID
     curated: dict[str, list[str]] = dict(_PROVIDER_MODELS)
     curated["openrouter"] = [mid for mid, _ in OPENROUTER_MODELS]
-    # "nous" pulls from the remote model-catalog manifest published at
+    # "prometheus" pulls from the remote model-catalog manifest published at
     # https://github.com/geohot0199/Prometheus-agent/docs/api/model-catalog.json so
     # newly added Portal models surface in the /model picker without
     # requiring a Prometheus release. Falls back to the in-repo
-    # _PROVIDER_MODELS["nous"] snapshot when the manifest is unreachable.
-    curated["nous"] = get_curated_nous_model_ids()
+    # _PROVIDER_MODELS["prometheus"] snapshot when the manifest is unreachable.
+    curated["prometheus"] = get_curated_prometheus_model_ids()
     # Ollama Cloud uses dynamic discovery (no static curated list)
     if "ollama-cloud" not in curated:
         from prometheus_cli.models import fetch_ollama_cloud_models
@@ -2925,7 +2925,7 @@ def list_authenticated_providers(
         seen_slugs.add(slug.lower())
         _record_builtin_endpoint(slug)
 
-    # --- 2. Check Prometheus-only providers (nous, openai-codex, copilot, opencode-go) ---
+    # --- 2. Check Prometheus-only providers (prometheus, openai-codex, copilot, opencode-go) ---
     from prometheus_cli.providers import PROMETHEUS_OVERLAYS
     from prometheus_cli.auth import PROVIDER_REGISTRY as _auth_registry
 
@@ -3046,35 +3046,35 @@ def list_authenticated_providers(
                 model_ids = _ids if _ids else (curated.get(prometheus_slug, []) or curated.get(pid, []))
             except Exception:
                 model_ids = curated.get(prometheus_slug, []) or curated.get(pid, [])
-        elif prometheus_slug == "nous":
-            # Nous serves a large live /v1/models catalog (vendor-prefixed
+        elif prometheus_slug == "prometheus":
+            # Prometheus serves a large live /v1/models catalog (vendor-prefixed
             # models from many providers, returned alphabetically). The
             # `prometheus model` picker deliberately shows ONLY the curated agentic
             # list — augmented with the Portal's free/paid recommendations so
             # newly-launched models surface without a CLI release — in curated
-            # order. Mirror that exactly (see _model_flow_nous in main.py) so
+            # order. Mirror that exactly (see _model_flow_prometheus in main.py) so
             # the GUI picker matches the CLI. Was: falling through to
             # cached_provider_model_ids, which dumped the full alphabetical
             # catalog; then: curated-only, which dropped the 4 Portal
             # recommendations (e.g. stepfun/step-3.7-flash:free).
-            model_ids = curated.get("nous", [])
+            model_ids = curated.get("prometheus", [])
             try:
                 from prometheus_cli.models import (
-                    get_pricing_for_provider as _nous_pricing,
-                    check_nous_free_tier as _nous_free,
+                    get_pricing_for_provider as _prometheus_pricing,
+                    check_prometheus_free_tier as _prometheus_free,
                     union_with_portal_free_recommendations as _union_free,
                     union_with_portal_paid_recommendations as _union_paid,
                 )
-                from prometheus_cli.auth import get_provider_auth_state as _nous_state
+                from prometheus_cli.auth import get_provider_auth_state as _prometheus_state
 
-                _pricing = _nous_pricing("nous") or {}
+                _pricing = _prometheus_pricing("prometheus") or {}
                 _portal = ""
                 try:
-                    _st = _nous_state("nous") or {}
+                    _st = _prometheus_state("prometheus") or {}
                     _portal = _st.get("portal_base_url", "") or ""
                 except Exception:
                     _portal = ""
-                if _nous_free(force_fresh=force_fresh_nous_tier):
+                if _prometheus_free(force_fresh=force_fresh_prometheus_tier):
                     model_ids, _ = _union_free(model_ids, _pricing, _portal)
                 else:
                     model_ids, _ = _union_paid(model_ids, _pricing, _portal)

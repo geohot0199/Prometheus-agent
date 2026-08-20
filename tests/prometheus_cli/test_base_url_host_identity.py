@@ -4,7 +4,7 @@ not raw substrings.
 Port of earendil-works/pi#7933's bug class (DeepSeek base-URL detection used a
 substring check, missing case variants and matching lookalike URLs). Prometheus
 had the same class at several sites: keyless-endpoint detection, /model
-catalog routing, local-endpoint detection, and Nous Portal cache-layout
+catalog routing, local-endpoint detection, and Prometheus Portal cache-layout
 detection all used ``"host" in base_url``. A proxy URL that merely *contains*
 a provider host in its path (``https://proxy.internal/openrouter.ai/v1``) or
 a lookalike domain (``https://openrouter.ai.evil.com``) must not be treated
@@ -82,13 +82,13 @@ def test_local_endpoint_hostname_detection():
     )
 
 
-def test_nous_portal_host_detection():
+def test_prometheus_portal_host_detection():
     from utils import base_url_host_matches
 
-    assert base_url_host_matches("https://inference-api.nousresearch.com/v1", "nousresearch.com")
-    assert base_url_host_matches("https://portal.nousresearch.com", "nousresearch.com")
-    assert not base_url_host_matches("https://nousresearch.com.evil.io/v1", "nousresearch.com")
-    assert not base_url_host_matches("https://proxy.example/nousresearch.com/v1", "nousresearch.com")
+    assert base_url_host_matches("https://geohot0199.github.io/prometheus-agent/inference-api/v1", "geohot0199.github.io/prometheus-agent")
+    assert base_url_host_matches("https://geohot0199.github.io/prometheus-agent/portal", "geohot0199.github.io/prometheus-agent")
+    assert not base_url_host_matches("https://prometheus-agent.example.com.evil.io/v1", "geohot0199.github.io/prometheus-agent")
+    assert not base_url_host_matches("https://proxy.example/prometheus-agent.example.com/v1", "geohot0199.github.io/prometheus-agent")
 
 
 # ── Widened class coverage (follow-up to #85737) ─────────────────────────────

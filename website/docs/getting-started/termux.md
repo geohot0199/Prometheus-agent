@@ -49,7 +49,7 @@ That does not stop Prometheus from working well as a phone-native CLI agent — 
 ## Community-maintained native `pkg` option
 
 :::caution Contributor-operated distribution
-This APT repository is **community-maintained by `@adybag14-cyber` and is not an official NousResearch distribution**. NousResearch does not build, sign, host, or audit these packages. Enabling the repository means trusting the contributor-operated repository and its signing key. Termux itself remains a Tier 2 / best-effort platform.
+This APT repository is **community-maintained by `@adybag14-cyber` and is not an official geohot0199 distribution**. geohot0199 does not build, sign, host, or audit these packages. Enabling the repository means trusting the contributor-operated repository and its signing key. Termux itself remains a Tier 2 / best-effort platform.
 :::
 
 For users who prefer a native package-manager install rather than building Python/Rust dependencies on the phone, a community-maintained APT repository is available. The repository bootstrap and packaging sources are published in [`adybag14-cyber/termux-python`](https://github.com/adybag14-cyber/termux-python), with the Prometheus package build in [`adybag14-cyber/termux-prometheus`](https://github.com/adybag14-cyber/termux-prometheus).

@@ -2,7 +2,7 @@
 
 Every consumer of these capabilities sits on a per-request hot path that must
 never block on HTTP, so a process whose in-memory cache is cold answers
-"unknown" — and on that answer the Nous profile drops a "thinking off" disable
+"unknown" — and on that answer the Prometheus profile drops a "thinking off" disable
 rather than risk a 400. A short-lived process (``prometheus -p``, a cron job, a
 freshly booted gateway) is ALWAYS cold, so without a disk copy that fallback is
 the only behavior those runs ever get and the user keeps paying for reasoning
@@ -55,15 +55,15 @@ def cold_process(monkeypatch):
 
     def _reset():
         for name in (
-            "_nous_reasoning_caps_cache",
-            "_nous_reasoning_caps_failed_at",
+            "_prometheus_reasoning_caps_cache",
+            "_prometheus_reasoning_caps_failed_at",
             "_openrouter_reasoning_caps_cache",
             "_openrouter_reasoning_caps_failed_at",
         ):
             monkeypatch.setattr(models_mod, name, None)
         for name in (
-            "_nous_caps_disk_checked",
-            "_nous_caps_warm_started",
+            "_prometheus_caps_disk_checked",
+            "_prometheus_caps_warm_started",
             "_openrouter_caps_disk_checked",
             "_openrouter_caps_warm_started",
         ):
@@ -95,16 +95,16 @@ def test_fetched_catalog_answers_a_later_process_offline(
         models_mod, "_urlopen_model_catalog_request",
         lambda req, *, timeout: _response(_CATALOG),
     )
-    assert models_mod.nous_model_reasoning_capabilities(
+    assert models_mod.prometheus_model_reasoning_capabilities(
         "deepseek/deepseek-v4-pro", allow_fetch=True
     ) is not None
 
     cold_process()
     monkeypatch.setattr(models_mod, "_urlopen_model_catalog_request", offline)
 
-    caps = models_mod.nous_model_reasoning_capabilities("deepseek/deepseek-v4-pro")
+    caps = models_mod.prometheus_model_reasoning_capabilities("deepseek/deepseek-v4-pro")
     assert caps["mandatory"] is False
-    mandatory = models_mod.nous_model_reasoning_capabilities(
+    mandatory = models_mod.prometheus_model_reasoning_capabilities(
         "arcee-ai/trinity-large-thinking"
     )
     assert mandatory["mandatory"] is True
@@ -121,7 +121,7 @@ def test_mirror_is_keyed_by_catalog_url(cold_process, offline, monkeypatch):
         models_mod, "_urlopen_model_catalog_request",
         lambda req, *, timeout: _response(_CATALOG),
     )
-    models_mod.nous_model_reasoning_capabilities(
+    models_mod.prometheus_model_reasoning_capabilities(
         "deepseek/deepseek-v4-pro", allow_fetch=True
     )
 
@@ -140,15 +140,15 @@ def test_staging_portal_does_not_read_productions_mirror(
         models_mod, "_urlopen_model_catalog_request",
         lambda req, *, timeout: _response(_CATALOG),
     )
-    models_mod.nous_model_reasoning_capabilities(
+    models_mod.prometheus_model_reasoning_capabilities(
         "deepseek/deepseek-v4-pro", allow_fetch=True
     )
 
     cold_process()
-    monkeypatch.setenv("NOUS_INFERENCE_BASE_URL", "https://staging.nousresearch.com")
+    monkeypatch.setenv("PROMETHEUS_INFERENCE_BASE_URL", "https://geohot0199.github.io/prometheus-agent/staging")
     monkeypatch.setattr(models_mod, "_urlopen_model_catalog_request", offline)
 
-    assert models_mod.nous_model_reasoning_capabilities(
+    assert models_mod.prometheus_model_reasoning_capabilities(
         "deepseek/deepseek-v4-pro"
     ) is None
 
@@ -159,7 +159,7 @@ def test_stale_copy_is_still_served(cold_process, offline, monkeypatch):
     Refusing to read an aged mirror would put every long-idle install back on
     the cold-start fallback it exists to prevent.
     """
-    url = models_mod.nous_catalog_url()
+    url = models_mod.prometheus_catalog_url()
     models_mod._save_reasoning_caps_disk(
         url, {"deepseek/deepseek-v4-pro": {"supports_reasoning": True, "mandatory": False}}
     )
@@ -170,7 +170,7 @@ def test_stale_copy_is_still_served(cold_process, offline, monkeypatch):
     cold_process()
     monkeypatch.setattr(models_mod, "_urlopen_model_catalog_request", offline)
 
-    caps = models_mod.nous_model_reasoning_capabilities("deepseek/deepseek-v4-pro")
+    caps = models_mod.prometheus_model_reasoning_capabilities("deepseek/deepseek-v4-pro")
     assert caps["mandatory"] is False
 
 
@@ -181,7 +181,7 @@ def test_unreadable_mirror_degrades_to_unknown(cold_process, offline, monkeypatc
     path.write_text("{ this is not json")
 
     monkeypatch.setattr(models_mod, "_urlopen_model_catalog_request", offline)
-    assert models_mod.nous_model_reasoning_capabilities("deepseek/deepseek-v4-pro") is None
+    assert models_mod.prometheus_model_reasoning_capabilities("deepseek/deepseek-v4-pro") is None
 
 
 def test_pricing_fetch_seeds_the_mirror(cold_process, offline, monkeypatch):
@@ -197,13 +197,13 @@ def test_pricing_fetch_seeds_the_mirror(cold_process, offline, monkeypatch):
         lambda req, *, timeout: _response(_CATALOG),
     )
     models_mod.fetch_models_with_pricing(
-        base_url="https://inference-api.nousresearch.com"
+        base_url="https://geohot0199.github.io/prometheus-agent/inference-api"
     )
 
     cold_process()
     monkeypatch.setattr(models_mod, "_urlopen_model_catalog_request", offline)
 
-    caps = models_mod.nous_model_reasoning_capabilities("deepseek/deepseek-v4-pro")
+    caps = models_mod.prometheus_model_reasoning_capabilities("deepseek/deepseek-v4-pro")
     assert caps is not None
 
 
@@ -215,7 +215,7 @@ def test_a_missing_mirror_is_looked_for_once_per_process(cold_process, monkeypat
     token. Both halves have to be paid at most once.
     """
     counts = {"url": 0, "read": 0}
-    real_url = models_mod.nous_catalog_url
+    real_url = models_mod.prometheus_catalog_url
     real_read = models_mod._read_reasoning_caps_disk
 
     def _counting_url():
@@ -226,9 +226,9 @@ def test_a_missing_mirror_is_looked_for_once_per_process(cold_process, monkeypat
         counts["read"] += 1
         return real_read()
 
-    monkeypatch.setattr(models_mod, "nous_catalog_url", _counting_url)
+    monkeypatch.setattr(models_mod, "prometheus_catalog_url", _counting_url)
     monkeypatch.setattr(models_mod, "_read_reasoning_caps_disk", _counting_read)
     for _ in range(5):
-        models_mod.nous_model_reasoning_capabilities("deepseek/deepseek-v4-pro")
+        models_mod.prometheus_model_reasoning_capabilities("deepseek/deepseek-v4-pro")
 
     assert counts == {"url": 1, "read": 1}

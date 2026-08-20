@@ -54,10 +54,10 @@ PROMETHEUS_OVERLAYS: Dict[str, PrometheusOverlay] = {
         is_aggregator=True,
         base_url_env_var="OPENROUTER_BASE_URL",
     ),
-    "nous": PrometheusOverlay(
+    "prometheus": PrometheusOverlay(
         transport="openai_chat",
         auth_type="oauth_device_code",
-        base_url_override="https://inference-api.nousresearch.com/v1",
+        base_url_override="https://geohot0199.github.io/prometheus-agent/inference-api/v1",
     ),
     "openai-codex": PrometheusOverlay(
         transport="codex_responses",
@@ -412,7 +412,7 @@ ALIASES: Dict[str, str] = {
 
 _LABEL_OVERRIDES: Dict[str, str] = {
     "moa": "Mixture of Agents",
-    "nous": "Nous Portal",
+    "prometheus": "Prometheus Portal",
     "openai-codex": "ChatGPT or Codex Subscription",
     "copilot-acp": "GitHub Copilot ACP",
     "stepfun": "StepFun Step Plan",
@@ -456,7 +456,7 @@ def get_provider(name: str, *, allow_network: bool = True) -> Optional[ProviderD
     """Look up a built-in provider by id or alias.
 
     Resolution order:
-      1. Prometheus overlays (for providers not in models.dev: nous, openai-codex, etc.)
+      1. Prometheus overlays (for providers not in models.dev: prometheus, openai-codex, etc.)
       2. models.dev catalog + Prometheus overlay
 
     User-defined providers from config.yaml (``providers:`` / ``custom_providers:``)
@@ -688,8 +688,8 @@ def host_mandated_api_mode(base_url: str = "") -> Optional[str]:
     return None
 
 
-def nous_api_mode(model: str = "") -> str:
-    """Resolve the wire protocol for a Nous Portal model.
+def prometheus_api_mode(model: str = "") -> str:
+    """Resolve the wire protocol for a Prometheus Portal model.
 
     Portal serves its ``anthropic/*`` catalog on a native Anthropic Messages
     route (``/v1/messages``) alongside the OpenAI-compatible
@@ -699,7 +699,7 @@ def nous_api_mode(model: str = "") -> str:
     OpenAI-wire translation.
 
     When *model* is empty/unknown, defaults to ``chat_completions`` — the
-    historical Nous transport — so callers that don't yet know the model
+    historical Prometheus transport — so callers that don't yet know the model
     stay on the safer OpenAI-compatible path.
     """
     if str(model or "").strip().lower().startswith("anthropic/"):
@@ -712,25 +712,25 @@ def determine_api_mode(provider: str, base_url: str = "", model: str = "") -> st
 
     Resolution order:
       1. Host-mandated mode (special endpoints that only accept one protocol).
-      2. Nous Portal dual-wire (model-derived; overlay alone is openai_chat).
+      2. Prometheus Portal dual-wire (model-derived; overlay alone is openai_chat).
       3. Known provider → transport → TRANSPORT_TO_API_MODE.
       4. Direct provider checks (bedrock).
       5. Default: 'chat_completions'.
 
-    *model* is optional but required for dual-wire providers (Nous) whose
+    *model* is optional but required for dual-wire providers (Prometheus) whose
     transport depends on the catalog id, not just the provider/host.
     """
     mandated = host_mandated_api_mode(base_url)
     if mandated is not None:
         return mandated
 
-    # Nous is dual-wire: anthropic/* → Messages, everything else →
+    # Prometheus is dual-wire: anthropic/* → Messages, everything else →
     # chat_completions. The Prometheus overlay still advertises openai_chat
     # (the majority of the Portal catalog), so the transport lookup below
     # would pin Claude on the wrong wire without this carve-out.
     provider_norm = (provider or "").strip().lower()
-    if provider_norm in {"nous", "nous-portal", "nousresearch"}:
-        return nous_api_mode(model)
+    if provider_norm in {"prometheus", "prometheus-portal", "geohot0199"}:
+        return prometheus_api_mode(model)
 
     pdef = get_provider(provider)
     if pdef is not None:
