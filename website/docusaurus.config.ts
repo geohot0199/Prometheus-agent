@@ -149,6 +149,11 @@ const config: Config = {
           position: 'right',
         },
         {
+          href: 'https://github.com/geohot0199/Prometheus-agent/releases',
+          label: 'Releases',
+          position: 'right',
+        },
+        {
           href: 'https://github.com/geohot0199/Prometheus-agent',
           label: 'GitHub',
           position: 'right',
@@ -183,7 +188,8 @@ const config: Config = {
         {
           title: 'More',
           items: [
-            { label: 'Desktop Download', href: 'https://github.com/geohot0199/Prometheus-agent/' },
+            { label: 'Downloads', to: '/getting-started/downloads' },
+            { label: 'GitHub Releases', href: 'https://github.com/geohot0199/Prometheus-agent/releases' },
             { label: 'GitHub', href: 'https://github.com/geohot0199/Prometheus-agent' },
             { label: 'Nous Research', href: 'https://nousresearch.com' },
           ],

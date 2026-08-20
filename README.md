@@ -7,6 +7,7 @@
   <a href="https://github.com/geohot0199/Prometheus-agent">Prometheus Agent</a> | <a href="https://github.com/geohot0199/Prometheus-agent/blob/main/website/docs/getting-started/downloads.md">Downloads</a>
 </p>
 <p align="center">
+  <a href="https://github.com/geohot0199/Prometheus-agent/releases"><img src="https://img.shields.io/github/v/release/geohot0199/Prometheus-agent?style=for-the-badge&label=Release" alt="Latest release"></a>
   <a href="https://github.com/geohot0199/Prometheus-agent/blob/main/website/docs/getting-started/downloads.md"><img src="https://img.shields.io/badge/Docs-GitHub-FFD700?style=for-the-badge" alt="Documentation"></a>
   <a href="https://discord.gg/NousResearch"><img src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
   <a href="https://github.com/geohot0199/Prometheus-agent/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License: MIT"></a>
@@ -39,7 +40,7 @@ Use any model you want — [Nous Portal](https://portal.nousresearch.com), OpenR
 | **Linux / macOS / WSL2 / Termux** | `curl -fsSL https://raw.githubusercontent.com/geohot0199/Prometheus-agent/main/scripts/install.sh \| bash` |
 | **Windows 10/11** | `iex (irm https://raw.githubusercontent.com/geohot0199/Prometheus-agent/main/scripts/install.ps1)` |
 | **Desktop app** | After CLI install: `prometheus desktop` — or `--include-desktop` on the Unix installer |
-| **Releases** | [github.com/geohot0199/Prometheus-agent/releases](https://github.com/geohot0199/Prometheus-agent/releases) |
+| **Releases** | **[v0.20.4 (2026.8.20)](https://github.com/geohot0199/Prometheus-agent/releases/tag/v2026.8.20)** — [all releases](https://github.com/geohot0199/Prometheus-agent/releases) |
 
 Full download notes: [Downloads](website/docs/getting-started/downloads.md).
 
