@@ -1,8 +1,19 @@
-<p align="center">
-  <img src="assets/banner.png" alt="Prometheus Agent" width="100%">
-</p>
+<div align="center">
+<pre>
+        ▄
+       ▄█▄
+      █████
+     ███████
+    ████ ████
+   ███████████
+  █████████████
+ ███████████████
+█████████████████
+ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+</pre>
+</div>
 
-# Prometheus Agent ☤
+# Prometheus Agent
 <p align="center">
   <a href="https://github.com/geohot0199/Prometheus-agent">Prometheus Agent</a> | <a href="https://github.com/geohot0199/Prometheus-agent/blob/main/website/docs/getting-started/downloads.md">Descargas</a>
 </p>
