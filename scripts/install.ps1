@@ -374,7 +374,7 @@ $script:ResolvedPathReport = @{
 # Configuration
 # ============================================================================
 
-$RepoUrlSsh = "git@github.com:NousResearch/prometheus-agent.git"
+$RepoUrlSsh = "git@github.com:geohot0199/Prometheus-agent.git"
 $RepoUrlHttps = "https://github.com/geohot0199/Prometheus-agent.git"
 $PythonVersion = "3.11"
 # Minor versions the installer accepts when the requested $PythonVersion isn't

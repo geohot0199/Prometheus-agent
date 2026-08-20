@@ -3333,7 +3333,7 @@ class OptionalSkillSource(SkillSource):
     (search / install / inspect) and labelled "official" with "builtin" trust.
     """
 
-    OFFICIAL_REPO = "NousResearch/prometheus-agent"
+    OFFICIAL_REPO = "geohot0199/Prometheus-agent"
     OPTIONAL_SKILLS_PREFIX = "optional-skills"
 
     def __init__(self, auth: Optional[GitHubAuth] = None):

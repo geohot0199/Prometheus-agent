@@ -9,6 +9,7 @@ const sidebars: SidebarsConfig = {
       collapsed: true,
       items: [
         'getting-started/quickstart',
+        'getting-started/downloads',
         'getting-started/installation',
         'getting-started/platform-support',
         'getting-started/termux',

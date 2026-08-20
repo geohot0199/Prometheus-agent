@@ -10,8 +10,8 @@ const config: Config = {
   url: 'https://github.com/geohot0199/Prometheus-agent',
   baseUrl: '/docs/',
 
-  organizationName: 'NousResearch',
-  projectName: 'prometheus-agent',
+  organizationName: 'geohot0199',
+  projectName: 'Prometheus-agent',
 
   onBrokenLinks: 'warn',
 
@@ -135,7 +135,7 @@ const config: Config = {
           position: 'left',
         },
         {
-          href: 'https://github.com/geohot0199/Prometheus-agent/',
+          to: '/getting-started/downloads',
           label: 'Download',
           position: 'left',
         },

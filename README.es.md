@@ -4,10 +4,10 @@
 
 # Prometheus Agent ☤
 <p align="center">
-  <a href="https://github.com/geohot0199/Prometheus-agent/">Prometheus Agent</a> | <a href="https://github.com/geohot0199/Prometheus-agent/">Prometheus Desktop</a>
+  <a href="https://github.com/geohot0199/Prometheus-agent">Prometheus Agent</a> | <a href="https://github.com/geohot0199/Prometheus-agent/blob/main/website/docs/getting-started/downloads.md">Descargas</a>
 </p>
 <p align="center">
-  <a href="https://github.com/geohot0199/Prometheus-agent/docs/"><img src="https://img.shields.io/badge/Docs-prometheus--agent.nousresearch.com-FFD700?style=for-the-badge" alt="Documentación"></a>
+  <a href="https://github.com/geohot0199/Prometheus-agent/blob/main/website/docs/getting-started/downloads.md"><img src="https://img.shields.io/badge/Docs-GitHub-FFD700?style=for-the-badge" alt="Documentación"></a>
   <a href="https://discord.gg/NousResearch"><img src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
   <a href="https://github.com/geohot0199/Prometheus-agent/blob/main/LICENSE"><img src="https://img.shields.io/badge/Licencia-MIT-green?style=for-the-badge" alt="Licencia: MIT"></a>
   <a href="https://nousresearch.com"><img src="https://img.shields.io/badge/Creado%20por-Nous%20Research-blueviolet?style=for-the-badge" alt="Creado por Nous Research"></a>
@@ -126,7 +126,7 @@ Para las listas de comandos completas, consulta la [guía de CLI](https://github
 
 ## Documentación
 
-Toda la documentación está en **[prometheus-agent.nousresearch.com/docs](https://github.com/geohot0199/Prometheus-agent/docs/)**:
+Toda la documentación está en **[website/docs](https://github.com/geohot0199/Prometheus-agent/tree/main/website/docs)**:
 
 | Sección                                                                                             | Contenido                                                    |
 | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |

@@ -264,19 +264,19 @@ test('compareApiUrl builds the GitHub compare URL for HTTPS origins', () => {
       originUrl: 'https://github.com/geohot0199/Prometheus-agent.git',
       targetSha: SHA_B
     }),
-    `https://api.github.com/repos/NousResearch/prometheus-agent/compare/${SHA_A}...${SHA_B}`
+    `https://api.github.com/repos/geohot0199/Prometheus-agent/compare/${SHA_A}...${SHA_B}`
   )
 })
 
 test('compareApiUrl handles SSH origin forms', () => {
   for (const originUrl of [
-    'git@github.com:NousResearch/prometheus-agent.git',
-    'ssh://git@github.com/NousResearch/prometheus-agent.git',
-    'git@github.com:NousResearch/prometheus-agent'
+    'git@github.com:geohot0199/Prometheus-agent.git',
+    'ssh://git@github.com/geohot0199/Prometheus-agent.git',
+    'git@github.com:geohot0199/Prometheus-agent'
   ]) {
     assert.equal(
       compareApiUrl({ currentSha: SHA_A, originUrl, targetSha: SHA_B }),
-      `https://api.github.com/repos/NousResearch/prometheus-agent/compare/${SHA_A}...${SHA_B}`
+      `https://api.github.com/repos/geohot0199/Prometheus-agent/compare/${SHA_A}...${SHA_B}`
     )
   }
 })
