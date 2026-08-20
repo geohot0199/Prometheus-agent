@@ -1,0 +1,4498 @@
+diff --git a/.github/workflows/ci-review-comment.yml b/.github/workflows/ci-review-comment.yml
+new file mode 100644
+index 0000000..216d0c0
+--- /dev/null
++++ b/.github/workflows/ci-review-comment.yml
+@@ -0,0 +1,80 @@
++name: CI review comment
++
++# Live-updating PR review comment.
++#
++# The poller runs for up to 40 minutes.
++# This run lives in its own workflow.
++# A run stays in progress until its last job ends, and GitHub refuses
++# ``gh run rerun`` on a run that is in progress.
++#
++# ``workflow_run`` starts this when CI starts. It always reads the workflow
++# and the scripts from the default branch, never from the PR head.
++# It makes a write token safe here.
++#
++# The poller reads job results through the API. Thus it watches the CI run
++# and the separate docker run, and it depends on neither.
++
++on:
++  workflow_run:
++    workflows: [CI]
++    # ``in_progress``, not ``requested``: a first-time contributor's run
++    # sits in ``action_required`` until a maintainer approves it, and
++    # ``requested`` fires at creation — the poller would wait out its
++    # whole timeout on a run that never starts. ``in_progress`` fires
++    # when the run actually starts, and it also fires on re-runs, which
++    # ``requested`` does not.
++    types: [in_progress]
++
++permissions:
++  contents: read
++  actions: read
++  pull-requests: write
++
++# One poller per CI run. A new push starts a new CI run, and its poller
++# cancels the poller of the run that GitHub superseded. The group keys
++# on the head repository too: fork PRs often share a branch name
++# (``main``, ``patch-1``), and two PRs must not cancel each other.
++concurrency:
++  group: ci-review-comment-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
++  cancel-in-progress: true
++
++jobs:
++  comment:
++    name: CI review comment (live)
++    # Fork PRs get no comment: the poller needs a write token, and the
++    # ``pull_requests`` payload is empty for a fork run.
++    if: >-
++      github.event.workflow_run.event == 'pull_request' &&
++      github.event.workflow_run.head_repository.full_name == github.repository
++    runs-on: ubuntu-latest
++    timeout-minutes: 60
++    steps:
++      - name: Checkout trusted default branch
++        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++        with:
++          ref: ${{ github.event.repository.default_branch }}
++          persist-credentials: false
++
++      - name: Run live comment poller
++        env:
++          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
++          # The CI run to report on — not this run. The name must not be
++          # GITHUB_RUN_ID: the runner sets the GITHUB_* defaults itself and
++          # ignores an env: override, so that name silently resolves to THIS
++          # run. The poller then watches itself, which stays in_progress for
++          # as long as the poller runs, and it waits out its whole timeout.
++          CI_RUN_ID: ${{ github.event.workflow_run.id }}
++          # Sibling runs for the same commit that the comment also covers,
++          # one workflow name per line (a name can contain a comma).
++          # The poller resolves each name to its runs through the API.
++          WATCH_WORKFLOWS: |
++            Docker Build, Test, and Publish
++          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
++          RUN_URL: ${{ github.event.workflow_run.html_url }}
++          # Commit info for the review comment header.
++          COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
++          COMMIT_MESSAGE: ${{ github.event.workflow_run.head_commit.message }}
++        run: |
++          python3 -u scripts/ci/live_comment.py \
++            --interval 15 \
++            --timeout 3000
+diff --git a/.github/workflows/ci.yaml b/.github/workflows/ci.yaml
+new file mode 100644
+index 0000000..9ec6163
+--- /dev/null
++++ b/.github/workflows/ci.yaml
+@@ -0,0 +1,357 @@
++name: CI
++
++# Orchestrator workflow. Runs ``detect-changes`` once, then conditionally
++# calls the sub-workflows that a PR can actually affect. A final
++# ``all-checks-pass`` gate job aggregates results so branch protection only
++# needs to require a single check.
++#
++# Sub-workflows are triggered via ``workflow_call`` and keep their own job
++# definitions, matrices, and concurrency settings. They no longer have
++# ``push:`` / ``pull_request:`` triggers of their own — everything flows
++# through this file.
++#
++# SECURITY: this workflow runs PR-controlled actions, workflows, and code.
++# Do not add ``secrets: inherit`` or GitHub App credentials here. Trusted
++# main-only automation uses protected environments in its own workflows.
++
++on:
++  pull_request:
++  push:
++    branches: [main]
++
++permissions:
++  contents: read
++  pull-requests: write # needed by lint (PR comment) + supply-chain review_status
++  actions: read # needed by osv-scanner (SARIF upload)
++  security-events: write # needed by osv-scanner (SARIF upload)
++
++concurrency:
++  group: ci-${{ github.ref }}
++  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
++
++jobs:
++  # ─────────────────────────────────────────────────────────────────────
++  # detect: run the classifier once. Every downstream job reads its outputs
++  # to decide whether to run. On push/dispatch the classifier fails open
++  # (all lanes true) so post-merge validation is never weakened.
++  # ─────────────────────────────────────────────────────────────────────
++  detect:
++    name: Detect affected areas
++    runs-on: ubuntu-latest
++    timeout-minutes: 10
++    outputs:
++      python: ${{ steps.classify.outputs.python }}
++      python_prod: ${{ steps.classify.outputs.python_prod }}
++      frontend: ${{ steps.classify.outputs.frontend }}
++      site: ${{ steps.classify.outputs.site }}
++      scan: ${{ steps.classify.outputs.scan }}
++      deps: ${{ steps.classify.outputs.deps }}
++      uv_lock: ${{ steps.classify.outputs.uv_lock }}
++      npm_lock: ${{ steps.classify.outputs.npm_lock }}
++      installer: ${{ steps.classify.outputs.installer }}
++      docker_meta: ${{ steps.classify.outputs.docker_meta }}
++      mcp_catalog: ${{ steps.classify.outputs.mcp_catalog }}
++      ci_review: ${{ steps.classify.outputs.ci_review }}
++      ci_review_files: ${{ steps.classify.outputs.ci_review_files }}
++      event_name: ${{ github.event_name }}
++    steps:
++      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++      - name: Detect affected areas
++        id: classify
++        uses: ./.github/actions/detect-changes
++        with:
++          github-token: ${{ github.token }}
++
++  # ─────────────────────────────────────────────────────────────────────
++  # Lane-gated sub-workflows. Each runs in parallel after detect finishes.
++  # Skipped workflows (if condition is false) don't spin up runners.
++  # ─────────────────────────────────────────────────────────────────────
++  tests:
++    name: Python tests
++    needs: detect
++    if: needs.detect.outputs.python == 'true'
++    uses: ./.github/workflows/tests.yml
++    with:
++      slice_count: 12
++
++  # macOS + Windows lanes. The main `tests` lane above is Linux-only, and
++  # the OS-marked tests it collects are skipped there by design (see the
++  # `_OS_MARKS` comment in tests/conftest.py) — this is where they run.
++  # Same `python` lane gate: if no Python changed, neither runs.
++  tests-os:
++    name: OS-specific tests
++    needs: detect
++    if: needs.detect.outputs.python == 'true'
++    uses: ./.github/workflows/tests-os.yml
++
++  lint:
++    name: Python lints
++    needs: detect
++    if: needs.detect.outputs.python == 'true'
++    uses: ./.github/workflows/lint.yml
++    with:
++      event_name: ${{ needs.detect.outputs.event_name }}
++
++  js-tests:
++    name: JS & TS checks
++    needs: detect
++    if: needs.detect.outputs.frontend == 'true'
++    uses: ./.github/workflows/js-tests.yml
++
++  installer-tests:
++    name: Installer tests
++    needs: detect
++    # Windows-only, and only for PRs that touch install.ps1 or its tests.
++    if: needs.detect.outputs.installer == 'true'
++    uses: ./.github/workflows/installer-tests.yml
++
++  e2e-desktop:
++    name: Desktop E2E
++    needs: detect
++    # python_prod (not python): the Playwright suite exercises the built app
++    # + `prometheus serve` backend, which never import anything under tests/.
++    # Tests-only PRs (~17% of commits) skip this 5-minute job — the longest
++    # single job in the workflow — while still running the full pytest lanes.
++    #
++    # ⛔ TEMPORARILY DISABLED (Aug 2, 2026, Teknium) — the suite is red on
++    # every PR and on main itself since the Aug 1 night engines/npm churn
++    # (#76499 → #76562 → #76575): the mock-backend Electron window never
++    # gets a title, so boot/chat/setup/interim specs all fail identically
++    # regardless of the PR's diff (verified on #76573 and the docs-only
++    # #76582). Tracking issue: #76627 (assigned: Ari). To re-enable,
++    # delete the `false &&` below — nothing else changed.
++    if: ${{ false && (needs.detect.outputs.python_prod == 'true' || needs.detect.outputs.frontend == 'true') }}
++    uses: ./.github/workflows/e2e-desktop.yml
++
++  docs-site:
++    name: Docs Site
++    needs: detect
++    if: needs.detect.outputs.site == 'true'
++    uses: ./.github/workflows/docs-site-checks.yml
++
++  history-check:
++    name: Deny unrelated histories
++    needs: detect
++    if: needs.detect.outputs.event_name == 'pull_request'
++    uses: ./.github/workflows/history-check.yml
++
++  contributor-check:
++    name: Check contributors
++    needs: detect
++    if: needs.detect.outputs.python == 'true'
++    uses: ./.github/workflows/contributor-check.yml
++
++  uv-lockfile:
++    name: Check uv.lock
++    needs: detect
++    # Gated: `uv lock --check` re-resolves the whole dependency graph against
++    # PyPI, so on every PR it spent a network round-trip — and, on a registry
++    # blip, a blocking red X — for diffs that cannot desync the lockfile
++    # (docs, frontend, prose). Only pyproject.toml / uv.lock can. A
++    # `.github/` change still forces it on via the classifier's fail-open.
++    if: needs.detect.outputs.uv_lock == 'true'
++    uses: ./.github/workflows/uv-lockfile-check.yml
++
++  infographic-check:
++    name: Check no committed infographics
++    needs: detect
++    uses: ./.github/workflows/infographic-check.yml
++
++  lockfile-diff:
++    name: package-lock.json diff
++    needs: detect
++    if: needs.detect.outputs.event_name == 'pull_request' && needs.detect.outputs.npm_lock == 'true'
++    uses: ./.github/workflows/lockfile-diff.yml
++
++  docker-lint:
++    name: Lint Docker scripts
++    needs: detect
++    if: needs.detect.outputs.docker_meta == 'true'
++    uses: ./.github/workflows/docker-lint.yml
++
++  supply-chain:
++    name: Supply-chain scan
++    needs: detect
++    if: needs.detect.outputs.event_name == 'pull_request' && (needs.detect.outputs.scan == 'true' || needs.detect.outputs.deps == 'true')
++    uses: ./.github/workflows/supply-chain-audit.yml
++    with:
++      event_name: ${{ needs.detect.outputs.event_name }}
++      scan: ${{ needs.detect.outputs.scan == 'true' }}
++      deps: ${{ needs.detect.outputs.deps == 'true' }}
++
++  review-labels:
++    name: Review label gate
++    needs: [detect, supply-chain]
++    if: always() && needs.detect.outputs.event_name == 'pull_request' && (needs.detect.outputs.ci_review == 'true' || needs.detect.outputs.mcp_catalog == 'true' || needs.supply-chain.outputs.critical_findings == 'true')
++    uses: ./.github/workflows/review-labels.yml
++    with:
++      ci_review: ${{ needs.detect.outputs.ci_review == 'true' }}
++      ci_review_files: ${{ needs.detect.outputs.ci_review_files }}
++      mcp_catalog: ${{ needs.detect.outputs.mcp_catalog == 'true' }}
++      supply_chain: ${{ needs.supply-chain.outputs.critical_findings == 'true' }}
++
++  osv-scanner:
++    name: OSV scan
++    uses: ./.github/workflows/osv-scanner.yml
++
++  # ─────────────────────────────────────────────────────────────────────
++  # Gate: runs after everything. ``if: always()`` ensures it reports a
++  # status even when some deps were skipped. Only actual ``failure``
++  # results cause it to fail; ``skipped`` is treated as success.
++  #
++  # Branch protection should require ONLY this check.
++  #
++  # Outputs ``needs-json`` — a compact ``{job_name: result}`` dict — so
++  # the live comment poller can list failed jobs in the PR comment.
++  # ─────────────────────────────────────────────────────────────────────
++  all-checks-pass:
++    name: All required checks pass
++    needs:
++      - detect
++      - tests
++      - tests-os
++      - lint
++      - js-tests
++      - installer-tests
++      - e2e-desktop
++      - docs-site
++      - history-check
++      - contributor-check
++      - uv-lockfile
++      - lockfile-diff
++      - docker-lint
++      - supply-chain
++      - review-labels
++      - osv-scanner
++      # The image build runs in its own workflow (docker.yml) and reports
++      # its own check. It was never required here, because it is too slow
++      # to block a merge. A separate run also stops it from holding this
++      # run open. That is what blocked ``gh run rerun``.
++    if: always()
++    runs-on: ubuntu-latest
++    timeout-minutes: 10
++    outputs:
++      needs-json: ${{ steps.evaluate.outputs.needs-json }}
++    steps:
++      - name: Evaluate job results
++        id: evaluate
++        env:
++          NEEDS: ${{ toJSON(needs) }}
++        run: |
++          echo "$NEEDS" | python3 -c "
++          import json, sys
++          needs = json.load(sys.stdin)
++          # Emit compact {job_name: result} for the comment assembler.
++          compact = {name: info['result'] for name, info in needs.items()}
++          print(f'needs-json={json.dumps(compact)}')
++          with open('$GITHUB_OUTPUT', 'a') as f:
++              f.write(f'needs-json={json.dumps(compact)}\n')
++          failed = [name for name, info in needs.items() if info['result'] == 'failure']
++          for name, info in sorted(needs.items()):
++              result = info['result']
++              icon = '✅' if result in ('success', 'skipped') else '❌'
++              print(f'{icon} {name}: {result}')
++          if failed:
++              print(f'::error::{len(failed)} job(s) failed: {\", \".join(failed)}')
++              sys.exit(1)
++          print('All checks passed (or were skipped)')
++          "
++
++  # ─────────────────────────────────────────────────────────────────────
++  # CI timing report: collect per-job/step durations from the GitHub API,
++  # cache them on main (as a baseline), and on PRs generate an HTML diff
++  # report with a gantt chart + per-step breakdown. The report is uploaded
++  # as an artifact and a markdown summary is written to $GITHUB_STEP_SUMMARY.
++  #
++  # The live comment poller dynamically fetches all review-status-* artifacts
++  # across the orchestrator and sub-workflow runs every cycle, so its link
++  # points straight at that report.
++  # ─────────────────────────────────────────────────────────────────────
++  ci-timings:
++    name: CI timing report
++    needs: [all-checks-pass]
++    if: always()
++    runs-on: ubuntu-latest
++    timeout-minutes: 10
++    steps:
++      - name: Checkout code
++        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++
++      - name: Restore baseline cache (PR only)
++        if: github.event_name == 'pull_request'
++        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
++        with:
++          path: ci-timings-baseline.json
++          # Prefix-match: exact key will never hit (run_id differs), so
++          # restore-keys finds the most recent baseline from main.
++          key: ci-timings-baseline-never-exact
++          restore-keys: |
++            ci-timings-baseline-
++
++      - name: Collect timings and generate report
++        env:
++          GITHUB_TOKEN: ${{ github.token }}
++        run: |
++          python3 scripts/ci/timings_report.py \
++            --baseline ci-timings-baseline.json \
++            --output ci-timings-report.html \
++            --json-out ci-timings.json \
++            --summary-out ci-timings-summary.md
++
++      - name: Upload HTML report
++        # Advisory report — artifact-service blips must not fail the job.
++        continue-on-error: true
++        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
++        id: ci-timings-html
++        with:
++          name: ci-timings-report
++          path: ci-timings-report.html
++          retention-days: 14
++
++      - name: Build linked review status
++        if: hashFiles('ci-timings.json') != ''
++        env:
++          CI_TIMINGS_REPORT_URL: ${{ steps.ci-timings-html.outputs.artifact-url }}
++        run: |
++          python3 scripts/ci/timings_report.py \
++            --from-json ci-timings.json \
++            --baseline ci-timings-baseline.json \
++            --review-status-out review-status.json \
++            --review-status-only
++
++      - name: Upload review status
++        if: hashFiles('review-status.json') != ''
++        continue-on-error: true
++        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
++        with:
++          name: review-status-ci-timings
++          path: review-status.json
++          retention-days: 14
++
++      - name: Output summary
++        env:
++          REPORT_URL: ${{ steps.ci-timings-html.outputs.artifact-url}}
++        run: |
++          {
++            echo "# CI Timing report"
++            echo "[View the full interactive report]($REPORT_URL)"
++          } >> "$GITHUB_STEP_SUMMARY"
++          cat ci-timings-summary.md >> "$GITHUB_STEP_SUMMARY"
++
++      - name: Save baseline cache (main only)
++        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
++        run: |
++          # Degraded runs (API rate-limited) produce no ci-timings.json —
++          # skip rather than fail, and never cache an empty baseline.
++          if [ -f ci-timings.json ]; then
++            cp ci-timings.json ci-timings-baseline.json
++          else
++            echo "No timings JSON this run — skipping baseline update"
++          fi
++
++      - name: Upload baseline to cache (main only)
++        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && hashFiles('ci-timings-baseline.json') != ''
++        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
++        with:
++          path: ci-timings-baseline.json
++          key: ci-timings-baseline-${{ github.run_id }}
+diff --git a/.github/workflows/contributor-check.yml b/.github/workflows/contributor-check.yml
+new file mode 100644
+index 0000000..b532d35
+--- /dev/null
++++ b/.github/workflows/contributor-check.yml
+@@ -0,0 +1,108 @@
++name: Contributor Attribution Check
++
++on:
++  workflow_call:
++    outputs:
++      review_status:
++        description: "JSON array of review status objects"
++        value: ${{ jobs.check-attribution.outputs.review_status }}
++
++permissions:
++  contents: read
++
++jobs:
++  check-attribution:
++    runs-on: ubuntu-latest
++    timeout-minutes: 10
++    outputs:
++      review_status: ${{ steps.check-emails.outputs.review_status }}
++    steps:
++      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
++        with:
++          fetch-depth: 0  # Full history needed for git log
++
++      - name: Check for unmapped contributor emails
++        id: check-emails
++        run: |
++          # Get the merge base between this PR and main
++          MERGE_BASE=$(git merge-base origin/main HEAD)
++
++          # Find any new author emails in this PR's commits
++          NEW_EMAILS=$(git log ${MERGE_BASE}..HEAD --format='%ae' --no-merges | sort -u)
++
++          if [ -z "$NEW_EMAILS" ]; then
++            echo "No new commits to check."
++            echo "review_status=[]" >> "$GITHUB_OUTPUT"
++            echo "review_status=[]" > review-status.json
++            exit 0
++          fi
++
++          # An email is mapped if it has a file in contributors/emails/
++          # (one file per email — conflict-free) or an entry in the frozen
++          # legacy AUTHOR_MAP in scripts/release.py.
++          MISSING=""
++          while IFS= read -r email; do
++            # Skip teknium and bot emails
++            case "$email" in
++              *teknium*|*noreply@github.com*|*dependabot*|*github-actions*|*anthropic.com*|*cursor.com*)
++                continue ;;
++            esac
++
++            if echo "$email" | grep -qP '\+.*@users\.noreply\.github\.com'; then
++              continue  # GitHub id+login noreply emails auto-resolve
++            fi
++
++            if [ -f "contributors/emails/${email}" ]; then
++              continue  # mapped via the contributors directory
++            fi
++
++            if ! grep -qF "\"${email}\"" scripts/release.py 2>/dev/null; then
++              AUTHOR=$(git log --author="$email" --format='%an' -1)
++              MISSING="${MISSING}\n  ${email} (${AUTHOR})"
++            fi
++          done <<< "$NEW_EMAILS"
++
++          if [ -n "$MISSING" ]; then
++            echo ""
++            echo "⚠️  New contributor email(s) without a mapping:"
++            echo -e "$MISSING"
++            echo ""
++            echo "Add a mapping file (do NOT edit AUTHOR_MAP in release.py):"
++            echo "  python3 scripts/audit_pr_attribution.py --fix   # auto-resolve + create files"
++            echo "or manually:"
++            echo -e "$MISSING" | while read -r line; do
++              email=$(echo "$line" | sed 's/^ *//' | cut -d' ' -f1)
++              [ -z "$email" ] && continue
++              echo "    python3 scripts/add_contributor.py ${email} <github-username>"
++            done
++            echo ""
++            echo "To find the GitHub username for an email:"
++            echo "  gh api 'search/users?q=EMAIL+in:email' --jq '.items[0].login'"
++
++            # Emit review_status for unmapped emails
++            DETAIL=$(echo -e "$MISSING" | sed '/^$/d; s/^  //')
++            HOW_TO_FIX=$'Run from the PR branch:\n```\npython3 scripts/audit_pr_attribution.py --fix\ngit add contributors && git commit -m "chore: map contributor emails" && git push\n```\nOr map one email manually (do NOT edit AUTHOR_MAP in release.py):\n```\npython3 scripts/add_contributor.py <email> <github-username>\n```\nTo find the GitHub username for an email:\n```\ngh api \'search/users?q=EMAIL+in:email\' --jq \'.items[0].login\'\n```\n'
++            REVIEW_STATUS=$(jq -nc \
++              --arg detail "$DETAIL" \
++              --arg how_to_fix "$HOW_TO_FIX" \
++              '[{"source":"contributor attribution","results":[{"kind":"action_required","title":"Unmapped contributor email(s)","summary":"New contributor email(s) are not in AUTHOR_MAP.","detail":$detail,"how_to_fix":$how_to_fix}]}]')
++            echo "review_status=$REVIEW_STATUS" >> "$GITHUB_OUTPUT"
++            echo "review_status=$REVIEW_STATUS" > review-status.json
++
++            exit 1
++          else
++            echo "✅ All contributor emails are mapped."
++            echo "review_status=[]" >> "$GITHUB_OUTPUT"
++            echo "review_status=[]" > review-status.json
++          fi
++
++      - name: Upload review status artifact
++        if: always() && steps.check-emails.outcome != 'skipped'
++        continue-on-error: true
++        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
++        with:
++          name: review-status-contributor-check
++          path: review-status.json
++          retention-days: 1
++          overwrite: true
++          if-no-files-found: ignore
+diff --git a/.github/workflows/deploy-site.yml b/.github/workflows/deploy-site.yml
+new file mode 100644
+index 0000000..cf7b303
+--- /dev/null
++++ b/.github/workflows/deploy-site.yml
+@@ -0,0 +1,254 @@
++name: Deploy Site
++
++on:
++  release:
++    types: [published]
++  push:
++    branches: [main]
++    paths:
++      - 'website/**'
++      - 'skills/**'
++      - 'optional-skills/**'
++      - '.github/workflows/deploy-site.yml'
++  workflow_dispatch:
++    inputs:
++      skills_index_run_id:
++        description: 'Optional Build Skills Index run ID whose skills-index artifact should be deployed'
++        required: false
++        type: string
++      rebuild_skills_index:
++        description: 'Force a fresh multi-source crawl instead of reusing the latest healthy index'
++        required: false
++        default: false
++        type: boolean
++
++permissions:
++  contents: read
++  actions: read
++  pages: write
++  id-token: write
++
++concurrency:
++  group: pages
++  cancel-in-progress: false
++
++jobs:
++  deploy-vercel:
++    # Triggered automatically on release publish (production cuts) and
++    # manually via `gh workflow run deploy-site.yml` when an out-of-band
++    # main commit needs to ship live before the next release tag — e.g.
++    # a skills-index PR that doesn't touch website/** paths and so
++    # doesn't auto-deploy via the deploy-docs path.
++    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
++    runs-on: ubuntu-latest
++    timeout-minutes: 30
++    steps:
++      - name: Trigger Vercel Deploy
++        run: curl -fsS --retry 3 --retry-delay 10 -X POST "${{ secrets.VERCEL_DEPLOY_HOOK }}"
++
++  deploy-docs:
++    if: github.repository == 'NousResearch/prometheus-agent'
++    runs-on: ubuntu-latest
++    timeout-minutes: 30
++    environment:
++      name: github-pages
++      url: ${{ steps.deploy.outputs.page_url }}
++    steps:
++      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
++
++      - name: Get GitHub App token
++        id: app-token
++        uses: ./.github/actions/get-app-token
++        with:
++          client-id: ${{ vars.APP_CLIENT_ID }}
++          private-key: ${{ secrets.APP_PRIVATE_KEY }}
++
++      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
++        with:
++          node-version: 26
++          cache: npm
++          cache-dependency-path: website/package-lock.json
++
++      - name: grab npm 12
++        run: |
++          npm i -g npm@12
++
++      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
++        with:
++          python-version: '3.11'
++
++      - name: Install PyYAML for skill extraction
++        uses: ./.github/actions/retry
++        with:
++          command: pip install pyyaml==6.0.2 httpx==0.28.1
++
++      - name: Prepare skills index (unified multi-source catalog)
++        env:
++          GH_TOKEN: ${{ steps.app-token.outputs.token }}
++          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
++          SKILLS_INDEX_RUN_ID: ${{ github.event.inputs.skills_index_run_id || '' }}
++          REBUILD_SKILLS_INDEX: ${{ github.event.inputs.rebuild_skills_index || 'false' }}
++        run: |
++          # The unified external catalog is expensive to crawl and can burn
++          # through the repository installation's GitHub API quota when several
++          # docs deploys land close together.  Normal docs deploys therefore
++          # reuse the latest healthy catalog: first the artifact from a
++          # scheduled skills-index run, then the currently live index.  Only a
++          # manual force rebuild does a fresh crawl here.
++          #
++          # If we do crawl, the build remains fatal. build_skills_index.py runs
++          # the health check BEFORE writing and exits non-zero on source
++          # collapse, keeping the last good Pages deployment live instead of
++          # publishing a degenerate catalog.
++          set -euo pipefail
++          INDEX_PATH="website/static/api/skills-index.json"
++          mkdir -p "$(dirname "$INDEX_PATH")"
++
++          validate_index() {
++            python3 - "$INDEX_PATH" <<'PY'
++          import json
++          import sys
++          from pathlib import Path
++
++          path = Path(sys.argv[1])
++          try:
++              data = json.loads(path.read_text(encoding="utf-8"))
++          except Exception as exc:
++              print(f"invalid skills index JSON: {exc}", file=sys.stderr)
++              sys.exit(1)
++          skills = data.get("skills")
++          if not isinstance(skills, list) or len(skills) < 1500:
++              count = len(skills) if isinstance(skills, list) else "missing"
++              print(f"skills index too small: {count}", file=sys.stderr)
++              sys.exit(1)
++          print(f"skills index ready: {len(skills)} skills")
++          PY
++          }
++
++          if [ "$REBUILD_SKILLS_INDEX" = "true" ]; then
++            python3 scripts/build_skills_index.py
++            validate_index
++            exit 0
++          fi
++
++          if [ -n "$SKILLS_INDEX_RUN_ID" ]; then
++            tmpdir="$(mktemp -d)"
++            echo "Downloading skills-index artifact from run $SKILLS_INDEX_RUN_ID"
++            if gh run download "$SKILLS_INDEX_RUN_ID" --name skills-index --dir "$tmpdir"; then
++              candidate="$(find "$tmpdir" -name skills-index.json -type f | head -n 1 || true)"
++              if [ -n "$candidate" ]; then
++                cp "$candidate" "$INDEX_PATH"
++                if validate_index; then
++                  exit 0
++                fi
++              fi
++            fi
++            echo "::warning::Could not use skills-index artifact from run $SKILLS_INDEX_RUN_ID; trying live index"
++          fi
++
++          echo "Downloading currently live skills index"
++          if curl -fsSL --retry 3 --retry-delay 5 \
++            "https://github.com/geohot0199/Prometheus-agent/docs/api/skills-index.json" \
++            -o "$INDEX_PATH" && validate_index; then
++            exit 0
++          fi
++
++          echo "::warning::Live skills index unavailable or unhealthy; falling back to a fresh crawl"
++          rm -f "$INDEX_PATH"
++          python3 scripts/build_skills_index.py
++          validate_index
++
++      - name: Extract skill metadata for dashboard
++        run: python3 website/scripts/extract-skills.py
++
++      - name: Regenerate per-skill docs pages + catalogs
++        run: python3 website/scripts/generate-skill-docs.py
++
++      - name: Install dependencies
++        uses: ./.github/actions/retry
++        with:
++          command: npm ci
++          working-directory: website
++
++      - name: Build Docusaurus
++        run: npm run build
++        working-directory: website
++
++      - name: Stage deployment
++        run: |
++          mkdir -p _site/docs
++          cp -r website/build/* _site/docs/
++          # llms.txt / llms-full.txt are also published at the site root
++          # (https://github.com/geohot0199/Prometheus-agent/llms.txt) because some
++          # agents and IDE plugins probe the classic root-level path rather
++          # than /docs/llms.txt. Same file, two URLs, one source of truth.
++          if [ -f website/build/llms.txt ]; then
++            cp website/build/llms.txt _site/llms.txt
++          fi
++          if [ -f website/build/llms-full.txt ]; then
++            cp website/build/llms-full.txt _site/llms-full.txt
++          fi
++
++      # Pages serves exactly the newest artifact, so each deploy used to delete
++      # the previous build's content-hashed JS/CSS while edge caches (Vercel →
++      # Fastly, max-age=300 + stale-while-revalidate=3600) kept serving HTML
++      # that referenced it — every asset request 404'd for up to ~65 minutes
++      # after each deploy. With push-triggered deploys landing every ~15-30
++      # minutes, the docs were in that broken window most of the day (search,
++      # being pure client JS, died first). Fix: keep a rolling pool of prior
++      # builds' hashed assets and union-merge it into every artifact so stale
++      # HTML keeps resolving. Hashed filenames are content-addressed, so a
++      # collision is by definition the identical file — the merge never
++      # overwrites current-build output (cp --update=none).
++      - name: Restore asset retention pool
++        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
++        with:
++          path: _asset_retention
++          key: docs-asset-retention-${{ github.run_id }}
++          restore-keys: |
++            docs-asset-retention-
++
++      - name: Merge retained assets from previous deploys
++        run: |
++          set -euo pipefail
++          ASSET_DIRS="assets zh-Hans/assets"
++          mkdir -p _asset_retention
++          # 1) Add this build's hashed assets to the pool (fresh mtimes, so
++          #    assets still shipped by current builds never age out).
++          for d in $ASSET_DIRS; do
++            if [ -d "_site/docs/$d" ]; then
++              mkdir -p "_asset_retention/$d"
++              cp -a "_site/docs/$d/." "_asset_retention/$d/"
++            fi
++          done
++          # 2) Drop pool entries no build has produced for 14 days — far
++          #    beyond any edge-cache or open-tab horizon.
++          find _asset_retention -type f -mtime +14 -delete
++          find _asset_retention -type d -empty -delete
++          # 3) Union-merge the pool into the artifact; --update=none keeps the
++          #    current build authoritative for any path it produced.
++          for d in $ASSET_DIRS; do
++            if [ -d "_asset_retention/$d" ]; then
++              mkdir -p "_site/docs/$d"
++              cp -R --update=none "_asset_retention/$d/." "_site/docs/$d/"
++            fi
++          done
++          echo "retention pool:" && du -sh _asset_retention
++          echo "deployed assets:" && du -sh _site/docs/assets
++
++      - name: Save asset retention pool
++        # Always save under a fresh key (caches are immutable); restore-keys
++        # prefix matching picks the newest on the next run.
++        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
++        with:
++          path: _asset_retention
++          key: docs-asset-retention-${{ github.run_id }}
++
++      - name: Upload artifact
++        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa  # v3
++        with:
++          path: _site
++
++      - name: Deploy to GitHub Pages
++        id: deploy
++        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e  # v4
+diff --git a/.github/workflows/docker-lint.yml b/.github/workflows/docker-lint.yml
+new file mode 100644
+index 0000000..89b80fa
+--- /dev/null
++++ b/.github/workflows/docker-lint.yml
+@@ -0,0 +1,55 @@
++name: Docker / shell lint
++
++# Lints the container build inputs: Dockerfile (via hadolint) and any shell
++# scripts under docker/ (via shellcheck). These catch the class of regression
++# the behavioral docker smoke test can't — unquoted variable
++# expansions, silently-failing RUN commands, etc.
++#
++# Rules and ignores are documented in .hadolint.yaml at the repo root.
++# shellcheck severity is pinned to `error` so SC1091-style "can't follow
++# sourced script" info-level warnings don't fail the job — the .venv
++# activate script doesn't exist at lint time.
++
++on:
++  workflow_call:
++
++permissions:
++  contents: read
++
++concurrency:
++  group: docker-lint-${{ github.ref }}
++  cancel-in-progress: true
++
++jobs:
++  hadolint:
++    name: Lint Dockerfile (hadolint)
++    runs-on: ubuntu-latest
++    timeout-minutes: 5
++    steps:
++      - name: Checkout code
++        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++
++      - name: hadolint
++        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf # v3.1.0
++        with:
++          dockerfile: Dockerfile
++          config: .hadolint.yaml
++          failure-threshold: warning
++
++  shellcheck:
++    name: Lint docker/ shell scripts (shellcheck)
++    runs-on: ubuntu-latest
++    timeout-minutes: 5
++    steps:
++      - name: Checkout code
++        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++
++      - name: shellcheck
++        uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # v2.0.0
++        env:
++          # Severity = error: SC1091 (can't follow sourced script) is info-
++          # level and would otherwise fail when the venv activate script
++          # doesn't exist at lint time.
++          SHELLCHECK_OPTS: --severity=error
++        with:
++          scandir: ./docker
+diff --git a/.github/workflows/docker.yml b/.github/workflows/docker.yml
+new file mode 100644
+index 0000000..23eb572
+--- /dev/null
++++ b/.github/workflows/docker.yml
+@@ -0,0 +1,328 @@
++name: Docker Build, Test, and Publish
++
++on:
++  # This workflow owns its own triggers. ci.yml does not call it.
++  # A reusable-workflow call eeps the caller run in progress for that full time.
++  # GitHub refuses  ``gh run rerun`` on a run that is still in progress.
++  # Thus one slow advisory job blocked every rerun of the fast required jobs. A separate
++  # run reruns and cancels independently.
++  #
++  # Trusted main pushes resolve the environment-scoped Docker Hub secrets in
++  # this same workflow, never across a workflow boundary.
++  pull_request:
++  push:
++    branches: [main]
++  release:
++    types: [published]
++
++permissions:
++  contents: read
++
++# Concurrency: push/release runs are NEVER cancelled so every merge gets
++# its own image.  PR runs reuse a PR-scoped group with
++# cancel-in-progress: true so rapid pushes to the same PR collapse to
++# the latest commit.
++concurrency:
++  group: docker-${{ github.event.pull_request.number || github.ref }}
++  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
++
++env:
++  IMAGE_NAME: nousresearch/prometheus-agent
++
++jobs:
++  # Classify the PR's changed files. ci.yml used to gate the docker call on
++  # its own ``detect`` outputs; now that this workflow triggers itself, it
++  # runs the same composite action. On push and release the classifier fails
++  # open (every lane true), so post-merge validation is never weakened.
++  detect:
++    name: Detect affected areas
++    runs-on: ubuntu-latest
++    timeout-minutes: 10
++    outputs:
++      build: ${{ steps.gate.outputs.build }}
++    steps:
++      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++
++      - name: Detect affected areas
++        id: classify
++        uses: ./.github/actions/detect-changes
++        with:
++          github-token: ${{ github.token }}
++
++      - name: Decide whether to build
++        id: gate
++        env:
++          # The docker lane derives from python_prod (not python: the image
++          # copies installed code, never tests/, so tests-only PRs skip the
++          # build), frontend and docker_meta. classify_changes.py owns the
++          # formula so this gate and the nix lane cannot drift apart.
++          DOCKER: ${{ steps.classify.outputs.docker }}
++        run: |
++          set -euo pipefail
++          if [ "$DOCKER" = "true" ]; then
++            echo "build=true" >> "$GITHUB_OUTPUT"
++          else
++            echo "build=false" >> "$GITHUB_OUTPUT"
++          fi
++
++  # Build and test the image for each architecture. This job runs PR code,
++  # so it must remain secret-free. Publishing happens in the separate,
++  # protected publish job after these tests pass.
++  build:
++    needs: [detect]
++    if: github.repository == 'NousResearch/prometheus-agent' && needs.detect.outputs.build == 'true'
++    strategy:
++      fail-fast: false
++      matrix:
++        include:
++          - arch: amd64
++            runner: ubuntu-latest
++            platform: linux/amd64
++            cache-from: type=gha,scope=docker-amd64
++            cache-to: type=gha,mode=max,scope=docker-amd64
++          - arch: arm64
++            runner: ubuntu-24.04-arm
++            platform: linux/arm64
++            cache-from: type=gha,scope=docker-arm64
++            cache-to: type=gha,mode=max,scope=docker-arm64
++
++    runs-on: ${{ matrix.runner }}
++    timeout-minutes: 45
++    steps:
++      - name: Checkout code
++        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++
++      # Retry once on transient Docker Hub / buildkit pull failures
++      # (connection reset, auth token timeout, rate limiting). The action
++      # generates a unique builder name per invocation so the retry doesn't
++      # collide with the failed first attempt. A genuine persistent failure
++      # still fails the job — only the first attempt has continue-on-error.
++      # Refs: docker/setup-buildx-action#510
++      - name: Set up Docker Buildx
++        id: buildx
++        continue-on-error: true
++        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
++
++      - name: Set up Docker Buildx (retry)
++        if: steps.buildx.outcome == 'failure'
++        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
++
++      # Build once, load into the local daemon for testing.  Cached
++      # per-arch; the push step below reuses every layer from this build.
++      - name: Build image (${{ matrix.arch }})
++        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
++        with:
++          context: .
++          file: Dockerfile
++          load: true
++          platforms: ${{ matrix.platform }}
++          tags: ${{ env.IMAGE_NAME }}:test
++          build-args: |
++            PROMETHEUS_GIT_SHA=${{ github.sha }}
++          cache-from: ${{ matrix.cache-from }}
++          cache-to: ${{ (github.event_name != 'pull_request') && matrix.cache-to || '' }}
++
++
++      # Run the docker-integration test suite against the freshly-built
++      # image already loaded into the local daemon (`:test`).
++      #
++      # Piggybacking here avoids a second image build: the build step
++      # already loaded the image into the daemon under
++      # `${IMAGE_NAME}:test`, so we just point ``PROMETHEUS_TEST_IMAGE`` at
++      # that.  The fixture's ``PROMETHEUS_TEST_IMAGE`` branch (see
++      # tests/docker/conftest.py:62-63) short-circuits the rebuild.
++      #
++      # Why this job and not a standalone one: the image is 5GB+; passing
++      # it between jobs via ``docker save``/``upload-artifact`` is slower
++      # than the build itself.  Reusing the existing daemon state is the
++      # cheapest path to coverage on every PR that touches docker code.
++      # ---------------------------------------------------------------------
++      - name: Install uv (for docker tests)
++        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # 8.2.0
++        with:
++          # Pinned: unpinned setup-uv fetches a 'latest' manifest from
++          # raw.githubusercontent.com every job; transient fetch failures
++          # fail the job (2026-07-28 incident). Keep in sync with tests.yml.
++          version: "0.9.28"
++
++      - name: Set up Python 3.11 (for docker tests)
++        uses: ./.github/actions/retry
++        with:
++          command: uv python install 3.11
++
++      - name: Install Python dependencies (for docker tests)
++        # ``dev`` extra pulls in pytest, pytest-asyncio —
++        # everything tests/docker/ needs.  We deliberately avoid ``all``
++        # here because the docker tests only drive the container via
++        # subprocess and don't import prometheus_agent's optional deps.
++        uses: ./.github/actions/retry
++        with:
++          command: uv sync --locked --python 3.11 --extra dev
++
++      - name: Run docker integration tests
++        env:
++          # Skip rebuild; use the image already loaded by the build step.
++          PROMETHEUS_TEST_IMAGE: ${{ env.IMAGE_NAME }}:test
++          # Match the policy in tests.yml :: test job — no accidental
++          # real-API calls from inside the harness.
++          OPENROUTER_API_KEY: ""
++          OPENAI_API_KEY: ""
++          NOUS_API_KEY: ""
++        run: |
++          scripts/run_tests.sh tests/docker/ --file-timeout 600
++
++  # ---------------------------------------------------------------------------
++  # Rebuild and push each architecture only after the unprivileged build/test
++  # matrix passes. This job is the sole Docker Hub credential boundary.
++  # ---------------------------------------------------------------------------
++  publish:
++    if: github.repository == 'NousResearch/prometheus-agent' && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'release')
++    needs: [build]
++    environment: container-publish
++    strategy:
++      fail-fast: false
++      matrix:
++        include:
++          - arch: amd64
++            runner: ubuntu-latest
++            platform: linux/amd64
++            cache-from: type=gha,scope=docker-amd64
++            cache-to: type=gha,mode=max,scope=docker-amd64
++          - arch: arm64
++            runner: ubuntu-24.04-arm
++            platform: linux/arm64
++            cache-from: type=gha,scope=docker-arm64
++            cache-to: type=gha,mode=max,scope=docker-arm64
++    runs-on: ${{ matrix.runner }}
++    timeout-minutes: 30
++    steps:
++      - name: Checkout trusted source
++        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++
++      # Retry once on transient Docker Hub / buildkit pull failures.
++      # See build job for rationale; same pattern.
++      - name: Set up Docker Buildx
++        id: buildx
++        continue-on-error: true
++        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
++
++      - name: Set up Docker Buildx (retry)
++        if: steps.buildx.outcome == 'failure'
++        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
++
++      - name: Log in to Docker Hub
++        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
++        with:
++          username: ${{ secrets.DOCKERHUB_USERNAME }}
++          password: ${{ secrets.DOCKERHUB_TOKEN }}
++
++      # Push by digest only (no tag). The merge job assembles the tagged
++      # manifest list after both architecture publishers complete.
++      - name: Push ${{ matrix.arch }} by digest
++        id: push
++        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
++        with:
++          context: .
++          file: Dockerfile
++          platforms: ${{ matrix.platform }}
++          labels: |
++            org.opencontainers.image.revision=${{ github.sha }}
++          build-args: |
++            PROMETHEUS_GIT_SHA=${{ github.sha }}
++          outputs: type=image,name=${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
++          cache-from: ${{ matrix.cache-from }}
++          cache-to: ${{ matrix.cache-to }}
++
++      - name: Export digest
++        run: |
++          mkdir -p /tmp/digests
++          digest="${{ steps.push.outputs.digest }}"
++          touch "/tmp/digests/${digest#sha256:}"
++
++      - name: Upload digest artifact
++        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
++        with:
++          name: digest-${{ matrix.arch }}
++          path: /tmp/digests/*
++          if-no-files-found: error
++          retention-days: 1
++
++  # ---------------------------------------------------------------------------
++  # Stitch both per-arch digests into a single tagged multi-arch manifest.
++  # This is a registry-side operation — no building, no layer re-push —
++  # so it runs in ~30 seconds.
++  #
++  # On main pushes: tags both :main and :latest.
++  # On releases: tags :<release_tag_name>.
++  # ---------------------------------------------------------------------------
++  merge:
++    if: github.repository == 'NousResearch/prometheus-agent' && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'release')
++    runs-on: ubuntu-latest
++    needs: [publish]
++    timeout-minutes: 10
++    environment: container-publish
++    steps:
++      - name: Download digests
++        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
++        with:
++          path: /tmp/digests
++          pattern: digest-*
++          merge-multiple: true
++
++      # Retry once on transient Docker Hub / buildkit pull failures.
++      # See build job for rationale; same pattern.
++      - name: Set up Docker Buildx
++        id: buildx
++        continue-on-error: true
++        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
++
++      - name: Set up Docker Buildx (retry)
++        if: steps.buildx.outcome == 'failure'
++        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
++
++      - name: Log in to Docker Hub
++        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
++        with:
++          username: ${{ secrets.DOCKERHUB_USERNAME }}
++          password: ${{ secrets.DOCKERHUB_TOKEN }}
++
++      - name: Create manifest list and push
++        working-directory: /tmp/digests
++        env:
++          IMAGE_NAME: ${{ env.IMAGE_NAME }}
++          RELEASE_TAG: ${{ github.event.release.tag_name }}
++        run: |
++          set -euo pipefail
++          args=()
++          for digest_file in *; do
++            args+=("${IMAGE_NAME}@sha256:${digest_file}")
++          done
++          if [ "${{ github.event_name }}" = "release" ]; then
++            tags=(-t "${IMAGE_NAME}:${RELEASE_TAG}")
++          else
++            tags=(-t "${IMAGE_NAME}:main" -t "${IMAGE_NAME}:latest")
++          fi
++          # Retry: Docker Hub API + just-pushed digest eventual consistency
++          # can transiently fail the create; the operation is idempotent.
++          for i in 1 2 3; do
++            if docker buildx imagetools create "${tags[@]}" "${args[@]}"; then
++              break
++            fi
++            if [ "$i" = 3 ]; then
++              echo "::error::imagetools create failed after 3 attempts"
++              exit 1
++            fi
++            echo "::warning::imagetools create failed (attempt $i); retrying in 20s"
++            sleep 20
++          done
++
++      - name: Inspect image
++        env:
++          IMAGE_NAME: ${{ env.IMAGE_NAME }}
++          RELEASE_TAG: ${{ github.event.release.tag_name }}
++        run: |
++          if [ "${{ github.event_name }}" = "release" ]; then
++            docker buildx imagetools inspect "${IMAGE_NAME}:${RELEASE_TAG}"
++          else
++            docker buildx imagetools inspect "${IMAGE_NAME}:main"
++          fi
+diff --git a/.github/workflows/docs-site-checks.yml b/.github/workflows/docs-site-checks.yml
+new file mode 100644
+index 0000000..1e82698
+--- /dev/null
++++ b/.github/workflows/docs-site-checks.yml
+@@ -0,0 +1,56 @@
++name: Docs Site Checks
++
++on:
++  workflow_call:
++
++permissions:
++  contents: read
++
++jobs:
++  docs-site-checks:
++    runs-on: ubuntu-latest
++    timeout-minutes: 20
++    steps:
++      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++
++      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
++        with:
++          node-version: 26
++          cache: npm
++          cache-dependency-path: website/package-lock.json
++
++      - name: grab npm 12
++        run: |
++          npm i -g npm@12
++
++      - name: Install website dependencies
++        uses: ./.github/actions/retry
++        with:
++          command: npm ci
++          working-directory: website
++
++      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
++        with:
++          python-version: "3.11"
++
++      - name: Install ascii-guard
++        uses: ./.github/actions/retry
++        with:
++          command: python -m pip install ascii-guard==2.3.0 pyyaml==6.0.3
++
++      - name: Extract skill metadata for dashboard
++        run: python3 website/scripts/extract-skills.py
++
++      - name: Regenerate per-skill docs pages + catalogs
++        run: python3 website/scripts/generate-skill-docs.py
++
++      - name: Lint docs diagrams
++        run: npm run lint:diagrams
++        working-directory: website
++
++      - name: Build Docusaurus
++        # Build only the default (en) locale in CI — the full bilingual
++        # build runs in deploy-site.yml on push-to-main / release.
++        # Same pattern Docusaurus uses internally (build:fast --locale en).
++        run: npm run build:fast
++        working-directory: website
+diff --git a/.github/workflows/e2e-desktop.yml b/.github/workflows/e2e-desktop.yml
+new file mode 100644
+index 0000000..c27c06c
+--- /dev/null
++++ b/.github/workflows/e2e-desktop.yml
+@@ -0,0 +1,281 @@
++name: E2E Desktop
++
++on:
++  workflow_call:
++    outputs:
++      review_status:
++        description: Screenshot and visual-diff status for the CI review comment.
++        value: ${{ jobs.e2e.outputs.review_status }}
++
++permissions:
++  contents: read
++
++concurrency:
++  group: e2e-desktop-${{ github.ref }}
++  cancel-in-progress: true
++
++jobs:
++  e2e:
++    name: Playwright E2E (Linux)
++    runs-on: ubuntu-latest
++    timeout-minutes: 20
++    outputs:
++      review_status: ${{ steps.review-status.outputs.review_status }}
++    steps:
++      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++
++      # ── System deps for Electron on headless Ubuntu ───────────────────
++      # Electron needs GTK, NSS,atk, etc. even under xvfb. Playwright's
++      # install-deps covers browsers; for Electron we install the apt
++      # packages directly.
++      - name: Install system dependencies for Electron
++        run: |
++          sudo apt-get update -qq
++          sudo apt-get install -y -qq \
++            xvfb \
++            libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 \
++            xdg-utils libatspi2.0-0 libdrm2 libgbm1 libasound2t64
++
++      # ── Node ───────────────────────────────────────────────────────────
++      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
++        with:
++          node-version: 26
++          cache: npm
++
++      - name: grab npm 12
++        run: |
++          npm i -g npm@12
++
++      # Full npm ci (not --ignore-scripts): electron's postinstall
++      # downloads the binary we launch, and node-pty's native build is
++      # needed for the terminal pane.
++      - uses: ./.github/actions/retry
++        with:
++          command: npm ci
++
++      # ── Python (for the prometheus serve backend) ──────────────────────────
++      - name: Install uv
++        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # 8.2.0
++        with:
++          # Pin the uv version: unpinned, setup-uv resolves "latest" by
++          # fetching a manifest from raw.githubusercontent.com on EVERY job —
++          # a transient fetch failure fails the whole job (2026-07-28 slice-5
++          # incident). Pinned, the binary downloads directly; no manifest hop.
++          version: '0.9.28'
++          enable-cache: true
++          cache-dependency-glob: |
++            pyproject.toml
++            uv.lock
++
++      - name: Set up Python 3.11
++        uses: ./.github/actions/retry
++        with:
++          command: uv python install 3.11
++
++      - name: Install Python dependencies
++        uses: ./.github/actions/retry
++        with:
++          command: uv sync --locked --python 3.11 --extra all --extra dev
++
++      # ── Build desktop app ─────────────────────────────────────────────
++      # The Playwright step below runs `npm run build` before testing so
++      # dist/ is always fresh — no separate build step needed here.
++
++      # ── Restore visual baseline screenshots from main ──────────────────
++      # Baselines are generated on main (via --update-snapshots) and cached.
++      # On PRs, we restore them so toHaveScreenshot has something to compare
++      # against.  The cache key is keyed on the desktop source files so a
++      # UI change naturally invalidates it — but we fall back to the main
++      # cache to avoid cold starts on unrelated PRs.
++      - name: Restore visual baseline screenshots
++        id: restore-baselines
++        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
++        with:
++          path: apps/desktop/e2e/*-snapshots
++          key: visual-baselines-${{ github.ref_name }}
++          restore-keys: |
++            visual-baselines-main
++
++      # ── Run Playwright E2E under xvfb ─────────────────────────────────
++      # xvfb runs at a fixed 1280x1024 screen so the 1220x800 Electron
++      # window always has a consistent viewport for screenshot comparison.
++      # On main, we run with --update-snapshots to generate baselines.
++      # `npm run test:e2e` builds dist/ as a pretest hook so the renderer
++      # is always fresh — no separate build step needed.
++      - name: Run Playwright E2E tests
++        working-directory: apps/desktop
++        run: |
++          if [ "${{ github.ref_name }}" = "main" ]; then
++            echo "On main — generating/updating baseline screenshots"
++            npm run build && xvfb-run -a --server-args="-screen 0 1280x1024x24" \
++              npx playwright test --reporter=list --update-snapshots
++          else
++            echo "On PR — comparing against cached baselines"
++            npm run build && xvfb-run -a --server-args="-screen 0 1280x1024x24" \
++              npx playwright test --reporter=list
++          fi
++        env:
++          CI: 'true'
++          # Ensure no real API keys leak into the test env.
++          OPENROUTER_API_KEY: ''
++          OPENAI_API_KEY: ''
++          NOUS_API_KEY: ''
++
++      # ── Save updated baselines to cache (main only) ───────────────────
++      - name: Save updated baselines to cache
++        if: github.ref_name == 'main' && always()
++        uses: actions/cache/save@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
++        with:
++          path: apps/desktop/e2e/*-snapshots
++          key: visual-baselines-main
++
++      # ── Upload Playwright report (HTML + traces) ──────────────────────
++      - name: Upload Playwright report
++        id: upload-report
++        if: always()
++        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
++        with:
++          name: playwright-report-${{ github.sha }}
++          path: apps/desktop/playwright-report
++          retention-days: 14
++          overwrite: true
++
++      # ── Upload test results (screenshots, traces, diffs) ───────────────
++      - name: Upload test results
++        id: upload-results
++        if: always()
++        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
++        with:
++          name: playwright-test-results-${{ github.sha }}
++          path: apps/desktop/test-results
++          retention-days: 14
++          overwrite: true
++
++      # ── Upload just the visual diffs (small, fast to review) ──────────
++      - name: Upload visual diffs
++        id: upload-diffs
++        if: always() && github.ref_name != 'main'
++        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
++        with:
++          name: visual-diffs-${{ github.sha }}
++          path: |
++            apps/desktop/test-results/**/*-diff.png
++            apps/desktop/test-results/**/*-actual.png
++            apps/desktop/test-results/**/*-expected.png
++          retention-days: 14
++          overwrite: true
++          if-no-files-found: ignore
++
++      - name: Build screenshot review status
++        id: review-status
++        if: always()
++        working-directory: apps/desktop
++        env:
++          RESULTS_URL: ${{ steps.upload-results.outputs.artifact-url }}
++        run: |
++          python3 ../../scripts/ci/e2e_screenshot_status.py \
++            --results-dir test-results \
++            --manifest-output /tmp/e2e-screenshot-manifest.json \
++            --evidence-dir /tmp/e2e-evidence \
++            --artifact-url "$RESULTS_URL" \
++            --output /tmp/e2e-review-status.json
++          {
++            echo 'review_status<<__E2E_REVIEW_STATUS__'
++            cat /tmp/e2e-review-status.json
++            echo '__E2E_REVIEW_STATUS__'
++          } >> "$GITHUB_OUTPUT"
++          cp /tmp/e2e-review-status.json review-status.json
++
++      - name: Upload review status artifact
++        if: always() && steps.review-status.outcome != 'skipped'
++        continue-on-error: true
++        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
++        with:
++          name: review-status-e2e-desktop
++          path: apps/desktop/review-status.json
++          retention-days: 1
++          overwrite: true
++          if-no-files-found: ignore
++
++      # The trusted workflow_run publisher consumes only this flat, bounded
++      # artifact. It turns selected images into GitHub attachment URLs; it
++      # never checks out or runs this PR's code.
++      - name: Upload inline E2E evidence
++        if: always() && github.ref_name != 'main'
++        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
++        with:
++          name: e2e-evidence-${{ github.sha }}
++          path: /tmp/e2e-evidence
++          retention-days: 14
++          overwrite: true
++          if-no-files-found: error
++
++      # ── Generate step summary with visual diff info ───────────────────
++      # Parse the JSON report + scan for diff images, then post a summary
++      # to the GitHub Actions step output so reviewers can see what changed
++      # without downloading artifacts.  Runs AFTER uploads so it can link
++      # the artifact download URLs from their step outputs.
++      - name: Generate visual diff summary
++        if: always()
++        working-directory: apps/desktop
++        env:
++          REPORT_URL: ${{ steps.upload-report.outputs.artifact-url }}
++          RESULTS_URL: ${{ steps.upload-results.outputs.artifact-url }}
++          DIFFS_URL: ${{ steps.upload-diffs.outputs.artifact-url }}
++        run: |
++          {
++          echo "## Desktop E2E — Visual Diff Report"
++          echo ""
++
++          # Count diff images (playwright writes *-diff.png on mismatch)
++          DIFF_COUNT=$(find test-results -name '*-diff.png' 2>/dev/null | wc -l)
++          ACTUAL_COUNT=$(find test-results -name '*-actual.png' 2>/dev/null | wc -l)
++
++          if [ "$DIFF_COUNT" -eq 0 ]; then
++            echo "✅ All $ACTUAL_COUNT screenshot(s) matched their baselines (or no baselines existed yet)."
++          else
++            echo "📸 **$DIFF_COUNT of $ACTUAL_COUNT screenshot(s) differ from baseline:**"
++            echo ""
++            echo "| Test | Diff | Actual | Expected |"
++            echo "|------|------|--------|----------|"
++
++            # List each diff image with a link to the artifact
++            for diff in $(find test-results -name '*-diff.png' 2>/dev/null | sort); do
++              base=${diff%-diff.png}
++              test_name=$(basename "$base")
++              echo "| $test_name | [diff]($diff) | [actual](${base}-actual.png) | [expected](${base}-expected.png) |"
++            done
++          fi
++
++          echo ""
++          echo "📥 **Artifacts:**"
++          echo ""
++          if [ -n "$RESULTS_URL" ]; then
++            echo "- [playwright-test-results]($RESULTS_URL) — all screenshots (actual + expected + diff) + traces"
++          fi
++          if [ -n "$REPORT_URL" ]; then
++            echo "- [playwright-report]($REPORT_URL) — interactive HTML report"
++          fi
++          if [ -n "$DIFFS_URL" ]; then
++            echo "- [visual-diffs]($DIFFS_URL) — just the diffed screenshots (small, fast to review)"
++          fi
++          echo ""
++          echo "**To update baselines:** merge to main (baselines auto-update on main runs) or run \`npx playwright test --update-snapshots\` locally."
++
++          # Also parse the JSON report for pass/fail counts
++          if [ -f playwright-report/results.json ]; then
++            echo ""
++            echo "### Test Results"
++            echo ""
++            node -e "
++              const r = require('./playwright-report/results.json');
++              const stats = r.stats || {};
++              console.log('| Status | Count |');
++              console.log('|--------|-------|');
++              console.log('| ✅ Passed | ' + (stats.expected || 0) + ' |');
++              console.log('| ❌ Failed | ' + (stats.unexpected || 0) + ' |');
++              console.log('| ⏭️ Skipped | ' + (stats.skipped || 0) + ' |');
++              console.log('| 🔄 Flaky | ' + (stats.flaky || 0) + ' |');
++            " 2>/dev/null || true
++          fi
++          } >> "$GITHUB_STEP_SUMMARY"
+diff --git a/.github/workflows/history-check.yml b/.github/workflows/history-check.yml
+new file mode 100644
+index 0000000..f679007
+--- /dev/null
++++ b/.github/workflows/history-check.yml
+@@ -0,0 +1,81 @@
++name: History Check
++
++# Rejects PRs whose branch has no common ancestor with main.
++#
++# In May 2026 PR #25045 was merged from a branch that had been disconnected
++# from main's history (likely an accidental `git checkout --orphan` or
++# `.git/` re-init).  GitHub's merge UI does not refuse merges of unrelated
++# histories, so the PR landed cleanly with the intended one-file change —
++# but its parent-less root commit (413990c94) got grafted into main as a
++# second root, and ~1500 files' worth of `git blame` history collapsed
++# onto that single commit.
++#
++# This check catches the failure mode by requiring `git merge-base` between
++# the PR head and main to be non-empty.
++
++on:
++  workflow_call:
++    outputs:
++      review_status:
++        description: "JSON array of review_status objects for the synthesizer."
++        value: ${{ jobs.check-common-ancestor.outputs.review_status }}
++
++permissions:
++  contents: read
++
++jobs:
++  check-common-ancestor:
++    runs-on: ubuntu-latest
++    timeout-minutes: 10
++    outputs:
++      review_status: ${{ steps.merge-base-check.outputs.review_status }}
++    steps:
++      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++        with:
++          fetch-depth: 0 # full history both sides for merge-base
++
++      - id: merge-base-check
++        name: Reject PRs with no common ancestor on main
++        run: |
++          # `git merge-base` exits non-zero AND prints nothing when the two
++          # commits share no ancestor.  We check both conditions explicitly
++          # so the failure message is clear regardless of which signal fires
++          # first.
++          if ! BASE=$(git merge-base origin/main HEAD 2>/dev/null) || [ -z "$BASE" ]; then
++            STATUS='[{"source":"unrelated histories","results":[{"kind":"action_required","title":"Unrelated histories","summary":"This PR has no common ancestor with main.","detail":"","how_to_fix":"Rebase your changes onto current main:\n```\ngit fetch origin main\ngit checkout -b fix-branch origin/main\n# re-apply your changes (cherry-pick, copy files, etc.)\ngit push -f origin fix-branch\n```\n"}]}]'
++            echo "review_status=${STATUS}" >> "$GITHUB_OUTPUT"
++            echo "review_status=${STATUS}" > review-status.json
++            echo ""
++            echo "::error::This PR has no common ancestor with main."
++            echo ""
++            echo "Your branch's history is disconnected from main.  Common causes:"
++            echo "  - the branch was created with 'git checkout --orphan'"
++            echo "  - '.git/' was re-initialized at some point during the work"
++            echo "  - the branch was force-pushed from an unrelated repository"
++            echo ""
++            echo "Merging an unrelated-history PR grafts a parent-less root commit"
++            echo "into main and collapses git blame for every file in that snapshot."
++            echo "Reference: PR #25045 caused this and re-rooted blame on ~1500"
++            echo "files to a single orphan commit."
++            echo ""
++            echo "To fix, rebase your changes onto current main:"
++            echo "  git fetch origin main"
++            echo "  git checkout -b fix-branch origin/main"
++            echo "  # re-apply your changes (cherry-pick, copy files, etc.)"
++            echo "  git push -f origin fix-branch"
++            exit 1
++          fi
++          echo "::notice::Common ancestor with main: $BASE"
++          echo "review_status=[]" >> "$GITHUB_OUTPUT"
++          echo "review_status=[]" > review-status.json
++
++      - name: Upload review status artifact
++        if: always() && steps.merge-base-check.outcome != 'skipped'
++        continue-on-error: true
++        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
++        with:
++          name: review-status-history-check
++          path: review-status.json
++          retention-days: 1
++          overwrite: true
++          if-no-files-found: ignore
+diff --git a/.github/workflows/infographic-check.yml b/.github/workflows/infographic-check.yml
+new file mode 100644
+index 0000000..288f6f4
+--- /dev/null
++++ b/.github/workflows/infographic-check.yml
+@@ -0,0 +1,78 @@
++name: Infographic Check
++
++# Rejects PRs that commit PR-infographic images into the repo.
++#
++# PR infographics are rendered to an image-provider URL (fal.media) and
++# embedded in the PR *description*.  The PR body is the archive; the binary
++# never belongs in git history.
++#
++# This has now leaked twice.  PR #48261 removed the first batch, PR #54564
++# removed a second batch and added `infographic/` to `.gitignore` — but
++# `.gitignore` only stops *accidental* `git add`.  It does nothing against
++# `git add -f`, and it does nothing for a path that does not literally match
++# the ignore pattern.  Nine more PNGs (~14MB) were committed in the four
++# weeks AFTER that rule landed, plus PR #70552 caught an `infograficos/`
++# spelling that sidestepped the pattern entirely.
++#
++# A passive ignore rule cannot enforce a policy.  This check can.
++
++on:
++  workflow_call:
++    outputs:
++      review_status:
++        description: "JSON array of review_status objects for the synthesizer."
++        value: ${{ jobs.check-no-committed-infographics.outputs.review_status }}
++
++permissions:
++  contents: read
++
++jobs:
++  check-no-committed-infographics:
++    runs-on: ubuntu-latest
++    timeout-minutes: 10
++    outputs:
++      review_status: ${{ steps.infographic-check.outputs.review_status }}
++    steps:
++      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++
++      - id: infographic-check
++        name: Reject committed PR-infographic images
++        run: |
++          # Match on the IMAGE, not on a directory name.  Keying this to
++          # `infographic/` is what let `infograficos/` through in #70552 —
++          # any localized or typo'd directory would sidestep it again.
++          # Instead: find tracked raster images whose path contains an
++          # infographic-ish segment, in any spelling, at any depth.
++          #
++          # `docs/assets` and `website/` legitimately hold product imagery
++          # and are excluded; those are referenced from shipped docs pages.
++          OFFENDERS=$(git ls-files -z \
++            | tr '\0' '\n' \
++            | grep -iE '(^|/)(infograph|infograf)[^/]*/' \
++            | grep -iE '\.(png|jpe?g|webp|gif)$' \
++            || true)
++
++          if [ -n "$OFFENDERS" ]; then
++            COUNT=$(printf '%s\n' "$OFFENDERS" | wc -l | tr -d ' ')
++            STATUS='[{"source":"committed infographics","results":[{"kind":"action_required","title":"PR infographic committed to the repo","summary":"Infographic images belong in the PR description, never in git.","detail":"","how_to_fix":"Untrack the image and reference the provider URL from the PR body instead:\n```\ngit rm --cached <path-to-image>\n```\nThen put it in the PR description:\n```\n## Infographic\n\n![slug](https://<provider-url>)\n```\n"}]}]'
++            echo "review_status=${STATUS}" >> "$GITHUB_OUTPUT"
++            echo ""
++            echo "::error::${COUNT} PR-infographic image(s) are tracked in git."
++            echo ""
++            printf '%s\n' "$OFFENDERS" | sed 's/^/  /'
++            echo ""
++            echo "PR infographics are rendered to an image-provider URL and"
++            echo "embedded in the PR DESCRIPTION.  The PR body is the archive —"
++            echo "the binary never enters git history."
++            echo ""
++            echo "This rule has been re-established twice already (#48261,"
++            echo "#54564) and leaked both times, because .gitignore cannot stop"
++            echo "'git add -f' or a differently-spelled directory (#70552)."
++            echo ""
++            echo "To fix:"
++            echo "  git rm --cached <path>   # keeps your local copy"
++            echo "  # then embed the provider URL in the PR description"
++            exit 1
++          fi
++          echo "::notice::No committed PR-infographic images."
++          echo "review_status=[]" >> "$GITHUB_OUTPUT"
+diff --git a/.github/workflows/install-e2e-run.yml b/.github/workflows/install-e2e-run.yml
+new file mode 100644
+index 0000000..964256e
+--- /dev/null
++++ b/.github/workflows/install-e2e-run.yml
+@@ -0,0 +1,122 @@
++name: Install & Update E2E (reusable)
++
++# Runs ONE update route against ONE starting commit, in the dev sandbox, with a
++# real install (uv, a managed Python, Node, the venv) behind it.
++#
++# Reusable so callers can fan out over the combinations that matter -- update
++# from the tip vs. from an older release, `prometheus update` vs. re-running the
++# installer -- without duplicating the runner setup. Each leg is independent:
++# its own sandbox, its own install, nothing rewound or shared.
++#
++# Call it:
++#
++#   jobs:
++#     tip:
++#       uses: ./.github/workflows/install-e2e-run.yml
++#       with:
++#         route: update
++#         install-ref: refs/heads/main
++
++on:
++  workflow_call:
++    inputs:
++      route:
++        description: 'Update path to exercise: update (prometheus update) or installer (re-run install.sh).'
++        required: true
++        type: string
++      install-ref:
++        description: 'What to install before updating: a branch, a tag (v2026.7.7), or a SHA reachable from main.'
++        required: false
++        type: string
++        default: refs/heads/main
++      runner:
++        description: 'Runner label.'
++        required: false
++        type: string
++        default: ubuntu-latest
++      timeout-minutes:
++        description: 'Job timeout. A cold run installs real toolchains twice.'
++        required: false
++        type: number
++        default: 45
++
++permissions:
++  contents: read
++
++jobs:
++  e2e:
++    name: ${{ inputs.route }} from ${{ inputs.install-ref }}
++    runs-on: ${{ inputs.runner }}
++    timeout-minutes: ${{ inputs.timeout-minutes }}
++
++    steps:
++      # Full history: the sandbox fetches the starting commit and the test
++      # compares against this commit, so a shallow clone is not enough.
++      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++        with:
++          fetch-depth: 0
++
++      # bubblewrap + slirp4netns are what the sandbox is built on; util-linux
++      # supplies the `unshare` that builds the multi-uid userns for the
++      # user-level (non-root) install.
++      - name: Install sandbox dependencies
++        run: |
++          set -euo pipefail
++          sudo apt-get update -qq
++          sudo apt-get install -y -qq bubblewrap slirp4netns uidmap util-linux
++
++      # Ubuntu 24.04 restricts unprivileged user namespaces through AppArmor,
++      # which is exactly what bwrap needs. Report the state before touching it
++      # so a future runner-image change is visible in the log rather than
++      # silently altering what this job proves.
++      - name: Permit unprivileged user namespaces
++        run: |
++          set -euo pipefail
++          echo "--- kernel userns settings (before)"
++          sysctl kernel.unprivileged_userns_clone 2>/dev/null || echo "  (sysctl absent)"
++          sysctl kernel.apparmor_restrict_unprivileged_userns 2>/dev/null || echo "  (sysctl absent)"
++          if sysctl -n kernel.apparmor_restrict_unprivileged_userns >/dev/null 2>&1; then
++            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
++          fi
++          echo "--- subuid/subgid for $(id -un)"
++          grep "^$(id -un):" /etc/subuid /etc/subgid || echo "  (none — sandbox will say so)"
++
++      - name: Run install + update E2E
++        run: |
++          set -euo pipefail
++          tests/install/install-update-e2e.sh \
++            --route '${{ inputs.route }}' \
++            --install-ref '${{ inputs.install-ref }}'
++        env:
++          # Outside the workspace on purpose: the script creates this directory
++          # up front, and an untracked dir inside the repo makes the worktree
++          # dirty -- which dev-sandbox reacts to by snapshotting the working
++          # copy into a fresh fake-main commit on every invocation, moving the
++          # update target mid-run.
++          PROMETHEUS_E2E_LOG_DIR: ${{ runner.temp }}/e2e-logs
++
++      # Artifact names cannot contain '/', and install-ref may be a full ref
++      # like refs/heads/main. GitHub Actions expressions have no string-replace
++      # function, so build the safe name here. Runs even on failure -- that is
++      # exactly when the logs are wanted.
++      - name: Build artifact name
++        if: always()
++        id: artifact
++        run: |
++          set -euo pipefail
++          safe_ref='${{ inputs.install-ref }}'
++          safe_ref="${safe_ref//\//-}"
++          echo "name=install-e2e-${{ inputs.route }}-${safe_ref}" >> "$GITHUB_OUTPUT"
++
++      # The installer's own transcripts say far more than the assertion that
++      # tripped when a real install breaks.
++      - name: Upload installer logs
++        if: always()
++        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
++        with:
++          # Unique per leg: a matrix over releases runs this workflow several
++          # times per route, and same-named artifacts collide.
++          name: ${{ steps.artifact.outputs.name }}-${{ github.sha }}
++          path: ${{ runner.temp }}/e2e-logs
++          retention-days: 14
++          if-no-files-found: ignore
+diff --git a/.github/workflows/install-e2e.yml b/.github/workflows/install-e2e.yml
+new file mode 100644
+index 0000000..270a48f
+--- /dev/null
++++ b/.github/workflows/install-e2e.yml
+@@ -0,0 +1,110 @@
++name: Install & Update E2E
++
++# Can a user on a released version get to this commit?
++#
++# For each release we sample, a leg installs that release through the real
++# `curl | install.sh` one-liner (uv, a managed Python, Node, the venv) inside
++# scripts/dev-sandbox.sh, then applies one update route and requires the
++# checkout to land on this commit with a working `prometheus`.
++#
++# The starting versions are chosen at runtime from the repo's release tags
++# (scripts/sandbox/pick-release-tags.sh): newest, oldest, and a spread between.
++# A hardcoded list would stop covering the newest release the day after it
++# ships, and would pin an "oldest" that nobody still runs.
++#
++# Triggers:
++#   * every 12 hours, so upstream drift (a new uv, a Node bump, a PyPI change)
++#     surfaces on a schedule rather than in someone's review cycle;
++#   * when a release tag is created -- the moment the set of versions users can
++#     update FROM changes, and the moment a broken updater would strand them;
++#   * manually, where you can pick the route and how many releases to sample.
++#
++# Deliberately NOT on pull_request: a leg takes ~11 minutes of real toolchain
++# installation, and the matrix multiplies that. Updating is release-shaped work,
++# so it is gated on releases and the clock instead.
++
++on:
++  workflow_dispatch:
++    inputs:
++      route:
++        description: 'Which update route to exercise.'
++        required: false
++        type: choice
++        default: both
++        options: [both, update, installer]
++      tag-count:
++        description: 'How many release tags to sample (newest, oldest, and a spread between).'
++        required: false
++        type: string
++        default: '5'
++  schedule:
++    # Every 12 hours, off the hour to avoid the top-of-hour runner crunch.
++    - cron: '20 7,19 * * *'
++  push:
++    tags:
++      # Release tags only: the repo also carries backup/* and one-off tags.
++      - 'v[0-9]+.[0-9]+.[0-9]+'
++      - 'v[0-9]+.[0-9]+.[0-9]+.[0-9]+'
++
++permissions:
++  contents: read
++
++concurrency:
++  group: install-e2e-${{ github.ref }}
++  cancel-in-progress: true
++
++jobs:
++  # Which released versions do we test updating FROM? Resolved once and shared
++  # by both route matrices, so the two routes cover the same set.
++  pick-releases:
++    name: Pick release tags
++    runs-on: ubuntu-latest
++    timeout-minutes: 5
++    outputs:
++      tags: ${{ steps.pick.outputs.tags }}
++    steps:
++      # This job only reads tag names and runs one script, so take the cheap
++      # checkout: no blobs (filter), no other files (sparse), but DO fetch tags
++      # -- they are the whole input, and the default shallow checkout has none.
++      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++        with:
++          filter: blob:none
++          fetch-tags: true
++          sparse-checkout: scripts/sandbox/pick-release-tags.sh
++          sparse-checkout-cone-mode: false
++      - id: pick
++        run: |
++          set -euo pipefail
++          tags="$(scripts/sandbox/pick-release-tags.sh --count '${{ inputs.tag-count || 5 }}')"
++          echo "Testing updates from: $tags"
++          echo "tags=$tags" >> "$GITHUB_OUTPUT"
++
++  # `prometheus update` -- the route most users take.
++  update:
++    if: github.event_name != 'workflow_dispatch' || inputs.route != 'installer'
++    needs: pick-releases
++    strategy:
++      # One release breaking is worth knowing about even if another already
++      # failed, so let every leg report.
++      fail-fast: false
++      matrix:
++        install-ref: ${{ fromJSON(needs.pick-releases.outputs.tags) }}
++    uses: ./.github/workflows/install-e2e-run.yml
++    with:
++      route: update
++      install-ref: ${{ matrix.install-ref }}
++
++  # Re-running the curl one-liner over an existing checkout: autostash + pull
++  # rather than the updater's own git handling.
++  installer:
++    if: github.event_name != 'workflow_dispatch' || inputs.route != 'update'
++    needs: pick-releases
++    strategy:
++      fail-fast: false
++      max-parallel: 3
++      matrix:
++        install-ref: ${{ fromJSON(needs.pick-releases.outputs.tags) }}
++    uses: ./.github/workflows/install-e2e-run.yml
++    with:
++      route: installer
++      install-ref: ${{ matrix.install-ref }}
+diff --git a/.github/workflows/installer-tests.yml b/.github/workflows/installer-tests.yml
+new file mode 100644
+index 0000000..66f249f
+--- /dev/null
++++ b/.github/workflows/installer-tests.yml
+@@ -0,0 +1,38 @@
++name: Installer tests
++
++# scripts/install.ps1's PowerShell tests. They exercise the installer as a real
++# subprocess, and every path contract they assert (8.3 short-name aliases,
++# Git Bash layouts, provider-cmdlet behavior) is Windows-specific — so they need
++# a Windows runner. Before this workflow existed the files were in the tree but
++# nothing ever ran them.
++
++on:
++  workflow_call:
++
++permissions:
++  contents: read
++
++concurrency:
++  group: installer-tests-${{ github.ref }}
++  cancel-in-progress: true
++
++jobs:
++  powershell:
++    name: PowerShell installer tests
++    runs-on: windows-latest
++    timeout-minutes: 15
++    steps:
++      - name: Checkout code
++        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++
++      # Windows PowerShell 5.1 as well as pwsh 7: install.ps1 is delivered via
++      # `irm | iex` into whatever shell the user already has, and 5.1 is what
++      # ships with Windows. A construct that only parses under 7 is a broken
++      # installer for most of the people hitting it.
++      - name: 8.3 short-path normalization (pwsh 7)
++        shell: pwsh
++        run: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/tests/test-install-ps1-longpath.ps1
++
++      - name: 8.3 short-path normalization (Windows PowerShell 5.1)
++        shell: powershell
++        run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/test-install-ps1-longpath.ps1
+diff --git a/.github/workflows/js-autofix.yml b/.github/workflows/js-autofix.yml
+new file mode 100644
+index 0000000..bd4ee6d
+--- /dev/null
++++ b/.github/workflows/js-autofix.yml
+@@ -0,0 +1,276 @@
++name: auto-fix lint issues & formatting
++
++# On push to main (or manual trigger), run `npm run fix` on each workspace
++# package and apply any changes via a PR.
++#
++# Fixable lint issues (import sorting, unused imports, curly braces, etc.) are
++# auto-corrected on merge so PRs aren't blocked by them. The PR-time eslint
++# check in typecheck.yml fails only when un-fixable errors remain.
++#
++# NOTE: App token pushes DO trigger further workflow runs (unlike
++# secrets.GITHUB_TOKEN). The concurrency group (ts-autofix-${{ github.ref }})
++# with cancel-in-progress: true prevents an infinite loop — a re-triggered
++# run cancels the in-flight one, and since the second run finds no new fixes
++# (the first run already applied them), it exits with an empty patch.
++#
++# ── Security model: two-job split ───────────────────────────────────────────
++#
++# The eslint process executes repo code (eslint.config.mjs, package.json
++# scripts, installed plugins). To prevent a malicious PR from getting arbitrary
++# code execution on a runner with push access, the work is split:
++#
++#   1. generate-patch (unprivileged, contents: read only)
++#      Checks out, installs deps, runs eslint --fix, produces a .patch artifact.
++#      Worst case: malicious code runs here on an ephemeral runner with zero
++#      push permissions.
++#
++#   2. apply-patch (privileged, contents: write + pull-requests: write)
++#      Checks out, downloads the patch artifact, applies it, pushes to the
++#      bot/js-autofix branch, creates/updates a PR, and enables auto-merge.
++#      This job never runs npm, never installs anything, never executes any
++#      repo code. The only input it trusts is the patch artifact.
++#      Skipped entirely when generate-patch reports no fixes (has-fixes != true).
++#      The PR auto-merges (squash) once CI passes. If CI fails or main moves,
++#      the PR is auto-closed and the branch deleted — the next run re-applies
++#      on the current state.
++
++on:
++  push:
++    branches: [main]
++    paths:
++      - '**/*.js'
++      - '**/*.cjs'
++      - '**/*.mjs'
++      - '**/*.ts'
++      - '**/*.tsx'
++      - 'package.json'
++      - 'package-lock.json'
++  workflow_dispatch:
++
++permissions:
++  contents: read # default; apply-patch job overrides to write
++
++concurrency:
++  group: ts-autofix-${{ github.ref }}
++  cancel-in-progress: true
++
++jobs:
++  generate-patch:
++    name: Generate eslint --fix patch
++    runs-on: ubuntu-latest
++    timeout-minutes: 5
++    outputs:
++      has-fixes: ${{ steps.produce-patch.outputs.has-fixes }}
++    # No permissions override → inherits workflow-level contents: read.
++    steps:
++      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++
++      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
++        with:
++          node-version: 26
++          cache: npm
++
++      - name: grab npm 12
++        run: |
++          npm i -g npm@12
++
++      # --ignore-scripts: eslint only needs TS sources + eslint packages.
++      - uses: ./.github/actions/retry
++        with:
++          command: npm ci --ignore-scripts
++
++      - name: npm run fix in all workspaces
++        # continue-on-error: if un-fixable errors exist on main, we still want
++        # to commit whatever fixes were applied. The PR-time check in
++        # typecheck.yml is what blocks un-fixable errors from landing.
++        continue-on-error: true
++        run: npm run fix
++
++      - name: Produce patch
++        id: produce-patch
++        run: |
++          # Exclude every file that the dep-version-gate ruleset guards
++          # (package manifests, eslint configs, workflow files). A patch
++          # that contains one of these files makes the bot PR wait for a
++          # team review, and auto-merge then stops. The check step in
++          # typecheck.yml still reports their lint errors.
++          # The (glob) magic makes "**/" also match files at the repo
++          # root, which plain pathspec wildcards do not.
++          EXCLUDES=(
++            ':(exclude,glob)**/package.json'
++            ':(exclude,glob)**/package-lock.json'
++            ':(exclude,glob)**/eslint.config.*'
++            ':(exclude,glob).github/**'
++          )
++          if git diff --quiet -- . "${EXCLUDES[@]}"; then
++            echo "No fixes needed."
++            echo "has-fixes=false" >> "$GITHUB_OUTPUT"
++            # Empty patch signals "nothing to do" to apply-patch.
++            : > js-fix.patch
++          else
++            git diff -- . "${EXCLUDES[@]}" > js-fix.patch
++            echo "has-fixes=true" >> "$GITHUB_OUTPUT"
++            echo "Patch size: $(wc -c < js-fix.patch) bytes"
++
++            # Reject patches that touch anything outside JS/TS/JSON sources.
++            # `npm run fix` should only ever modify those; anything else means
++            # eslint/prettier or a plugin went rogue and we refuse to ship it.
++            BAD=$(git diff --name-only -- . "${EXCLUDES[@]}" | grep -vE '\.(js|cjs|mjs|ts|tsx|json)$' || true)
++            if [ -n "$BAD" ]; then
++              echo "::error::Refusing to upload patch — touches disallowed files:"
++              echo "$BAD"
++              exit 1
++            fi
++          fi
++
++      - name: Upload patch artifact
++        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
++        with:
++          name: js-fix-patch
++          path: js-fix.patch
++          retention-days: 1
++          include-hidden-files: true
++
++  apply-patch:
++    name: Apply patch
++    needs: generate-patch
++    # Skip entirely when generate-patch found no fixes — saves a runner,
++    # avoids a redundant checkout/download, and keeps the job graph honest.
++    if: needs.generate-patch.outputs.has-fixes == 'true'
++    runs-on: ubuntu-latest
++    timeout-minutes: 15
++    environment: trusted-automation
++    permissions:
++      contents: write # needed to push to bot/js-autofix
++      pull-requests: write # needed for PR creation + auto-merge
++    steps:
++      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++
++      - name: Get GitHub App token
++        id: app-token
++        uses: ./.github/actions/get-app-token
++        with:
++          client-id: ${{ vars.APP_CLIENT_ID }}
++          private-key: ${{ secrets.APP_PRIVATE_KEY }}
++
++      - name: Download patch
++        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
++        with:
++          name: js-fix-patch
++          # ${{ runner.temp }} expands in with: params (shell-style $VAR does not).
++          # download-artifact's path is a *directory* — the artifact's js-fix.patch
++          # file lands inside it, so $RUNNER_TEMP/js-fix.patch resolves correctly
++          # in the run step below.
++          path: ${{ runner.temp }}
++
++      - name: Apply patch and push to bot branch
++        env:
++          BOT_BRANCH: bot/js-autofix
++        run: |
++          set -euo pipefail
++
++          # Empty patch = nothing to do.
++          if [ ! -s "$RUNNER_TEMP/js-fix.patch" ]; then
++            echo "Patch is empty. No fixes to apply."
++            exit 0
++          fi
++
++          # Apply the patch produced by the unprivileged job.
++          git apply --check "$RUNNER_TEMP/js-fix.patch" || {
++            echo "::error::Patch does not apply cleanly. Branch may have moved."
++            exit 1
++          }
++          git apply "$RUNNER_TEMP/js-fix.patch"
++
++          git config user.name "github-actions[bot]"
++          git config user.email "github-actions[bot]@users.noreply.github.com"
++          git add -A
++          git commit -m "fmt(js): \`npm run fix\` on merge"
++
++          # Push to the dedicated bot branch. Force-push is safe here:
++          # bot/js-autofix is a bot-only branch that gets rewritten each run.
++          # If the branch was deleted after a previous PR merge, this
++          # recreates it.
++          git push --force origin HEAD:"$BOT_BRANCH"
++
++      - name: Create/update PR and enable auto-merge
++        env:
++          GH_TOKEN: ${{ steps.app-token.outputs.token }}
++          BOT_BRANCH: bot/js-autofix
++        run: |
++          set -euo pipefail
++
++          # Create PR if one doesn't exist. If it already exists, the
++          # force-push above already updated it with the latest fixes.
++          PR_NUM=$(gh pr list --head "$BOT_BRANCH" --state open --json number --jq '.[0].number' 2>/dev/null || true)
++          if [ -z "$PR_NUM" ]; then
++            # gh pr create prints the PR URL. Extract the number from it
++            # (https://github.com/<org>/<repo>/pull/<number>).
++            PR_URL=$(gh pr create \
++              --head "$BOT_BRANCH" --base main \
++              --title 'fmt(js): `npm run fix` auto-fix' \
++              --body 'Auto-generated by the `auto-fix lint issues & formatting` workflow. Auto-merges (squash) once CI passes. If CI fails or `main` moves, the PR is auto-closed and the branch deleted — the next run re-applies on the current state.')
++            PR_NUM=$(echo "$PR_URL" | grep -oE '[0-9]+$')
++          fi
++
++          # Enable auto-merge (squash). If already enabled, this is a no-op.
++          gh pr merge "$PR_NUM" --auto --squash || true
++
++      - name: Wait for merge, auto-close on failure or stale
++        env:
++          GH_TOKEN: ${{ steps.app-token.outputs.token }}
++          START_SHA: ${{ github.sha }}
++        run: |
++          set -euo pipefail
++
++          PR_NUM=$(gh pr list --head bot/js-autofix --state open --json number --jq '.[0].number' 2>/dev/null || true)
++          if [ -z "$PR_NUM" ]; then
++            echo "No open PR. Nothing to wait for."
++            exit 0
++          fi
++
++          echo "Waiting for PR #$PR_NUM to merge..."
++
++          # Poll every 15s for up to ~10 minutes. Auto-merge will handle the
++          # PR even if this job times out — the polling is for cleanup only
++          # (auto-close on CI failure, conflicts, or main moving).
++          for i in $(seq 1 40); do
++            sleep 15
++
++            STATE=$(gh pr view "$PR_NUM" --json state --jq '.state')
++            if [ "$STATE" = "MERGED" ] || [ "$STATE" = "CLOSED" ]; then
++              echo "PR #$PR_NUM is $STATE."
++              exit 0
++            fi
++
++            # If main moved, the PR may have already merged (which moves
++            # main) or another commit landed. Re-check state first.
++            CURRENT_SHA=$(gh api "repos/${{ github.repository }}/branches/main" --jq '.commit.sha')
++            if [ "$CURRENT_SHA" != "$START_SHA" ]; then
++              STATE=$(gh pr view "$PR_NUM" --json state --jq '.state')
++              if [ "$STATE" = "MERGED" ]; then
++                echo "PR #$PR_NUM merged (main moved to $CURRENT_SHA)."
++                exit 0
++              fi
++              echo "Main moved ($START_SHA → $CURRENT_SHA). Closing stale PR."
++              gh pr close "$PR_NUM" --delete-branch || true
++              exit 0
++            fi
++
++            # If CI checks failed, close + delete the branch.
++            if gh pr checks "$PR_NUM" 2>/dev/null | grep -qi "fail"; then
++              echo "CI failed on PR #$PR_NUM. Closing + deleting branch."
++              gh pr close "$PR_NUM" --delete-branch
++              exit 0
++            fi
++
++            # If PR is conflicted, close + delete the branch.
++            MERGEABLE=$(gh pr view "$PR_NUM" --json mergeable --jq '.mergeable')
++            if [ "$MERGEABLE" = "CONFLICTING" ]; then
++              echo "PR #$PR_NUM is conflicted. Closing + deleting branch."
++              gh pr close "$PR_NUM" --delete-branch
++              exit 0
++            fi
++          done
++
++          echo "Timeout reached. Auto-merge will handle PR #$PR_NUM if CI passes."
+diff --git a/.github/workflows/js-tests.yml b/.github/workflows/js-tests.yml
+new file mode 100644
+index 0000000..9631cdd
+--- /dev/null
++++ b/.github/workflows/js-tests.yml
+@@ -0,0 +1,125 @@
++# .github/workflows/js-tests.yml
++name: JS Tests
++
++on:
++  workflow_call:
++
++jobs:
++  workspaces:
++    name: List npm workspaces
++    runs-on: ubuntu-latest
++    timeout-minutes: 20
++    outputs:
++      checks: ${{ steps.set-matrix.outputs.checks }}
++    steps:
++      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
++        with:
++          node-version: 26
++          cache: npm
++
++      - name: grab npm 12
++        run: |
++          # No-op once the bundled npm is already 12.x — saves ~5-15s/job and
++          # keeps the installed major aligned with the npm12 cache-key tag.
++          npm --version | grep -q '^12\.' || npm i -g npm@12
++
++      # ``setup-node``'s ``cache: npm`` only caches the ~/.npm tarball cache;
++      # every job still re-extracts the full workspace node_modules and reruns
++      # postinstalls (including the Electron binary fetch). Cache the installed
++      # tree itself, keyed on the lockfile, and skip ``npm ci`` on an exact
++      # hit. No restore-keys: a partial hit would leave a stale tree, so
++      # anything but an exact lockfile match reinstalls from scratch.
++      # The discovery job installs with --ignore-scripts, so its tree differs
++      # from the check jobs' — hence the distinct ``-noscripts`` key.
++      - name: Restore node_modules
++        id: node-modules-cache
++        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
++        with:
++          path: |
++            node_modules
++            apps/*/node_modules
++            ui-tui/node_modules
++            ui-tui/packages/*/node_modules
++            tests-js/node_modules
++            web/node_modules
++          key: node-modules-noscripts-${{ runner.os }}-node26-npm12-${{ hashFiles('package-lock.json') }}
++
++      - uses: ./.github/actions/retry
++        if: steps.node-modules-cache.outputs.cache-hit != 'true'
++        with:
++          command: npm ci --ignore-scripts
++      - id: set-matrix
++        run: |
++          node -e '
++          const { execSync } = require("child_process");
++          const pkgs = JSON.parse(execSync("npm query .workspace", { encoding: "utf-8" }));
++          if (pkgs.length === 0) {
++            console.error("::error::Workspace discovery produced an empty package list — refusing to emit a zero-length matrix (would skip all JS/TS checks silently).");
++            process.exit(1);
++          }
++          const checks = [];
++          for (const pkg of pkgs) {
++            const scripts = pkg.scripts || {};
++            const subs = Object.keys(scripts).filter(s => /^check:.+$/.test(s));
++            if (subs.length > 0) {
++              for (const script of subs) {
++                checks.push({ package: pkg.location, script });
++              }
++            } else if (scripts.check) {
++              checks.push({ package: pkg.location, script: "check" });
++            }
++          }
++          if (checks.length === 0) {
++            console.error("::error::No check scripts found in any workspace package.");
++            process.exit(1);
++          }
++          process.stdout.write("checks=" + JSON.stringify(checks) + "\n");
++          ' >> "$GITHUB_OUTPUT"
++
++  check:
++    name: ${{ matrix.package }} / ${{ matrix.script }}
++    needs: workspaces
++    runs-on: ubuntu-latest
++    timeout-minutes: 20
++    strategy:
++      matrix:
++        include: ${{ fromJson(needs.workspaces.outputs.checks) }}
++      fail-fast: false # report all failures, not just the first one
++    steps:
++      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
++        with:
++          node-version: 26
++          cache: npm
++
++      - name: grab npm 12
++        run: |
++          # No-op once the bundled npm is already 12.x — saves ~5-15s/job and
++          # keeps the installed major aligned with the npm12 cache-key tag.
++          npm --version | grep -q '^12\.' || npm i -g npm@12
++
++      # Same rationale as the discovery job's cache above, but this ``npm ci``
++      # runs WITH install scripts, so the tree includes postinstall artifacts
++      # (electron's postinstall unpacks its binary into node_modules/electron/
++      # dist, which lives inside the cached tree — the ~/.cache/electron
++      # download cache is deliberately NOT cached: with npm ci skipped on hit
++      # it would never be read, only inflate the archive).
++      - name: Restore node_modules
++        id: node-modules-cache
++        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
++        with:
++          path: |
++            node_modules
++            apps/*/node_modules
++            ui-tui/node_modules
++            ui-tui/packages/*/node_modules
++            tests-js/node_modules
++            web/node_modules
++          key: node-modules-scripts-${{ runner.os }}-node26-npm12-${{ hashFiles('package-lock.json') }}
++
++      - uses: ./.github/actions/retry
++        if: steps.node-modules-cache.outputs.cache-hit != 'true'
++        with:
++          command: npm ci
++      - run: npm run --prefix ${{ matrix.package }} ${{ matrix.script }}
+diff --git a/.github/workflows/label-rerun.yml b/.github/workflows/label-rerun.yml
+new file mode 100644
+index 0000000..6eb1a44
+--- /dev/null
++++ b/.github/workflows/label-rerun.yml
+@@ -0,0 +1,87 @@
++name: Label rerun
++
++# When the ``ci-reviewed`` label is added to a PR, rerun all failed jobs in
++# the latest CI run. This re-evaluates ``review-labels`` (which now sees the
++# label) and GitHub reruns the dependent ``all-checks-pass`` gate.
++#
++# ``gh run rerun`` only works on a completed run. Thus this waits when the
++# run is still in progress. The wait is now short. The two slowest jobs are
++# the 40-minute comment poller and the 45-minute image build. Each one moved
++# to its own workflow, so a CI run ends when its required jobs end.
++#
++# The review comment updates without help. The poller in
++# ci-review-comment.yml watches the CI run through the API. It gets the
++# rerun results.
++
++on:
++  pull_request:
++    types: [labeled]
++
++permissions:
++  actions: write
++  pull-requests: read
++
++concurrency:
++  group: label-rerun-${{ github.event.pull_request.number }}
++  cancel-in-progress: true
++
++jobs:
++  rerun-review-labels:
++    name: Rerun review-labels job
++    if: github.event.label.name == 'ci-reviewed'
++    runs-on: ubuntu-latest
++    timeout-minutes: 40
++    steps:
++      - name: Wait for CI run to finish, then rerun failed jobs
++        env:
++          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
++          REPO: ${{ github.repository }}
++          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
++        run: |
++          set -uo pipefail
++
++          # Find the latest CI run for this PR's head SHA.
++          RUN_INFO=$(gh run list \
++            --repo "$REPO" \
++            --commit "$HEAD_SHA" \
++            --workflow ci.yaml \
++            --limit 1 \
++            --json databaseId,status \
++            --jq '.[0] | "\(.databaseId) \(.status)"' 2>/dev/null || true)
++
++          if [ -z "$RUN_INFO" ]; then
++            echo "No CI run found for this PR — nothing to rerun."
++            exit 0
++          fi
++
++          # Split "RUN_ID STATUS" into two vars. Read STATUS from RUN_INFO,
++          # not from the truncated RUN_ID. Both values came from the same
++          # var before, which made STATUS the run id. Thus the wait branch
++          # always ran.
++          RUN_ID="${RUN_INFO%% *}"
++          STATUS="${RUN_INFO##* }"
++
++          echo "Latest CI run: $RUN_ID (status: $STATUS)"
++
++          # If the run is still in progress, wait for it to finish.
++          # gh run rerun only works on completed runs — if we try while it's
++          # running, GitHub rejects with "cannot be rerun; This workflow is
++          # already running".
++          if [ "$STATUS" != "completed" ]; then
++            echo "Run is $STATUS — waiting for completion (this may take a while)..."
++            # gh run watch --exit-status exits non-zero if the run fails,
++            # which is expected (the label gate fails). Don't let that kill
++            # the workflow — we WANT to rerun failed jobs.
++            timeout 2100 gh run watch "$RUN_ID" --repo "$REPO" --interval 15 || true
++
++            # Verify it's actually completed now.
++            STATUS=$(gh run view "$RUN_ID" --repo "$REPO" --json status --jq '.status' 2>/dev/null || echo "unknown")
++            if [ "$STATUS" != "completed" ]; then
++              echo "Run is still $STATUS after wait — giving up."
++              exit 0
++            fi
++          fi
++
++          echo "Run completed. Rerunning all failed jobs..."
++          gh run rerun "$RUN_ID" --repo "$REPO" --failed || true
++          echo "Done. GitHub will rerun review-labels and all dependent jobs."
+diff --git a/.github/workflows/lint.yml b/.github/workflows/lint.yml
+new file mode 100644
+index 0000000..7a49a62
+--- /dev/null
++++ b/.github/workflows/lint.yml
+@@ -0,0 +1,180 @@
++name: Lint (ruff + ty)
++
++# Two things here:
++#   1. Advisory diff — ruff + ty diagnostics as a diff vs the target branch.
++#      Writes a Markdown summary to the run page. Exit zero always.
++#   2. Blocking ``ruff check .`` — enforces the explicit rules in
++#      ``[tool.ruff.lint.select]`` (currently PLW1514). Failure blocks merge.
++#      Separate job so the advisory diff still runs even when enforcement
++#      fails.
++#
++# CI-sensitive file review was previously here as a ``ci-review`` job but
++# has moved to ``review-labels.yml`` so it can be rerun independently.
++
++on:
++  workflow_call:
++    inputs:
++      event_name:
++        description: The event name from the calling orchestrator (pull_request or push).
++        type: string
++        required: true
++
++permissions:
++  contents: read
++
++concurrency:
++  group: lint-${{ github.ref }}
++  cancel-in-progress: true
++
++jobs:
++  lint-diff:
++    name: ruff + ty diff
++    if: inputs.event_name == 'pull_request'
++    runs-on: ubuntu-latest
++    timeout-minutes: 10
++    steps:
++      - name: Checkout code
++        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++        with:
++          fetch-depth: 0 # need full history for merge-base + worktree
++
++      - name: Install uv
++        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # 8.2.0
++        with:
++          # Pinned: unpinned setup-uv fetches a 'latest' manifest from
++          # raw.githubusercontent.com every job; transient fetch failures
++          # fail the job (2026-07-28 incident). Keep in sync with tests.yml.
++          version: "0.9.28"
++
++      - name: Install ruff + ty
++        uses: ./.github/actions/retry
++        with:
++          command: uv tool install ruff && uv tool install ty
++
++      - name: Determine base ref
++        id: base
++        run: |
++          # For PRs, diff against the merge base with the target branch.
++          # For pushes to main, diff against the previous commit on main.
++          if [ "${{ inputs.event_name }}" = "pull_request" ]; then
++            BASE_SHA=$(git merge-base "origin/${{ github.base_ref }}" HEAD)
++            BASE_REF="origin/${{ github.base_ref }}"
++          else
++            BASE_SHA=$(git rev-parse HEAD~1 2>/dev/null || git rev-parse HEAD)
++            BASE_REF="HEAD~1"
++          fi
++          echo "sha=${BASE_SHA}" >> "$GITHUB_OUTPUT"
++          echo "ref=${BASE_REF}" >> "$GITHUB_OUTPUT"
++          echo "Base SHA: ${BASE_SHA}"
++          echo "Base ref: ${BASE_REF}"
++
++      - name: Run ruff + ty on HEAD
++        run: |
++          mkdir -p .lint-reports/head
++          ruff check --output-format json --exit-zero \
++            > .lint-reports/head/ruff.json || true
++          ty check --output-format gitlab --exit-zero \
++            > .lint-reports/head/ty.json || true
++          echo "HEAD ruff: $(wc -c < .lint-reports/head/ruff.json) bytes"
++          echo "HEAD ty:   $(wc -c < .lint-reports/head/ty.json) bytes"
++
++      - name: Run ruff + ty on base (via git worktree)
++        run: |
++          mkdir -p .lint-reports/base
++          # Use a worktree so we don't clobber the main checkout. If the basex
++          # SHA is identical to HEAD (e.g. first commit), skip and leave the
++          # base reports empty — the diff script handles missing files.
++          HEAD_SHA=$(git rev-parse HEAD)
++          BASE_SHA="${{ steps.base.outputs.sha }}"
++          if [ "$BASE_SHA" = "$HEAD_SHA" ]; then
++            echo "Base SHA == HEAD SHA, skipping base scan."
++            echo '[]' > .lint-reports/base/ruff.json
++            echo '[]' > .lint-reports/base/ty.json
++          else
++            git worktree add --detach /tmp/lint-base "$BASE_SHA"
++            (
++              cd /tmp/lint-base
++              ruff check --output-format json --exit-zero \
++                > "$GITHUB_WORKSPACE/.lint-reports/base/ruff.json" || true
++              ty check --output-format gitlab --exit-zero \
++                > "$GITHUB_WORKSPACE/.lint-reports/base/ty.json" || true
++            )
++            git worktree remove --force /tmp/lint-base
++          fi
++          echo "base ruff: $(wc -c < .lint-reports/base/ruff.json) bytes"
++          echo "base ty:   $(wc -c < .lint-reports/base/ty.json) bytes"
++
++      - name: Generate diff summary
++        env:
++          HEAD_REF: ${{ inputs.event_name == 'pull_request' && github.head_ref || github.ref_name }}
++        run: |
++          python scripts/lint_diff.py \
++            --base-ruff .lint-reports/base/ruff.json \
++            --head-ruff .lint-reports/head/ruff.json \
++            --base-ty   .lint-reports/base/ty.json \
++            --head-ty   .lint-reports/head/ty.json \
++            --base-ref  "${{ steps.base.outputs.ref }}" \
++            --head-ref  "$HEAD_REF" \
++            --output    .lint-reports/summary.md
++          cat .lint-reports/summary.md >> "$GITHUB_STEP_SUMMARY"
++
++  ruff-blocking:
++    # Enforce the rules in pyproject.toml [tool.ruff.lint.select]. Currently
++    # PLW1514 (unspecified-encoding) — catches bare ``open()`` /
++    # ``read_text()`` / ``write_text()`` calls that default to locale
++    # encoding on Windows. Failure here blocks merge; the advisory
++    # ``lint-diff`` job above runs independently so reviewers still get
++    # the diff comment even when enforcement fails.
++    name: ruff enforcement (blocking)
++    runs-on: ubuntu-latest
++    timeout-minutes: 5
++    steps:
++      - name: Checkout code
++        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++
++      - name: Install uv
++        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # 8.2.0
++        with:
++          # Pinned: unpinned setup-uv fetches a 'latest' manifest from
++          # raw.githubusercontent.com every job; transient fetch failures
++          # fail the job (2026-07-28 incident). Keep in sync with tests.yml.
++          version: "0.9.28"
++
++      - name: Install ruff
++        uses: ./.github/actions/retry
++        with:
++          command: uv tool install ruff
++
++      - name: ruff check .
++        # No --exit-zero, no || true. Exit code propagates to the job,
++        # which propagates to the required-check gate.
++        run: |
++          ruff check .
++
++  windows-footguns:
++    # Static guardrails on Windows-unsafe Python primitives — os.kill(pid, 0),
++    # os.killpg, os.setsid, signal.SIGKILL without getattr fallback,
++    # shebang scripts via subprocess, bare open() without encoding=, etc.
++    # See scripts/check-windows-footguns.py for the full rule list.
++    name: Windows footguns (blocking)
++    runs-on: ubuntu-latest
++    timeout-minutes: 5
++    steps:
++      - name: Checkout code
++        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++
++      - name: Install uv
++        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # 8.2.0
++        with:
++          # Pinned: unpinned setup-uv fetches a 'latest' manifest from
++          # raw.githubusercontent.com every job; transient fetch failures
++          # fail the job (2026-07-28 incident). Keep in sync with tests.yml.
++          version: "0.9.28"
++
++      - name: Set up Python 3.11
++        uses: ./.github/actions/retry
++        with:
++          command: uv python install 3.11
++
++      - name: Run footgun checker
++        run: python scripts/check-windows-footguns.py --all
+diff --git a/.github/workflows/lockfile-diff.yml b/.github/workflows/lockfile-diff.yml
+new file mode 100644
+index 0000000..aa72e31
+--- /dev/null
++++ b/.github/workflows/lockfile-diff.yml
+@@ -0,0 +1,107 @@
++name: Lockfile diff
++
++# Advisory PR comment showing the *semantic* diff of package-lock.json
++# changes — which packages were added/removed/updated and their versions.
++# The raw textual diff of a lockfile is unreadable (npm reorders entries
++# and rewrites integrity hashes), so scripts/ci/lockfile_diff.py parses
++# the ``packages`` map at the merge base and at HEAD and set-diffs the
++# {install path: version} maps instead.
++#
++# The semantic diff is exposed as a workflow_call output ``review_status``
++# (a JSON array in the unified status format) and an artifact
++# (``lockfile-diff`` containing the markdown fragment) for the step
++# summary.
++#
++# Never blocking — this is review signal, not enforcement.
++
++on:
++  workflow_call:
++    outputs:
++      changed:
++        description: Whether package-lock.json changed relative to the target branch.
++        value: ${{ jobs.diff.outputs.changed }}
++      review_status:
++        description: JSON array of review status objects for the unified PR comment.
++        value: ${{ jobs.diff.outputs.review_status }}
++
++permissions:
++  contents: read
++
++concurrency:
++  group: lockfile-diff-${{ github.event.pull_request.number || github.ref }}
++  cancel-in-progress: true
++
++jobs:
++  diff:
++    name: package-lock.json semantic diff
++    runs-on: ubuntu-latest
++    timeout-minutes: 5
++    outputs:
++      changed: ${{ steps.diff.outputs.changed }}
++      review_status: ${{ steps.emit-status.outputs.review_status }}
++    steps:
++      - name: Checkout code
++        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++        with:
++          fetch-depth: 0 # need history for the merge base
++
++      - name: Generate semantic lockfile diff
++        id: diff
++        run: |
++          set -euo pipefail
++          # Three-dot semantics by hand: diff from the merge base with the
++          # target branch to the PR head, so changes that landed on main
++          # after the branch point don't show up as this PR's doing.
++          BASE_SHA=$(git merge-base "origin/${{ github.base_ref }}" HEAD)
++          echo "Merge base: ${BASE_SHA}"
++          python3 scripts/ci/lockfile_diff.py \
++            --base "$BASE_SHA" \
++            --head HEAD \
++            --output /tmp/lockfile-diff.md
++          if [ -s /tmp/lockfile-diff.md ]; then
++            echo "changed=true" >> "$GITHUB_OUTPUT"
++            {
++              echo "## package-lock.json semantic diff"
++              echo ""
++              cat /tmp/lockfile-diff.md
++            } >> "$GITHUB_STEP_SUMMARY"
++          else
++            echo "changed=false" >> "$GITHUB_OUTPUT"
++            : > /tmp/lockfile-diff.md
++          fi
++
++      - name: Emit review_status
++        id: emit-status
++        run: |
++          set -euo pipefail
++          CHANGED="${{ steps.diff.outputs.changed }}"
++          STATUS="[]"
++
++          if [ "$CHANGED" = "true" ]; then
++            CONTENT=$(cat /tmp/lockfile-diff.md | python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))")
++            STATUS="[{\"source\":\"lockfile-diff\",\"results\":[{\"kind\":\"action_required\",\"title\":\"package-lock.json\",\"summary\":\"Locked npm dependency versions changed.\",\"detail\":${CONTENT},\"how_to_fix\":\"Add the \`ci-reviewed\` label after verifying the version changes are expected.\"}]}]"
++          else
++            STATUS="[]"
++          fi
++
++          echo "review_status=${STATUS}" >> "$GITHUB_OUTPUT"
++          echo "review_status=${STATUS}" > review-status.json
++
++      - name: Upload review status artifact
++        if: always() && steps.emit-status.outcome != 'skipped'
++        continue-on-error: true
++        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
++        with:
++          name: review-status-lockfile-diff
++          path: review-status.json
++          retention-days: 1
++          overwrite: true
++          if-no-files-found: ignore
++
++      - name: Upload diff artifact
++        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
++        with:
++          name: lockfile-diff
++          path: /tmp/lockfile-diff.md
++          retention-days: 1
++          overwrite: true
+diff --git a/.github/workflows/nix.yml b/.github/workflows/nix.yml
+new file mode 100644
+index 0000000..e60c7d5
+--- /dev/null
++++ b/.github/workflows/nix.yml
+@@ -0,0 +1,117 @@
++name: Nix flake check
++
++# Builds every output of the flake: the package, the devShell, and the 21
++# checks under nix/checks.nix — module evaluation, option parity, .env
++# assembly, service argv, and the rest.
++#
++# This workflow owns its triggers and ci.yml does not call it, for the reason
++# docker.yml gives: a reusable-workflow call holds the caller run in progress
++# for the full build, and GitHub refuses `gh run rerun` on a run that is still
++# in progress. One slow advisory job in the CI lane blocks every rerun of the
++# fast required jobs beside it. A separate run reruns and cancels on its own.
++
++on:
++  pull_request:
++  push:
++    branches: [main]
++
++permissions:
++  contents: read
++
++# PR runs collapse to the newest commit. A push to main is never cancelled:
++# each one saves the store cache that later PRs restore from, so cancelling a
++# merge would leave the next PR to build from nothing.
++concurrency:
++  group: nix-${{ github.event.pull_request.number || github.ref }}
++  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
++
++jobs:
++  # A `paths:` filter cannot gate this workflow correctly. The flake packages
++  # the product, and nine of the checks then run the built binary, so a change
++  # to prometheus_cli/ alone can fail `nix flake check` without touching one file
++  # under nix/. The `nix` lane therefore follows python_prod as well as the
++  # flake inputs. On push the classifier fails open and every lane is true.
++  detect:
++    name: Detect affected areas
++    runs-on: ubuntu-latest
++    timeout-minutes: 10
++    outputs:
++      nix: ${{ steps.classify.outputs.nix }}
++    steps:
++      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++
++      - name: Detect affected areas
++        id: classify
++        uses: ./.github/actions/detect-changes
++        with:
++          github-token: ${{ github.token }}
++
++  flake-check:
++    name: nix flake check
++    needs: [detect]
++    if: needs.detect.outputs.nix == 'true'
++    # The build compiles the package and its whole dependency closure, so this
++    # is minutes and not seconds when the cache misses.
++    runs-on: ubuntu-latest
++    timeout-minutes: 60
++    steps:
++      - name: Checkout code
++        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++
++      - name: Install Nix
++        uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31.11.0
++        with:
++          extra_nix_config: |
++            experimental-features = nix-command flakes
++            # A store path that does not substitute is a cache miss and not a
++            # build failure. Build it here instead.
++            fallback = true
++            # Each source archive is fetched one time in a run, and not one
++            # time for each evaluation.
++            tarball-ttl = 3600
++
++      # Restores /nix/store from the GitHub Actions cache. The store holds the
++      # whole dependency closure, so a hit turns a build of several minutes
++      # into a short evaluation.
++      #
++      # The Magic Nix Cache is not an option here. Its free tier ended in
++      # February 2025 with the GitHub cache API that it was built on. This
++      # action uses the current API and needs no account and no secret.
++      - name: Restore and save the Nix store
++        uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7
++        with:
++          # The closure changes when the flake inputs change or when the
++          # dependencies of the project change. The key hashes both, so an
++          # edit to the source alone keeps the hit.
++          primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.lock', 'nix/**', 'pyproject.toml', 'uv.lock') }}
++          # On a miss, restore the newest store for this runner. Most of the
++          # closure — Python, node, each transitive library — survives a bump
++          # of the lockfile, so an old store still removes most of the work.
++          restore-prefixes-first-match: nix-${{ runner.os }}-
++
++          # Save from main only. A cache that a PR writes is visible to that
++          # PR alone and never to another branch, so a save there spends the
++          # 10 GB quota of the repository and helps no later run. A PR still
++          # restores: it reads the cache that the merge to main wrote. This is
++          # the same rule that docker.yml applies to `cache-to`.
++          save: ${{ github.event_name != 'pull_request' }}
++
++          # Collect garbage before the save, so the store stays inside the
++          # 10 GB quota of the repository. Without a limit the store grows at
++          # each merge until GitHub removes the entry, and the next PR then
++          # gets nothing. This number is the size of the store and not the
++          # size of the compressed archive.
++          gc-max-store-size-linux: 5G
++
++          # Delete the caches that this key replaces. GitHub removes caches by
++          # least recent use across the whole repository, so a Nix store that
++          # is never purged pushes out the caches of the other workflows.
++          purge: true
++          purge-prefixes: nix-${{ runner.os }}-
++          purge-created: 0
++          purge-primary-key: never
++
++      - name: nix flake check
++        # --print-build-logs: a check that fails then prints the assertion
++        # that failed, and not only the derivation that failed to build.
++        run: nix flake check --print-build-logs
+diff --git a/.github/workflows/osv-scanner.yml b/.github/workflows/osv-scanner.yml
+new file mode 100644
+index 0000000..671eecb
+--- /dev/null
++++ b/.github/workflows/osv-scanner.yml
+@@ -0,0 +1,141 @@
++name: OSV-Scanner
++
++# Scans lockfiles (uv.lock, package-lock.json) against the OSV vulnerability
++# database. Runs on every PR/push (via the ci.yml orchestrator's workflow_call)
++# and on a weekly schedule against main.
++#
++# This is detection-only — OSV-Scanner does NOT open PRs or modify pins.
++# It reports known CVEs in currently-pinned dependency versions so we can
++# decide when and how to patch on our own schedule. Our pinning strategy
++# (full SHA / exact version) is preserved; only the notification signal
++# is added.
++#
++# Complements the supply-chain-audit.yml workflow (which scans for malicious
++# code patterns in PR diffs) by covering the orthogonal "currently-pinned
++# dep became known-vulnerable" case.
++#
++# Uses Google's officially-recommended reusable workflow, pinned by SHA.
++# Findings land in the repo's Security tab (Code Scanning > OSV-Scanner).
++# fail-on-vuln is disabled so the job does not block merges on pre-existing
++# vulnerabilities in pinned deps that we may need to patch deliberately.
++#
++# The reusable workflow can't emit custom outputs, so a wrapper job
++# downloads the SARIF result and summarizes the vulnerability count into
++# a review_status for the unified PR comment.
++
++on:
++  workflow_call:
++  schedule:
++    # Weekly scan against main — catches CVEs published after merge for
++    # deps that haven't changed since.
++    - cron: '0 9 * * 1'
++  workflow_dispatch:
++
++permissions:
++  # Required to upload SARIF file to CodeQL. See: https://github.com/github/codeql-action/issues/2117
++  actions: read
++  contents: read
++  security-events: write
++
++jobs:
++  scan:
++    name: Scan lockfiles
++    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@9a498708959aeaef5ef730655706c5a1df1edbc2 # v2.3.8
++    with:
++      # Scan explicit lockfiles rather than recursing, so we only look at
++      # the five sources of truth and skip vendored / test / worktree dirs.
++      scan-args: |-
++        --lockfile=uv.lock
++        --lockfile=package-lock.json
++        --lockfile=website/package-lock.json
++        --lockfile=plugins/platforms/photon/sidecar/package-lock.json
++        --lockfile=scripts/whatsapp-bridge/package-lock.json
++      # The upstream reusable workflow uploads this exact file under its
++      # fixed artifact name, which the wrapper downloads below.
++      results-file-name: osv-results.sarif
++      fail-on-vuln: false
++
++  emit-status:
++    name: Emit review status
++    runs-on: ubuntu-latest
++    needs: scan
++    if: always()
++    outputs:
++      review_status: ${{ steps.emit.outputs.review_status }}
++    steps:
++      - name: Checkout code
++        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++
++      - name: Download SARIF result
++        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
++        with:
++          name: OSV Scanner SARIF file
++          path: /tmp/osv-results
++        continue-on-error: true
++
++      - name: Emit review_status
++        id: emit
++        run: |
++          set -euo pipefail
++          STATUS="[]"
++
++          if [ -f /tmp/osv-results/osv-results.sarif ]; then
++            # Count vulnerabilities from the SARIF file
++            VULN_COUNT=$(python3 -c "
++          import json, sys
++          try:
++              with open('/tmp/osv-results/osv-results.sarif') as f:
++                  data = json.load(f)
++              count = 0
++              vulns = []
++              for run in data.get('runs', []):
++                  for result in run.get('results', []):
++                      count += 1
++                      rule_id = result.get('ruleId', 'unknown')
++                      message = result.get('message', {}).get('text', '')
++                      loc = result.get('locations', [{}])[0].get('physicalLocation', {}).get('artifactLocation', {}).get('uri', '')
++                      vulns.append(f'- {rule_id} in {loc}: {message}')
++              print(count)
++              if vulns:
++                  print('\n'.join(vulns[:20]), file=sys.stderr)
++          except Exception:
++              print(0)
++          ")
++
++            VULN_DETAIL=""
++            if [ "$VULN_COUNT" -gt 0 ] 2>/dev/null; then
++              VULN_PLURAL=$([ "$VULN_COUNT" -eq 1 ] && echo "y" || echo "ies")
++              VULN_DETAIL=$(python3 -c "
++          import json, sys
++          try:
++              with open('/tmp/osv-results/osv-results.sarif') as f:
++                  data = json.load(f)
++              vulns = []
++              for run in data.get('runs', []):
++                  for result in run.get('results', []):
++                      rule_id = result.get('ruleId', 'unknown')
++                      loc = result.get('locations', [{}])[0].get('physicalLocation', {}).get('artifactLocation', {}).get('uri', '')
++                      vulns.append(f'- {rule_id} in {loc}')
++              print(json.dumps('\n'.join(vulns[:20])))
++          except Exception:
++              print(json.dumps(''))
++          ")
++              STATUS="[{\"source\":\"osv scan\",\"results\":[{\"kind\":\"warning\",\"title\":\"OSV vulnerability scan\",\"summary\":\"${VULN_COUNT} known vulnerabilit${VULN_PLURAL} found in pinned dependencies.\",\"detail\":${VULN_DETAIL},\"how_to_fix\":\"Review the findings in the [Security tab](../../security/code-scanning). Update the affected dependencies if a patched version is available.\"}]}]"
++            else
++              STATUS="[]"
++            fi
++          fi
++
++          echo "review_status=${STATUS}" >> "$GITHUB_OUTPUT"
++          echo "review_status=${STATUS}" > review-status.json
++
++      - name: Upload review status artifact
++        if: always() && steps.emit.outcome != 'skipped'
++        continue-on-error: true
++        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
++        with:
++          name: review-status-osv-scanner
++          path: review-status.json
++          retention-days: 1
++          overwrite: true
++          if-no-files-found: ignore
+diff --git a/.github/workflows/publish-e2e-evidence.yml b/.github/workflows/publish-e2e-evidence.yml
+new file mode 100644
+index 0000000..c4f22c2
+--- /dev/null
++++ b/.github/workflows/publish-e2e-evidence.yml
+@@ -0,0 +1,80 @@
++name: Publish E2E evidence
++
++# This runs only from the default branch after CI completes. It intentionally
++# checks out main, never the PR ref, and treats the downloaded artifact as
++# untrusted input before uploading validated GitHub attachments.
++on:
++  workflow_run:
++    workflows: [CI]
++    types: [completed]
++
++permissions:
++  actions: read
++  contents: read
++  pull-requests: write
++
++concurrency:
++  group: publish-e2e-evidence-${{ github.event.workflow_run.id }}
++  cancel-in-progress: false
++
++jobs:
++  publish:
++    name: Publish inline E2E evidence
++    if: github.event.workflow_run.event == 'pull_request'
++    runs-on: ubuntu-latest
++    timeout-minutes: 10
++    environment: gh-image
++    steps:
++      - name: Check out trusted publisher
++        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++        with:
++          ref: ${{ github.event.repository.default_branch }}
++          persist-credentials: false
++
++      # v1.2.0 resolves to 44f4b93ecbbe22de6c45fa2f62f519aee564ca8c.
++      - name: Install gh-image
++        env:
++          GH_TOKEN: ${{ github.token }}
++        run: gh extension install drogers0/gh-image --pin v1.2.0
++
++      - name: Download and attach evidence
++        env:
++          GH_TOKEN: ${{ github.token }}
++          GITHUB_TOKEN: ${{ github.token }}
++          GH_SESSION_TOKEN: ${{ secrets.GH_IMAGE_SESSION_TOKEN }}
++          SOURCE_REPO: ${{ github.repository }}
++          SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
++          HEAD_OWNER: ${{ github.event.workflow_run.head_repository.owner.login }}
++          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
++          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
++        run: |
++          set -euo pipefail
++
++          # The run's own ``pull_requests`` payload is always empty for a
++          # fork PR, so resolve the PR from its head reference instead.
++          # The head-SHA match skips runs that a newer push superseded.
++          PR_NUMBER=$(gh api -X GET "repos/$SOURCE_REPO/pulls" \
++            -f head="$HEAD_OWNER:$HEAD_BRANCH" -f state=open \
++            --jq '.[] | select(.head.sha == $ENV.HEAD_SHA) | .number' \
++            | head -n1)
++          if [ -z "$PR_NUMBER" ]; then
++            echo "No open pull request has head $HEAD_OWNER:$HEAD_BRANCH at $HEAD_SHA (CI run $SOURCE_RUN_ID)."
++            exit 0
++          fi
++
++          ARTIFACT_NAME=$(gh api "repos/$SOURCE_REPO/actions/runs/$SOURCE_RUN_ID/artifacts" \
++            --jq '.artifacts[] | select(.expired == false and (.name | startswith("e2e-evidence-"))) | .name' \
++            | python3 -c 'import sys; print(next(iter(sys.stdin), "").strip())')
++          if [ -z "$ARTIFACT_NAME" ]; then
++            echo "No E2E evidence artifact was produced for CI run $SOURCE_RUN_ID."
++            exit 0
++          fi
++
++          EVIDENCE_DIR="$RUNNER_TEMP/e2e-evidence"
++          mkdir -p "$EVIDENCE_DIR"
++          gh run download "$SOURCE_RUN_ID" --repo "$SOURCE_REPO" --name "$ARTIFACT_NAME" --dir "$EVIDENCE_DIR"
++
++          python3 scripts/ci/publish_e2e_evidence.py \
++            --evidence-dir "$EVIDENCE_DIR" \
++            --source-repo "$SOURCE_REPO" \
++            --pr-number "$PR_NUMBER"
+diff --git a/.github/workflows/review-labels.yml b/.github/workflows/review-labels.yml
+new file mode 100644
+index 0000000..8b40fca
+--- /dev/null
++++ b/.github/workflows/review-labels.yml
+@@ -0,0 +1,123 @@
++name: Review labels
++
++# Require explicit maintainer review when CI-sensitive files or the MCP
++# catalog change. Previously this was split across two jobs in two
++# workflows: ``ci-review`` in lint.yml (gated on ``ci_review``) and
++# ``mcp-catalog-review`` in supply-chain-audit.yml (gated on
++# ``mcp_catalog``). Both checked for their own label.
++#
++# Now consolidated: a single ``ci-reviewed`` label covers both. The
++# comment sections tell the reviewer exactly what to verify per area,
++# so one label is enough — the human reads the comment, not the label
++# name.
++#
++# Outputs:
++#   ci_reviewed    — "true" / "false" / "" (empty when neither lane ran)
++#   review_status  — JSON array of status objects consumed by the review
++#                    comment assembler. See scripts/ci/emit_review_status.py.
++
++on:
++  workflow_call:
++    inputs:
++      ci_review:
++        description: Whether CI-sensitive files (eslint config, workflows, actions) changed.
++        type: boolean
++        default: false
++      ci_review_files:
++        description: JSON list of CI-sensitive files changed by the pull request.
++        type: string
++        default: '[]'
++      mcp_catalog:
++        description: Whether the MCP catalog / installer changed.
++        type: boolean
++        default: false
++      supply_chain:
++        description: Whether the critical supply-chain scan found a risk requiring review.
++        type: boolean
++        default: false
++    outputs:
++      ci_reviewed:
++        description: Whether the ci-reviewed label is present. Empty when neither input was true.
++        value: ${{ jobs.check.outputs.ci_reviewed }}
++      review_status:
++        description: JSON array of status objects for the review comment assembler.
++        value: ${{ jobs.check.outputs.review_status }}
++
++permissions:
++  contents: read
++  pull-requests: read # read PR labels
++
++jobs:
++  check:
++    name: Review label gate
++    if: inputs.ci_review || inputs.mcp_catalog || inputs.supply_chain
++    runs-on: ubuntu-latest
++    timeout-minutes: 2
++    outputs:
++      ci_reviewed: ${{ steps.label-check.outputs.ci_reviewed }}
++      review_status: ${{ steps.build-status.outputs.review_status }}
++    steps:
++      - name: Checkout code
++        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++
++      - name: Check ci-reviewed label
++        id: label-check
++        env:
++          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
++          REPO: ${{ github.repository }}
++        run: |
++          set -euo pipefail
++          PR="${{ github.event.pull_request.number }}"
++          LABELS=$(gh pr view "$PR" --repo "$REPO" --json labels --jq '.labels[].name' || true)
++
++          if echo "$LABELS" | grep -Fxq 'ci-reviewed'; then
++            echo "ci-reviewed label present."
++            echo "ci_reviewed=true" >> "$GITHUB_OUTPUT"
++          else
++            echo "ci-reviewed label missing."
++            echo "ci_reviewed=false" >> "$GITHUB_OUTPUT"
++          fi
++
++      - name: Build review_status JSON
++        id: build-status
++        env:
++          CI_REVIEW: ${{ inputs.ci_review }}
++          CI_REVIEW_FILES: ${{ inputs.ci_review_files }}
++          MCP_CATALOG: ${{ inputs.mcp_catalog }}
++          SUPPLY_CHAIN: ${{ inputs.supply_chain }}
++          LABEL_PRESENT: ${{ steps.label-check.outputs.ci_reviewed }}
++          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
++          BASE_SHA: ${{ github.event.pull_request.base.sha }}
++          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
++        run: |
++          set -euo pipefail
++          args=()
++          if [ "$CI_REVIEW" = "true" ]; then args+=(--ci-review); fi
++          args+=(--ci-review-files "$CI_REVIEW_FILES")
++          if [ "$MCP_CATALOG" = "true" ]; then args+=(--mcp-catalog); fi
++          if [ "$SUPPLY_CHAIN" = "true" ]; then args+=(--supply-chain); fi
++          if [ "$LABEL_PRESENT" = "true" ]; then args+=(--label-present); fi
++
++          # Write to both $GITHUB_OUTPUT and review-status.json for the
++          # live comment poller to pick up as an artifact.
++          python3 scripts/ci/emit_review_status.py "${args[@]}" \
++            --repo-url "$REPO_URL" --base-sha "$BASE_SHA" --head-sha "$HEAD_SHA" \
++            --output "$GITHUB_OUTPUT"
++          grep '^review_status=' "$GITHUB_OUTPUT" > review-status.json
++
++      - name: Upload review status artifact
++        if: always() && steps.build-status.outcome != 'skipped'
++        continue-on-error: true
++        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
++        with:
++          name: review-status-review-labels
++          path: review-status.json
++          retention-days: 1
++          overwrite: true
++          if-no-files-found: ignore
++
++      - name: Fail on missing label
++        if: steps.label-check.outputs.ci_reviewed != 'true'
++        run: |
++          echo "::error::CI-sensitive changes require the ci-reviewed label. Add the label and re-run this check."
++          exit 1
+diff --git a/.github/workflows/skills-index-freshness.yml b/.github/workflows/skills-index-freshness.yml
+new file mode 100644
+index 0000000..f75af91
+--- /dev/null
++++ b/.github/workflows/skills-index-freshness.yml
+@@ -0,0 +1,167 @@
++name: Skills Index Freshness Check
++
++# Belt-and-suspenders for the twice-daily build_skills_index pipeline.
++# If the live /docs/api/skills-index.json ever goes more than 26 hours
++# stale OR the file disappears entirely OR a major source has collapsed,
++# this workflow opens a GitHub issue so we hear about it before users do.
++#
++# Triggered every 4 hours so we catch a stuck cron within one tick.
++
++on:
++  schedule:
++    - cron: '0 */4 * * *'
++  workflow_dispatch:
++
++permissions:
++  contents: read
++  issues: write
++
++jobs:
++  check-freshness:
++    if: github.repository == 'NousResearch/prometheus-agent'
++    runs-on: ubuntu-latest
++    timeout-minutes: 10
++    environment: trusted-automation
++    steps:
++      # `Get GitHub App token` below is a LOCAL composite action
++      # (./.github/actions/get-app-token), so the repository must be on disk
++      # before it can be resolved. Without this checkout the job dies with
++      # "Can't find 'action.yml' ... under .github/actions/get-app-token"
++      # every time the probe is non-ok — i.e. exactly when the watchdog is
++      # supposed to file its issue.
++      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++
++      - name: Probe live index
++        id: probe
++        run: |
++          set -e
++          URL="https://github.com/geohot0199/Prometheus-agent/docs/api/skills-index.json"
++          echo "Probing $URL"
++          # -L follows redirects; -f fails on HTTP errors; -s suppresses progress
++          if ! curl -fsSL --retry 3 --retry-delay 10 -o /tmp/skills-index.json "$URL"; then
++            echo "status=fetch-failed" >> "$GITHUB_OUTPUT"
++            echo "detail=Could not download $URL" >> "$GITHUB_OUTPUT"
++            exit 0
++          fi
++          # Validate + extract generated_at and per-source counts
++          python3 <<'PY' >> "$GITHUB_OUTPUT"
++          import json, sys
++          from datetime import datetime, timezone
++
++          try:
++              with open("/tmp/skills-index.json") as f:
++                  data = json.load(f)
++          except Exception as e:
++              print(f"status=parse-failed")
++              print(f"detail=JSON decode error: {e}")
++              sys.exit(0)
++
++          generated_at = data.get("generated_at", "")
++          total = data.get("skill_count", 0)
++          skills = data.get("skills", [])
++          if not isinstance(skills, list):
++              print("status=invalid-shape")
++              print(f"detail=skills field is not a list (got {type(skills).__name__})")
++              sys.exit(0)
++
++          # Per-source counts
++          from collections import Counter
++          by_src = Counter(s.get("source", "") for s in skills)
++
++          # Freshness
++          age_hours = None
++          try:
++              ts = datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
++              age_hours = (datetime.now(timezone.utc) - ts).total_seconds() / 3600
++          except Exception:
++              pass
++
++          # Floors — same as build_skills_index.py EXPECTED_FLOORS.
++          floors = {
++              "skills.sh": 100,
++              "lobehub": 100,
++              "clawhub": 50,
++              "official": 50,
++              "github": 30,
++              "browse-sh": 50,
++          }
++          issues = []
++          if age_hours is not None and age_hours > 26:
++              issues.append(f"Index is {age_hours:.1f}h old (limit 26h)")
++          for src, floor in floors.items():
++              count = by_src.get(src, 0)
++              if src == "skills.sh":
++                  count = by_src.get("skills.sh", 0) + by_src.get("skills-sh", 0)
++              if count < floor:
++                  issues.append(f"{src}: {count} < {floor}")
++          if total < 1500:
++              issues.append(f"total skills: {total} < 1500")
++
++          if issues:
++              detail = "; ".join(issues)
++              print("status=degraded")
++              # GITHUB_OUTPUT doesn't allow newlines without explicit delimiter
++              print(f"detail={detail}")
++          else:
++              print("status=ok")
++              print(f"detail=Index OK — {total} skills, generated {generated_at}")
++              by_summary = ", ".join(f"{k}={v}" for k, v in by_src.most_common(8))
++              print(f"summary={by_summary}")
++          PY
++
++      - name: Report status
++        run: |
++          echo "Probe status: ${{ steps.probe.outputs.status }}"
++          echo "Detail:       ${{ steps.probe.outputs.detail }}"
++          if [ -n "${{ steps.probe.outputs.summary }}" ]; then
++            echo "Summary:      ${{ steps.probe.outputs.summary }}"
++          fi
++
++      - name: Get GitHub App token
++        if: steps.probe.outputs.status != 'ok'
++        id: app-token
++        uses: ./.github/actions/get-app-token
++        with:
++          client-id: ${{ vars.APP_CLIENT_ID }}
++          private-key: ${{ secrets.APP_PRIVATE_KEY }}
++
++      - name: Open issue on degraded / failed probe
++        if: steps.probe.outputs.status != 'ok'
++        env:
++          GH_TOKEN: ${{ steps.app-token.outputs.token }}
++          STATUS: ${{ steps.probe.outputs.status }}
++          DETAIL: ${{ steps.probe.outputs.detail }}
++        run: |
++          # Find existing open issue by title prefix so we don't spam — we
++          # append a comment instead of opening a new one each tick.
++          TITLE_PREFIX="[skills-index-watchdog]"
++          existing=$(gh issue list \
++            --repo "${{ github.repository }}" \
++            --state open \
++            --search "in:title \"$TITLE_PREFIX\"" \
++            --json number,title \
++            --jq '.[] | select(.title | startswith("'"$TITLE_PREFIX"'")) | .number' \
++            | head -1)
++          BODY="Automated freshness probe failed.
++
++          **Status:** \`$STATUS\`
++          **Detail:** $DETAIL
++
++          The Skills Hub at /docs/skills depends on \`/docs/api/skills-index.json\`.
++          The unified index is rebuilt by \`.github/workflows/skills-index.yml\` (cron 6/18 UTC)
++          and \`.github/workflows/deploy-site.yml\` (on every push affecting website/skills).
++          If this issue keeps reopening, check the latest runs:
++
++          - https://github.com/${{ github.repository }}/actions/workflows/skills-index.yml
++          - https://github.com/${{ github.repository }}/actions/workflows/deploy-site.yml
++
++          This issue was opened by \`.github/workflows/skills-index-freshness.yml\`. Close it once the underlying problem is fixed; the next probe will reopen if it's still broken."
++          if [ -n "$existing" ]; then
++            echo "Appending to existing issue #$existing"
++            gh issue comment "$existing" --repo "${{ github.repository }}" --body "Probe still failing at $(date -u +%FT%TZ): \`$STATUS\` — $DETAIL"
++          else
++            echo "Opening new watchdog issue"
++            gh issue create --repo "${{ github.repository }}" \
++              --title "$TITLE_PREFIX Skills index is stale or degraded ($STATUS)" \
++              --body "$BODY"
++          fi
+diff --git a/.github/workflows/skills-index.yml b/.github/workflows/skills-index.yml
+new file mode 100644
+index 0000000..8672d8d
+--- /dev/null
++++ b/.github/workflows/skills-index.yml
+@@ -0,0 +1,82 @@
++name: Build Skills Index
++
++on:
++  schedule:
++    # Run twice daily: 6 AM and 6 PM UTC
++    - cron: "0 6,18 * * *"
++  workflow_dispatch: # Manual trigger
++  push:
++    branches: [main]
++    paths:
++      - "scripts/build_skills_index.py"
++      - ".github/workflows/skills-index.yml"
++
++permissions:
++  contents: read
++  actions: write # to trigger deploy-site.yml on schedule
++
++jobs:
++  build-index:
++    # Only run on the upstream repository, not on forks
++    if: github.repository == 'NousResearch/prometheus-agent'
++    runs-on: ubuntu-latest
++    timeout-minutes: 15
++    environment: trusted-automation
++    steps:
++      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++
++      - name: Get GitHub App token
++        id: app-token
++        uses: ./.github/actions/get-app-token
++        with:
++          client-id: ${{ vars.APP_CLIENT_ID }}
++          private-key: ${{ secrets.APP_PRIVATE_KEY }}
++
++      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
++        with:
++          python-version: "3.11"
++
++      - name: Install dependencies
++        uses: ./.github/actions/retry
++        with:
++          command: pip install httpx==0.28.1 pyyaml==6.0.2
++
++      - name: Build skills index
++        env:
++          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
++        run: python scripts/build_skills_index.py
++
++      - name: Upload index artifact
++        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
++        with:
++          name: skills-index
++          path: website/static/api/skills-index.json
++          retention-days: 7
++
++  # Re-trigger the docs deploy so the refreshed index lands on the live site.
++  # The deploy itself is owned by deploy-site.yml (which crawls and deploys
++  # everything in one pipeline); we just kick it on a schedule.
++  trigger-deploy:
++    needs: build-index
++    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
++    runs-on: ubuntu-latest
++    timeout-minutes: 15
++    environment: trusted-automation
++    steps:
++      # Required: `Get GitHub App token` is a LOCAL composite action
++      # (./.github/actions/get-app-token) and cannot resolve without the repo
++      # checked out. `build-index` above already does this; this job did not,
++      # so the scheduled deploy re-trigger never fired.
++      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++
++      - name: Get GitHub App token
++        id: app-token
++        uses: ./.github/actions/get-app-token
++        with:
++          client-id: ${{ vars.APP_CLIENT_ID }}
++          private-key: ${{ secrets.APP_PRIVATE_KEY }}
++
++      - name: Trigger Deploy Site workflow
++        env:
++          GH_TOKEN: ${{ steps.app-token.outputs.token }}
++        run: gh workflow run deploy-site.yml --repo ${{ github.repository }} -f skills_index_run_id=${{ github.run_id }}
+diff --git a/.github/workflows/supply-chain-audit.yml b/.github/workflows/supply-chain-audit.yml
+new file mode 100644
+index 0000000..ec7b8b2
+--- /dev/null
++++ b/.github/workflows/supply-chain-audit.yml
+@@ -0,0 +1,308 @@
++name: Supply Chain Audit
++
++# Narrow, high-signal scanner. Only fires on critical indicators of supply
++# chain attacks (e.g. the litellm-style payloads). Low-signal heuristics
++# (plain base64, plain exec/eval, dependency/Dockerfile/workflow edits,
++# Actions version unpinning, outbound POST/PUT) were intentionally
++# removed — they fired on nearly every PR and trained reviewers to ignore
++# the scanner. Keep this file's checks ruthlessly narrow: if you find
++# yourself adding WARNING-tier patterns here again, make a separate
++# advisory-only workflow instead.
++#
++# Path-gating is handled centrally by the ``ci.yml`` orchestrator's
++# ``detect`` job. The orchestrator passes ``scan`` / ``deps`` booleans as
++# inputs; this workflow's jobs gate on those inputs instead of re-computing
++# the diff. MCP catalog review was previously here but has moved to
++# ``review-labels.yml`` so it can be rerun independently.
++#
++# Outputs:
++#   review_status      — JSON array of status objects consumed by the review
++#                         comment assembler (scripts/ci/assemble_review_comment.py).
++#   critical_findings  — "true" when the narrow critical-pattern scan found
++#                         something. The review-label gate consumes this and
++#                         owns the action-required result, so adding
++#                         ``ci-reviewed`` can heal the run on rerun.
++
++on:
++  workflow_call:
++    inputs:
++      event_name:
++        description: The event name from the calling orchestrator.
++        type: string
++        required: true
++      scan:
++        description: Whether supply-chain-relevant files changed.
++        type: boolean
++        required: true
++      deps:
++        description: Whether pyproject.toml changed.
++        type: boolean
++        required: true
++    outputs:
++      review_status:
++        description: JSON array of review status objects for the review comment assembler.
++        value: ${{ jobs.aggregate.outputs.review_status }}
++      critical_findings:
++        description: Whether the critical-pattern scan found a risk requiring maintainer review.
++        value: ${{ jobs.aggregate.outputs.critical_findings }}
++
++permissions:
++  pull-requests: write
++  contents: read
++
++jobs:
++  scan:
++    name: Scan PR for critical supply chain risks
++    if: inputs.scan
++    runs-on: ubuntu-latest
++    timeout-minutes: 15
++    outputs:
++      review_status: ${{ steps.emit-status.outputs.review_status }}
++      critical_findings: ${{ steps.scan.outputs.found }}
++    steps:
++      - name: Checkout
++        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++        with:
++          fetch-depth: 0
++
++      - name: Scan diff for critical patterns
++        id: scan
++        env:
++          GH_TOKEN: ${{ github.token }}
++          CI_REVIEWED: ${{ contains(github.event.pull_request.labels.*.name, 'ci-reviewed') }}
++        run: |
++          set -euo pipefail
++
++          BASE="${{ github.event.pull_request.base.sha }}"
++          HEAD="${{ github.event.pull_request.head.sha }}"
++
++          # Added lines only, excluding lockfiles.
++          # Three-point diff (base...head) diffs from the merge base to HEAD,
++          # so only changes introduced by this PR are included — not changes
++          # that landed on main after the PR branched off.
++          DIFF=$(git diff "$BASE"..."$HEAD" -- . ':!uv.lock' ':!*.lock' ':!package-lock.json' ':!yarn.lock' || true)
++
++          FINDINGS=""
++
++          # --- .pth files (auto-execute on Python startup) ---
++          # The exact mechanism used in the litellm supply chain attack:
++          # https://github.com/BerriAI/litellm/issues/24512
++          PTH_FILES=$(git diff --diff-filter=d --name-only "$BASE"..."$HEAD" | grep '\.pth$' || true)
++          if [ -n "$PTH_FILES" ]; then
++            FINDINGS="${FINDINGS}
++          ### 🚨 CRITICAL: .pth file added or modified
++          Python \`.pth\` files in \`site-packages/\` execute automatically when the interpreter starts — no import required.
++
++          **Files:**
++          \`\`\`
++          ${PTH_FILES}
++          \`\`\`
++          "
++          fi
++
++          # --- base64 decode + exec/eval on the same line (the litellm attack pattern) ---
++          B64_EXEC_HITS=$(echo "$DIFF" | grep -n '^+' | grep -iE 'base64\.(b64decode|decodebytes|urlsafe_b64decode)' | grep -iE 'exec\(|eval\(' | head -10 || true)
++          if [ -n "$B64_EXEC_HITS" ]; then
++            FINDINGS="${FINDINGS}
++          ### 🚨 CRITICAL: base64 decode + exec/eval combo
++          Base64-decoded strings passed directly to exec/eval — the signature of hidden credential-stealing payloads.
++
++          **Matches:**
++          \`\`\`
++          ${B64_EXEC_HITS}
++          \`\`\`
++          "
++          fi
++
++          # --- subprocess with encoded/obfuscated command argument ---
++          PROC_HITS=$(echo "$DIFF" | grep -n '^+' | grep -E 'subprocess\.(Popen|call|run)\s*\(' | grep -iE 'base64|\\x[0-9a-f]{2}|chr\(' | head -10 || true)
++          if [ -n "$PROC_HITS" ]; then
++            FINDINGS="${FINDINGS}
++          ### 🚨 CRITICAL: subprocess with encoded/obfuscated command
++          Subprocess calls whose command strings are base64- or hex-encoded are a strong indicator of payload execution.
++
++          **Matches:**
++          \`\`\`
++          ${PROC_HITS}
++          \`\`\`
++          "
++          fi
++
++          # --- Install-hook files (setup.py/sitecustomize/usercustomize/__init__.pth) ---
++          # These execute during pip install or interpreter startup.
++          # Anchored at repo root: only the top-level setup.py/setup.cfg run during
++          # `pip install`, and only top-level sitecustomize.py/usercustomize.py are
++          # auto-loaded by the interpreter via site.py. Any nested file with the
++          # same name (e.g. prometheus_cli/setup.py — the CLI setup wizard) is unrelated
++          # and produced false positives that trained reviewers to ignore the scanner.
++          SETUP_HITS=$(git diff --diff-filter=d --name-only "$BASE"..."$HEAD" | grep -E '^(setup\.py|setup\.cfg|sitecustomize\.py|usercustomize\.py|__init__\.pth)$' || true)
++          # A maintainer-applied ci-reviewed label records the manual review
++          # required for intentional changes to an install hook. The scanner
++          # still blocks every unreviewed addition or modification.
++          if [ -n "$SETUP_HITS" ] && [ "$CI_REVIEWED" != "true" ]; then
++            FINDINGS="${FINDINGS}
++          ### 🚨 CRITICAL: Install-hook file added or modified
++          These files can execute code during package installation or interpreter startup.
++
++          **Files:**
++          \`\`\`
++          ${SETUP_HITS}
++          \`\`\`
++          "
++          fi
++
++          if [ -n "$FINDINGS" ]; then
++            echo "found=true" >> "$GITHUB_OUTPUT"
++            echo "$FINDINGS" > /tmp/findings.md
++          else
++            echo "found=false" >> "$GITHUB_OUTPUT"
++          fi
++
++      - name: Emit review_status
++        id: emit-status
++        if: always()
++        env:
++          FOUND: ${{ steps.scan.outputs.found }}
++        run: |
++          python3 - <<'PYEOF'
++          import json, os
++
++          # The review-label gate renders and blocks critical findings. Keep
++          # this scan a fact-finder so adding ci-reviewed can rerun the gate
++          # without requiring the scanner itself to fail again.
++          status = []
++
++          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
++              f.write(f"review_status={json.dumps(status)}\n")
++          PYEOF
++
++
++  dep-bounds:
++    name: Check PyPI dependency upper bounds
++    if: inputs.deps
++    runs-on: ubuntu-latest
++    timeout-minutes: 15
++    outputs:
++      review_status: ${{ steps.emit-status.outputs.review_status }}
++    steps:
++      - name: Checkout
++        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++        with:
++          fetch-depth: 0
++
++      - name: Check for unbounded PyPI deps
++        id: bounds
++        run: |
++          set -euo pipefail
++
++          BASE="${{ github.event.pull_request.base.sha }}"
++          HEAD="${{ github.event.pull_request.head.sha }}"
++
++          # Only check added lines in pyproject.toml
++          ADDED=$(git diff "$BASE"..."$HEAD" -- pyproject.toml | grep '^+' | grep -v '^+++' || true)
++
++          if [ -z "$ADDED" ]; then
++            echo "found=false" >> "$GITHUB_OUTPUT"
++            exit 0
++          fi
++
++          # Match PyPI dep specs that have >= and no < ceiling.
++          # Pattern: "package>=version" without a following ",<" bound.
++          # Excludes git+ URLs (which use commit SHAs) and comments.
++          UNBOUNDED=$(echo "$ADDED" | grep -oE '"[a-zA-Z0-9_-]+(\[[^\]]*\])?>=[ 0-9.]+"' | grep -v ',<' || true)
++
++          if [ -n "$UNBOUNDED" ]; then
++            echo "found=true" >> "$GITHUB_OUTPUT"
++            echo "$UNBOUNDED" > /tmp/unbounded.txt
++          else
++            echo "found=false" >> "$GITHUB_OUTPUT"
++          fi
++
++      - name: Emit review_status
++        id: emit-status
++        if: always()
++        env:
++          FOUND: ${{ steps.bounds.outputs.found }}
++        run: |
++          python3 - <<'PYEOF'
++          import json, os
++
++          found = os.environ.get("FOUND", "") == "true"
++
++          if found:
++              with open("/tmp/unbounded.txt", encoding="utf-8") as f:
++                  detail = f.read()
++              status = [{
++                  "source": "supply chain",
++                  "results": [{
++                      "kind": "action_required",
++                      "title": "Unbounded PyPI dependencies",
++                      "summary": "This PR adds PyPI dependencies without upper bounds.",
++                      "detail": detail,
++                      "how_to_fix": 'Add a `<next_major` upper bound, e.g. `"package>=1.2.0,<2"`. See CONTRIBUTING.md dependency pinning policy.'
++                  }]
++              }]
++          else:
++              status = []
++
++          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
++              f.write(f"review_status={json.dumps(status)}\n")
++          PYEOF
++
++      - name: Fail on unbounded deps
++        if: steps.bounds.outputs.found == 'true'
++        run: |
++          echo "::error::PyPI dependencies without upper bounds detected. Add <next_major ceiling per CONTRIBUTING.md policy."
++          exit 1
++
++  aggregate:
++    name: Aggregate review statuses
++    needs: [scan, dep-bounds]
++    if: always()
++    runs-on: ubuntu-latest
++    timeout-minutes: 15
++    outputs:
++      review_status: ${{ steps.merge.outputs.review_status }}
++      critical_findings: ${{ steps.merge.outputs.critical_findings }}
++    steps:
++      - name: Merge review statuses
++        id: merge
++        env:
++          SCAN_STATUS: ${{ needs.scan.outputs.review_status }}
++          DEP_STATUS: ${{ needs.dep-bounds.outputs.review_status }}
++          CRITICAL_FINDINGS: ${{ needs.scan.outputs.critical_findings }}
++        run: |
++          python3 - <<'PYEOF'
++          import json, os
++
++          merged = []
++          for key in ("SCAN_STATUS", "DEP_STATUS"):
++              raw = os.environ.get(key, "")
++              if not raw:
++                  continue
++              try:
++                  data = json.loads(raw)
++              except (json.JSONDecodeError, TypeError):
++                  continue
++              if isinstance(data, list):
++                  merged.extend(data)
++
++          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
++              f.write(f"review_status={json.dumps(merged)}\n")
++              f.write("critical_findings=" + os.environ.get("CRITICAL_FINDINGS", "false") + "\n")
++
++          # Write review-status.json for the live comment poller artifact.
++          with open("review-status.json", "w", encoding="utf-8") as f:
++              f.write(f"review_status={json.dumps(merged)}\n")
++          PYEOF
++
++      - name: Upload review status artifact
++        if: always() && steps.merge.outcome != 'skipped'
++        continue-on-error: true
++        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
++        with:
++          name: review-status-supply-chain
++          path: review-status.json
++          retention-days: 1
++          overwrite: true
++          if-no-files-found: ignore
+diff --git a/.github/workflows/tests-os.yml b/.github/workflows/tests-os.yml
+new file mode 100644
+index 0000000..9ac89c2
+--- /dev/null
++++ b/.github/workflows/tests-os.yml
+@@ -0,0 +1,154 @@
++name: OS-specific tests
++
++# Runs the tests that can only be trusted on their own host OS.
++#
++# The main Python suite (.github/workflows/tests.yml) runs on
++# ubuntu-latest and covers everything that is either platform-agnostic or
++# genuinely Linux-specific. Tests whose subject is macOS- or
++# Windows-specific behaviour carry a marker (see the ``_OS_MARKS`` block
++# comment in tests/conftest.py) and are SKIPPED on Linux, because faking
++# ``sys.platform`` on a Linux runner selects the branch under test without
++# reproducing any of the OS behaviour that branch exists for. This workflow
++# is where those markers actually execute:
++#
++#   macos    → ``-m macos_only``     on macos-latest
++#   windows  → ``-m windows_only``   on windows-latest
++#
++# Deliberately NOT sliced. The marked set is small (tens of tests, not
++# thousands), so one plain ``pytest`` process per OS is both faster and far
++# less machinery than the LPT-sliced per-file runner the Linux lane needs.
++# If either lane grows past its timeout, that is the signal to reach for
++# scripts/run_tests.sh --slice here too.
++#
++# Each lane FAILS when it selects zero tests (pytest exit code 5). Without
++# that guard, a renamed marker or a bad selector would report a green job
++# that ran nothing — the exact silent-coverage-loss failure this workflow
++# exists to prevent.
++
++on:
++  workflow_call:
++
++permissions:
++  contents: read
++
++concurrency:
++  group: tests-os-${{ github.ref }}
++  cancel-in-progress: true
++
++jobs:
++  os-tests:
++    name: ${{ matrix.name }}
++    runs-on: ${{ matrix.runner }}
++    timeout-minutes: 30
++    strategy:
++      fail-fast: false
++      matrix:
++        include:
++          - name: macOS-only tests
++            runner: macos-latest
++            marker: macos_only
++          - name: Windows-only tests
++            runner: windows-latest
++            marker: windows_only
++    steps:
++      - name: Checkout code
++        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++
++      - name: Install uv
++        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # 8.2.0
++        with:
++          # Pinned for the same reason as the Linux lane: unpinned, setup-uv
++          # resolves "latest" by fetching a manifest on every job and a
++          # transient fetch failure fails the whole job.
++          version: "0.9.28"
++          enable-cache: true
++          cache-dependency-glob: |
++            pyproject.toml
++            uv.lock
++
++      - name: Set up Python 3.11
++        uses: ./.github/actions/retry
++        with:
++          command: uv python install 3.11
++
++      - name: Install dependencies
++        # Same extras as the Linux test lane so an OS-marked test can import
++        # anything its Linux siblings can. ``[all]`` is deliberately
++        # Windows/macOS-installable (see the policy comment on the extra in
++        # pyproject.toml — matrix/python-olm was removed from it precisely
++        # because it could not build here).
++        uses: ./.github/actions/retry
++        with:
++          command: uv sync --locked --python 3.11 --extra all --extra dev --extra anthropic --extra mistral --extra fal --extra modal --extra daytona --extra hindsight --extra parallel-web
++
++      - name: Minimize uv cache
++        run: uv cache prune --ci
++
++      - name: Run ${{ matrix.marker }} tests
++        # Two-step selection:
++        #
++        #   1. scripts/ci/list_os_marked_tests.py narrows WHICH FILES are
++        #      imported. ``-m`` filters after collection, and collection
++        #      imports every module under tests/ — on this host that would
++        #      drag ~900 unrelated test modules through import, where a
++        #      single unrelated ImportError would fail a job whose own
++        #      subject is fine. The helper exits non-zero if the marker
++        #      matches no file at all.
++        #   2. ``-m`` decides WHICH TESTS run, and stays authoritative.
++        #      Passing it on the command line REPLACES pyproject's
++        #      ``-m 'not integration'`` addopts (same option, last wins) —
++        #      hence repeating ``not integration``, or the integration
++        #      suite would return through the side door.
++        #
++        # ``--timeout-method`` needs no override: tests/conftest.py's
++        # pytest_configure already downgrades the signal-based timer on
++        # Windows, which has no SIGALRM.
++        shell: bash
++        run: |
++          set -uo pipefail
++
++          LIST="${RUNNER_TEMP:-.}/selected-tests.txt"
++
++          # Process substitution would hide the helper's exit status, so write
++          # to a file and check it explicitly.
++          if ! uv run --no-sync python scripts/ci/list_os_marked_tests.py \
++                 "${{ matrix.marker }}" > "$LIST"; then
++            echo "::error::could not enumerate ${{ matrix.marker }} test files"
++            exit 1
++          fi
++          if [ ! -s "$LIST" ]; then
++            echo "::error::empty ${{ matrix.marker }} file list"
++            exit 1
++          fi
++
++          # Deliberately NOT `mapfile`: that is a bash 4 builtin and the macOS
++          # runner's /bin/bash is 3.2. Word-splitting is safe here because the
++          # helper emits repo-relative test paths, which contain no spaces.
++          # shellcheck disable=SC2046
++          set -- $(cat "$LIST")
++          echo "selected $# file(s) for ${{ matrix.marker }}:"
++          cat "$LIST"
++
++          # ``shell: bash`` runs this script with ``-e`` injected, which
++          # ``set -uo pipefail`` above does not clear. A bare pytest call
++          # would therefore abort the script on any non-zero exit and the
++          # exit-5 branch below would be unreachable dead code — the job
++          # would still fail red, but the diagnostic would never print.
++          status=0
++          uv run --no-sync python -m pytest \
++            "$@" \
++            -m "${{ matrix.marker }} and not integration" \
++            -v --tb=short || status=$?
++          if [ "$status" -eq 5 ]; then
++            echo "::error::No tests matched -m ${{ matrix.marker }}. Either the" \
++                 "marker was renamed/dropped or selection is broken — this job" \
++                 "must never pass without running its OS's tests."
++            exit 1
++          fi
++          exit "$status"
++        env:
++          # Belt-and-suspenders with tests/conftest.py's env blanking: no
++          # test may reach a real provider API.
++          OPENROUTER_API_KEY: ""
++          OPENAI_API_KEY: ""
++          NOUS_API_KEY: ""
+diff --git a/.github/workflows/tests.yml b/.github/workflows/tests.yml
+new file mode 100644
+index 0000000..924a835
+--- /dev/null
++++ b/.github/workflows/tests.yml
+@@ -0,0 +1,255 @@
++name: Tests
++
++on:
++  workflow_call:
++    inputs:
++      slice_count:
++        description: Number of parallel test slices
++        type: number
++        default: 8
++
++permissions:
++  contents: read
++
++# Cancel in-progress runs for the same ref
++concurrency:
++  group: tests-${{ github.ref }}
++  cancel-in-progress: true
++
++jobs:
++  generate:
++    name: "Generate slices"
++    runs-on: ubuntu-latest
++    timeout-minutes: 10
++    outputs:
++      matrix: ${{ steps.matrix.outputs.matrix }}
++    steps:
++      - name: Checkout code
++        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++
++      - name: Restore duration cache
++        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
++        with:
++          path: test_durations.json
++          key: test-durations
++          # Saves use test-durations-${run_id}, so the exact key above never
++          # matches — without this prefix fallback the cache ALWAYS missed,
++          # LPT slicing ran on no data, and unbalanced slices pushed heavy
++          # files toward the per-file timeout under load.
++          restore-keys: |
++            test-durations-
++
++      - name: Generate test slices
++        id: matrix
++        run: |
++          MATRIX=$(python3 scripts/run_tests_parallel.py --generate-slices ${{ inputs.slice_count }})
++          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
++
++  test:
++    name: Run tests slice ${{ matrix.slice.index }}/${{ inputs.slice_count }}
++    needs: generate
++    runs-on: ubuntu-latest
++    timeout-minutes: 30
++    strategy:
++      fail-fast: false
++      matrix: ${{ fromJSON(needs.generate.outputs.matrix) }}
++    steps:
++      - name: Checkout code
++        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++
++      - name: Install ripgrep (prebuilt binary)
++        run: |
++          set -euo pipefail
++          RG_VERSION=15.1.0
++          RG_SHA256=1c9297be4a084eea7ecaedf93eb03d058d6faae29bbc57ecdaf5063921491599
++          RG_TARBALL=ripgrep-${RG_VERSION}-x86_64-unknown-linux-musl.tar.gz
++          curl -sSfL --retry 3 --retry-delay 5 -o "$RG_TARBALL" \
++            "https://github.com/BurntSushi/ripgrep/releases/download/${RG_VERSION}/${RG_TARBALL}"
++          echo "${RG_SHA256}  ${RG_TARBALL}" | sha256sum -c -
++          tar -xzf "$RG_TARBALL"
++          sudo mv "ripgrep-${RG_VERSION}-x86_64-unknown-linux-musl/rg" /usr/local/bin/rg
++          rm -rf "$RG_TARBALL" "ripgrep-${RG_VERSION}-x86_64-unknown-linux-musl"
++          rg --version
++
++      - name: Install uv
++        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # 8.2.0
++        with:
++          # Pin the uv version: unpinned, setup-uv resolves "latest" by
++          # fetching a manifest from raw.githubusercontent.com on EVERY job —
++          # a transient fetch failure fails the whole job (2026-07-28 slice-5
++          # incident). Pinned, the binary downloads directly; no manifest hop.
++          version: "0.9.28"
++          # Persist uv's download/wheel cache (~/.cache/uv) across runs.
++          # Keyed on the dependency manifests, so the cache is reused until
++          # pyproject.toml or uv.lock changes. `uv sync` still runs every
++          # time, but resolves from the warm cache instead of re-downloading
++          # and re-building wheels.
++          enable-cache: true
++          cache-dependency-glob: |
++            pyproject.toml
++            uv.lock
++
++      - name: Set up Python 3.11
++        uses: ./.github/actions/retry
++        with:
++          command: uv python install 3.11
++
++      - name: Install dependencies
++        # `uv sync --locked` installs the exact pinned set from uv.lock (and
++        # fails if the lock is out of sync with pyproject.toml), giving a
++        # reproducible env. It also creates .venv itself, so no separate
++        # `uv venv` step is needed.
++        #
++        # The trailing extras beyond all/dev are the lazy-install features
++        # (tools/lazy_deps.py) that tests exercise for real: provider.anthropic,
++        # stt/tts.mistral, image.fal, terminal.modal, terminal.daytona,
++        # memory.hindsight, search.parallel. The hermetic test env forbids
++        # mid-run pip installs (PROMETHEUS_DISABLE_LAZY_INSTALLS=1 in
++        # tests/conftest.py), so the SDKs those tests need must be in the
++        # venv up front — resolved from uv.lock like everything else, which
++        # also honors the exact supply-chain pins these extras carry.
++        uses: ./.github/actions/retry
++        with:
++          command: uv sync --locked --python 3.11 --extra all --extra dev --extra anthropic --extra mistral --extra fal --extra modal --extra daytona --extra hindsight --extra parallel-web
++
++      - name: Minimize uv cache
++        # Optimized for CI: prunes pre-built wheels that are cheap to
++        # re-download, keeping the persisted cache small and fast to restore.
++        run: uv cache prune --ci
++
++      - name: Run tests (slice ${{ matrix.slice.index }}/${{ inputs.slice_count }})
++        # Per-file isolation via scripts/run_tests.sh: each test file runs
++        # in its own freshly-spawned `python -m pytest <file>` subprocess
++        # with bounded parallelism. No xdist, no shared workers, no
++        # module-level state leakage between files.
++        #
++        # File list is pre-computed by the generate job (--generate-slices)
++        # which runs LPT distribution once and passes the file list to each
++        # matrix job via --files. Previously each job re-discovered files and
++        # re-ran LPT independently — redundant N times.
++        run: |
++          source .venv/bin/activate
++          scripts/run_tests.sh --files '${{ matrix.slice.files }}'
++        env:
++          # Ensure tests don't accidentally call real APIs
++          OPENROUTER_API_KEY: ""
++          OPENAI_API_KEY: ""
++          NOUS_API_KEY: ""
++
++      - name: Upload per-slice durations
++        # Advisory artifact (feeds slice balancing) — a transient artifact-
++        # service blip must not fail an otherwise-green test slice.
++        continue-on-error: true
++        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
++        with:
++          name: test-durations-slice-${{ matrix.slice.index }}
++          path: test_durations.json
++          retention-days: 1
++
++  # Merge per-slice duration data into a single cache, so future runs
++  # (including PRs) get balanced slicing.
++  save-durations:
++    needs: test
++    if: needs.test.result == 'success' && github.ref == 'refs/heads/main'
++    runs-on: ubuntu-latest
++    timeout-minutes: 10
++    steps:
++      - name: Download all slice durations
++        # Each slice uploads the same file name (test_durations.json).
++        # With merge-multiple, the parallel downloads write to one path.
++        # This causes two problems: a race can write two JSON documents
++        # into one file, and the last write erases the other slices.
++        # Without merge-multiple, each artifact gets its own directory.
++        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
++        with:
++          pattern: test-durations-slice-*
++          path: durations
++
++      - name: Merge into single durations file
++        run: |
++          python3 -c "
++          import json, glob, os
++          merged = {}
++          for f in glob.glob('durations/*/test_durations.json'):
++            with open(f) as fh:
++              merged.update(json.load(fh))
++          with open('test_durations.json', 'w') as fh:
++            json.dump(merged, fh, indent=2, sort_keys=True)
++          print(f'Merged {len(merged)} file durations')
++          "
++
++      - name: Save merged duration cache
++        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
++        with:
++          path: test_durations.json
++          key: test-durations-${{ github.run_id }}
++
++  e2e:
++    runs-on: ubuntu-latest
++    timeout-minutes: 15
++    steps:
++      - name: Checkout code
++        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++
++      - name: Install ripgrep (prebuilt binary)
++        run: |
++          set -euo pipefail
++          RG_VERSION=15.1.0
++          RG_SHA256=1c9297be4a084eea7ecaedf93eb03d058d6faae29bbc57ecdaf5063921491599
++          RG_TARBALL=ripgrep-${RG_VERSION}-x86_64-unknown-linux-musl.tar.gz
++          curl -sSfL --retry 3 --retry-delay 5 -o "$RG_TARBALL" \
++            "https://github.com/BurntSushi/ripgrep/releases/download/${RG_VERSION}/${RG_TARBALL}"
++          echo "${RG_SHA256}  ${RG_TARBALL}" | sha256sum -c -
++          tar -xzf "$RG_TARBALL"
++          sudo mv "ripgrep-${RG_VERSION}-x86_64-unknown-linux-musl/rg" /usr/local/bin/rg
++          rm -rf "$RG_TARBALL" "ripgrep-${RG_VERSION}-x86_64-unknown-linux-musl"
++          rg --version
++
++      - name: Install uv
++        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # 8.2.0
++        with:
++          # Pin the uv version: unpinned, setup-uv resolves "latest" by
++          # fetching a manifest from raw.githubusercontent.com on EVERY job —
++          # a transient fetch failure fails the whole job (2026-07-28 slice-5
++          # incident). Pinned, the binary downloads directly; no manifest hop.
++          version: "0.9.28"
++          # Persist uv's download/wheel cache (~/.cache/uv) across runs.
++          # Keyed on the dependency manifests, so the cache is reused until
++          # pyproject.toml or uv.lock changes. `uv sync` still runs every
++          # time, but resolves from the warm cache instead of re-downloading
++          # and re-building wheels.
++          enable-cache: true
++          cache-dependency-glob: |
++            pyproject.toml
++            uv.lock
++
++      - name: Set up Python 3.11
++        run: uv python install 3.11
++
++      - name: Install dependencies
++        # `uv sync --locked` installs the exact pinned set from uv.lock (and
++        # fails if the lock is out of sync with pyproject.toml), giving a
++        # reproducible env. It also creates .venv itself, so no separate
++        # `uv venv` step is needed.
++        #
++        # Same extras as the test job's sync above: the hermetic test env
++        # forbids mid-run pip installs (PROMETHEUS_DISABLE_LAZY_INSTALLS=1 in
++        # tests/conftest.py), so lazy-install SDKs exercised by tests must be
++        # in the venv up front.
++        uses: ./.github/actions/retry
++        with:
++          command: uv sync --locked --python 3.11 --extra all --extra dev --extra anthropic --extra mistral --extra fal --extra modal --extra daytona --extra hindsight --extra parallel-web
++
++      - name: Minimize uv cache
++        # Optimized for CI: prunes pre-built wheels that are cheap to
++        # re-download, keeping the persisted cache small and fast to restore.
++        run: uv cache prune --ci
++
++      - name: Run e2e tests
++        run: |
++          source .venv/bin/activate
++          python -m pytest tests/e2e/ -v --tb=short
++        env:
++          OPENROUTER_API_KEY: ""
++          OPENAI_API_KEY: ""
++          NOUS_API_KEY: ""
+diff --git a/.github/workflows/uv-lockfile-check.yml b/.github/workflows/uv-lockfile-check.yml
+new file mode 100644
+index 0000000..d258ad7
+--- /dev/null
++++ b/.github/workflows/uv-lockfile-check.yml
+@@ -0,0 +1,180 @@
++name: uv.lock check
++
++# Verify uv.lock is in sync with pyproject.toml.  Blocking check — PRs
++# that modify pyproject.toml without regenerating uv.lock (or vice versa)
++# must not merge, because the Docker build's `uv sync --frozen` step will
++# fail on a stale lockfile and we'd rather catch it here than in the
++# docker workflow on main.
++#
++# ─────────────────────────────────────────────────────────────────────────
++# IMPORTANT: this check runs against the MERGED state, not just your branch
++# ─────────────────────────────────────────────────────────────────────────
++#
++# For `pull_request` events, GitHub checks out `refs/pull/<N>/merge` by
++# default — a synthetic commit that merges your PR branch into the CURRENT
++# state of `main`.  That means the pyproject.toml evaluated here is
++# `main's pyproject.toml + your PR's changes to pyproject.toml`, not just
++# what's on your branch.
++#
++# Failure mode this creates: if `main` has advanced since you branched
++# (e.g. someone merged a PR that added a dep to pyproject.toml + its
++# corresponding uv.lock entries), your branch's uv.lock is missing those
++# new entries.  `uv lock --check` resolves against the merged pyproject
++# and sees a lockfile that doesn't cover all the current deps → fails
++# with "The lockfile at uv.lock needs to be updated."
++#
++# This can be confusing: `uv lock --check` passes locally (your branch
++# is internally consistent) but fails in CI (merged state isn't).
++#
++# Fix is to sync your branch with main and regenerate the lockfile:
++#
++#     git fetch origin main
++#     git rebase origin/main      # or merge, whatever the repo prefers
++#     uv lock                     # regenerates uv.lock against new pyproject.toml
++#     git add uv.lock
++#     git commit -m "chore: refresh uv.lock after rebase onto main"
++#     git push --force-with-lease # if you rebased
++#
++# If you also changed pyproject.toml in your PR, `uv lock` handles that
++# at the same time — one regeneration covers both your changes and the
++# drift from main.
++#
++# This is the correct behavior!  The check is protecting main's Docker
++# build: a post-merge build would see the same merged state and fail
++# the same way.  Better to catch it here than after merge.
++
++on:
++  workflow_call:
++    outputs:
++      review_status:
++        description: "JSON review status for the review-status aggregator"
++        value: ${{ jobs.check.outputs.review_status }}
++
++permissions:
++  contents: read
++
++concurrency:
++  group: uv-lockfile-check-${{ github.event.pull_request.number || github.ref }}
++  cancel-in-progress: true
++
++jobs:
++  check:
++    name: uv lock --check
++    runs-on: ubuntu-latest
++    timeout-minutes: 5
++    outputs:
++      review_status: ${{ steps.verify.outputs.review_status }}
++    steps:
++      - name: Checkout code
++        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
++
++      - name: Install uv
++        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # 8.2.0
++        with:
++          # Pinned: unpinned setup-uv fetches a 'latest' manifest from
++          # raw.githubusercontent.com every job; transient fetch failures
++          # fail the job (2026-07-28 incident). Keep in sync with tests.yml.
++          version: "0.9.28"
++
++      # `uv lock --check` re-resolves the project from pyproject.toml and
++      # compares the result to uv.lock, exiting non-zero if they disagree.
++      # No network writes, no file modifications.
++      #
++      # On PRs this runs against the merge commit (see comment at the top
++      # of this file) — failures often mean "your branch is behind main,
++      # rebase and regenerate uv.lock."
++      - name: Verify uv.lock is up-to-date
++        id: verify
++        run: |
++          # uv lock --check re-resolves against PyPI (network). Retry so a
++          # registry blip doesn't read as "lockfile stale". A genuinely stale
++          # lockfile fails all attempts (deterministic), costing only seconds.
++          #
++          # Backoff rather than a flat 10s: three attempts inside ~20s all
++          # land in the same blip. 5/15/45s spans ~65s instead.
++          #
++          # Network failure and a real desync are also reported differently.
++          # uv says "Request failed after N retries" when it can't reach the
++          # registry, versus "lockfile needs to be updated" when the lock is
++          # genuinely stale. Only the second is the contributor's to fix, so
++          # an unreachable registry says so instead of sending them to
++          # `uv lock` with nothing to regenerate.
++          ok=false
++          net_fail=false
++          delays=(5 15 45)
++          for i in 1 2 3; do
++            if uv lock --check >lock-check.log 2>&1; then
++              ok=true
++              net_fail=false
++              cat lock-check.log
++              break
++            fi
++            cat lock-check.log
++            if grep -qiE "Request failed after|Failed to fetch|error sending request|connection (reset|closed)|timed out" lock-check.log; then
++              net_fail=true
++            else
++              # Deterministic failure (a real desync) — retrying just prints
++              # the same error twice more.
++              net_fail=false
++              break
++            fi
++            [ "$i" = 3 ] && break
++            echo "::warning::uv lock --check could not reach the registry (attempt $i); retrying in ${delays[$((i-1))]}s"
++            sleep "${delays[$((i-1))]}"
++          done
++          if [ "$ok" != true ] && [ "$net_fail" = true ]; then
++            echo "::error title=uv.lock check could not reach PyPI::Registry unreachable after 3 attempts — infrastructure failure, not a stale lockfile. Re-run the job."
++            review_status='[{"source":"uv.lock check","results":[{"kind":"action_required","title":"uv.lock check could not reach PyPI","summary":"`uv lock --check` could not reach the package registry after 3 attempts. This is an infrastructure failure, not a stale lockfile.","how_to_fix":"Re-run the failed job. No change to `uv.lock` is needed."}]}]'
++            echo "review_status=${review_status}" >> "$GITHUB_OUTPUT"
++            echo "review_status=${review_status}" > review-status.json
++            exit 1
++          fi
++          if [ "$ok" != true ]; then
++            cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
++          ## ❌ uv.lock is out of sync with pyproject.toml
++
++          **If this is a PR:** this check runs against the merged state
++          (your branch + current `main`), not just your branch.  If
++          `uv lock --check` passes locally, your branch is likely behind
++          `main` — recent changes to `pyproject.toml` on `main` aren't
++          reflected in your branch's `uv.lock` yet.
++
++          To fix, sync with main and regenerate the lockfile:
++
++          ```bash
++          git fetch origin main
++          git rebase origin/main   # or `git merge origin/main`
++          uv lock                  # regenerate against new pyproject.toml
++          git add uv.lock
++          git commit -m "chore: refresh uv.lock after syncing with main"
++          git push --force-with-lease  # drop --force-with-lease if you merged
++          ```
++
++          **If you only changed pyproject.toml:** run `uv lock` locally
++          and commit the result.
++
++          This check is blocking because the Docker image build uses
++          `uv sync --frozen --extra all`, which rejects stale lockfiles
++          — catching it here avoids a ~15 min failed docker run
++          on `main` post-merge.
++          EOF
++            echo "::error title=uv.lock out of sync::Run \`uv lock\` locally and commit the result. If on a PR, sync with main first."
++            review_status='[{"source":"uv.lock check","results":[{"kind":"action_required","title":"uv.lock out of sync","summary":"uv.lock is out of sync with pyproject.toml.","how_to_fix":"Run `uv lock` locally and commit the result. If on a PR, sync with main first:\n```\ngit fetch origin main\ngit rebase origin/main\nuv lock\ngit add uv.lock\ngit commit -m \"chore: refresh uv.lock\"\n```\n"}]}]'
++            echo "review_status=${review_status}" >> "$GITHUB_OUTPUT"
++            echo "review_status=${review_status}" > review-status.json
++            exit 1
++          fi
++          review_status='[]'
++          echo "review_status=${review_status}" >> "$GITHUB_OUTPUT"
++          echo "review_status=${review_status}" > review-status.json
++
++      - name: Upload review status artifact
++        if: always() && steps.verify.outcome != 'skipped'
++        continue-on-error: true
++        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
++        with:
++          name: review-status-uv-lockfile
++          path: review-status.json
++          retention-days: 1
++          overwrite: true
++          if-no-files-found: ignore
