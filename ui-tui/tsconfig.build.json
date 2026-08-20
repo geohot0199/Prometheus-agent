@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@prometheus/ink": ["src/types/prometheus-ink.d.ts"]
+    }
+  }
+}
