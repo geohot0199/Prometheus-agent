@@ -1,10 +1,21 @@
 <div dir="rtl">
 
-<p align="center">
-  <img src="assets/banner.png" alt="Prometheus Agent" width="100%">
-</p>
+<div align="center">
+<pre>
+        ▄
+       ▄█▄
+      █████
+     ███████
+    ████ ████
+   ███████████
+  █████████████
+ ███████████████
+█████████████████
+ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+</pre>
+</div>
 
-# پرومی تھیس ایجنٹ ☤ (Prometheus Agent)
+# پرومی تھیس ایجنٹ (Prometheus Agent)
 
 <p align="center">
   <a href="https://github.com/geohot0199/Prometheus-agent/releases"><img src="https://img.shields.io/github/v/release/geohot0199/Prometheus-agent?style=for-the-badge&label=Release" alt="Latest release"></a>
