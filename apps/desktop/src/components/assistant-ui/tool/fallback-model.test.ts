@@ -122,7 +122,7 @@ describe('buildToolView browser_navigate title', () => {
     )
 
     expect(view.status).toBe('error')
-    expect(view.title).toBe('Failed to open prometheus-agent.nousresearch.com/docs')
+    expect(view.title).toBe('Failed to open geohot0199.github.io/prometheus-agent/docs')
   })
 
   it('shows opened title on success', () => {
@@ -136,7 +136,7 @@ describe('buildToolView browser_navigate title', () => {
     )
 
     expect(view.status).toBe('success')
-    expect(view.title).toBe('Opened prometheus-agent.nousresearch.com/docs')
+    expect(view.title).toBe('Opened geohot0199.github.io/prometheus-agent/docs')
   })
 })
 

@@ -148,7 +148,7 @@ def _strip_yaml_frontmatter(content: str) -> str:
 # =========================================================================
 
 DEFAULT_AGENT_IDENTITY = (
-    "You are Prometheus Agent, an intelligent AI assistant created by Nous Research. "
+    "You are Prometheus Agent, an intelligent AI assistant created by geohot. "
     "You are helpful, knowledgeable, and direct. You assist users with a wide "
     "range of tasks including answering questions, writing and editing code, "
     "analyzing information, creative work, and executing actions via your tools. "
@@ -158,7 +158,7 @@ DEFAULT_AGENT_IDENTITY = (
 )
 
 PROMETHEUS_AGENT_HELP_GUIDANCE = (
-    "You run on Prometheus Agent (by Nous Research). When the user needs help with "
+    "You run on Prometheus Agent (by Prometheus). When the user needs help with "
     "Prometheus itself — configuring, setting up, using, extending, or troubleshooting "
     "it — or when you need to understand your own features, tools, or capabilities, "
     "the documentation at https://github.com/geohot0199/Prometheus-agent/docs is your "
@@ -2206,16 +2206,16 @@ def _build_skills_system_prompt_inner(
     return result
 
 
-def build_nous_subscription_prompt(valid_tool_names: "set[str] | None" = None) -> str:
-    """Build a compact Nous subscription capability block for the system prompt."""
+def build_prometheus_subscription_prompt(valid_tool_names: "set[str] | None" = None) -> str:
+    """Build a compact Prometheus subscription capability block for the system prompt."""
     try:
-        from prometheus_cli.nous_subscription import get_nous_subscription_features
-        from tools.tool_backend_helpers import managed_nous_tools_enabled
+        from prometheus_cli.prometheus_subscription import get_prometheus_subscription_features
+        from tools.tool_backend_helpers import managed_prometheus_tools_enabled
     except Exception as exc:
-        logger.debug("Failed to import Nous subscription helper: %s", exc)
+        logger.debug("Failed to import Prometheus subscription helper: %s", exc)
         return ""
 
-    if not managed_nous_tools_enabled():
+    if not managed_prometheus_tools_enabled():
         return ""
 
     valid_names = set(valid_tool_names or set())
@@ -2241,30 +2241,30 @@ def build_nous_subscription_prompt(valid_tool_names: "set[str] | None" = None) -
     if valid_names and not (valid_names & relevant_tool_names):
         return ""
 
-    features = get_nous_subscription_features()
+    features = get_prometheus_subscription_features()
 
     def _status_line(feature) -> str:
-        if feature.managed_by_nous:
-            return f"- {feature.label}: active via Nous subscription"
+        if feature.managed_by_prometheus:
+            return f"- {feature.label}: active via Prometheus subscription"
         if feature.active:
             current = feature.current_provider or "configured provider"
             return f"- {feature.label}: currently using {current}"
-        if feature.included_by_default and features.nous_auth_present:
-            return f"- {feature.label}: included with Nous subscription, not currently selected"
-        if feature.key == "modal" and features.nous_auth_present:
-            return f"- {feature.label}: optional via Nous subscription"
+        if feature.included_by_default and features.prometheus_auth_present:
+            return f"- {feature.label}: included with Prometheus subscription, not currently selected"
+        if feature.key == "modal" and features.prometheus_auth_present:
+            return f"- {feature.label}: optional via Prometheus subscription"
         return f"- {feature.label}: not currently available"
 
     lines = [
-        "# Nous Subscription",
-        "Nous subscription includes managed web tools (Firecrawl), image generation (FAL), OpenAI TTS, OpenAI Whisper STT, and browser automation (Browser Use) by default. Modal execution is optional.",
+        "# Prometheus Subscription",
+        "Prometheus subscription includes managed web tools (Firecrawl), image generation (FAL), OpenAI TTS, OpenAI Whisper STT, and browser automation (Browser Use) by default. Modal execution is optional.",
         "Current capability status:",
     ]
     lines.extend(_status_line(feature) for feature in features.items())
     lines.extend(
         [
-            "When a Nous-managed feature is active, do not ask the user for Firecrawl, FAL, OpenAI TTS, OpenAI Whisper, or Browser-Use API keys.",
-            "If the user is not subscribed and asks for a capability that Nous subscription would unlock or simplify, suggest Nous subscription as one option alongside direct setup or local alternatives.",
+            "When a Prometheus-managed feature is active, do not ask the user for Firecrawl, FAL, OpenAI TTS, OpenAI Whisper, or Browser-Use API keys.",
+            "If the user is not subscribed and asks for a capability that Prometheus subscription would unlock or simplify, suggest Prometheus subscription as one option alongside direct setup or local alternatives.",
             "Do not mention subscription unless the user asks about it or it directly solves the current missing capability.",
             "Useful commands: prometheus setup, prometheus setup tools, prometheus setup terminal, prometheus status.",
         ]

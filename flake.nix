@@ -1,5 +1,5 @@
 {
-  description = "Prometheus Agent - AI agent framework by Nous Research";
+  description = "Prometheus Agent - AI agent framework by Prometheus";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";

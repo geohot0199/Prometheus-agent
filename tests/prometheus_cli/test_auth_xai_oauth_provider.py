@@ -314,7 +314,7 @@ def test_resolve_credentials_quarantines_dead_tokens_on_terminal_refresh_failure
     Mirrors the credential_pool.py quarantine for the singleton/direct resolve path.
     """
     prometheus_home = tmp_path / "prometheus"
-    _seed_xai_oauth_state(prometheus_home, dict(_STALE_XAI_OAUTH_STATE), active_provider="nous")
+    _seed_xai_oauth_state(prometheus_home, dict(_STALE_XAI_OAUTH_STATE), active_provider="prometheus")
     monkeypatch.setenv("PROMETHEUS_HOME", str(prometheus_home))
 
     def _terminal_refresh(tokens, **kwargs):
@@ -353,7 +353,7 @@ def test_resolve_credentials_quarantines_dead_tokens_on_terminal_refresh_failure
     assert "at" in err
 
     # Active provider must be unchanged.
-    assert raw["active_provider"] == "nous"
+    assert raw["active_provider"] == "prometheus"
 
 
 # ---------------------------------------------------------------------------
@@ -883,7 +883,7 @@ def test_auxiliary_client_routes_xai_oauth_through_responses_api(tmp_path, monke
     arm and returns ``(None, None)`` — silently re-routing every auxiliary
     task (compression, curator, web extract, session search, ...) to
     whatever Step-2 fallback chain the user has configured (OpenRouter,
-    Nous, etc.).  Users on xAI Grok OAuth would then see surprise charges
+    Prometheus, etc.).  Users on xAI Grok OAuth would then see surprise charges
     on those side providers for side tasks they thought were running on
     their xAI subscription.
 
@@ -939,7 +939,7 @@ def test_auxiliary_client_xai_oauth_requires_explicit_model(tmp_path, monkeypatc
 def test_pool_sync_back_preserves_active_provider(tmp_path, monkeypatch):
     """A token-rotation sync-back is a side effect of refresh, not the user
     picking a provider.  ``_save_provider_state`` flips ``active_provider``;
-    using it on the sync-back path means every xAI/Codex/Nous refresh in a
+    using it on the sync-back path means every xAI/Codex/Prometheus refresh in a
     multi-provider setup silently overrides the user's chosen active
     provider (visible to ``prometheus auth status``, ``prometheus setup``, and the
     ``prometheus`` no-arg dispatcher).  Pin the ``set_active=False`` contract so
@@ -982,7 +982,7 @@ def test_pool_sync_back_preserves_active_provider(tmp_path, monkeypatch):
     raw_after = json.loads((prometheus_home / "auth.json").read_text())
     assert raw_after["active_provider"] == "openrouter", (
         "pool sync-back must not flip active_provider; otherwise xAI/Codex/"
-        "Nous token rotations silently take over multi-provider users' "
+        "Prometheus token rotations silently take over multi-provider users' "
         "auth.json `active_provider` flag."
     )
     # Tokens were actually written so the next process won't replay the

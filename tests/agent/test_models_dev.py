@@ -112,7 +112,7 @@ class TestProviderMapping:
         assert PROVIDER_TO_MODELS_DEV["xai-oauth"] == "xai"
 
     def test_unmapped_provider_not_in_dict(self):
-        assert "nous" not in PROVIDER_TO_MODELS_DEV
+        assert "prometheus" not in PROVIDER_TO_MODELS_DEV
 
 
 

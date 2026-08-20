@@ -1,12 +1,12 @@
 ---
 sidebar_position: 0
 title: "Run Nemotron 3 Ultra free in Prometheus Agent"
-description: "Try NVIDIA Nemotron 3 Ultra on Nous Portal — free June 4–18 — with day 0 support in Prometheus Agent"
+description: "Try NVIDIA Nemotron 3 Ultra on Prometheus Portal — free June 4–18 — with day 0 support in Prometheus Agent"
 ---
 
 # Run Nemotron 3 Ultra free in Prometheus Agent
 
-Nous Research has been inducted into the **Nemotron Coalition** of leading AI labs working with **NVIDIA** to advance open frontier foundation models. In honor of this, we've partnered with **Nebius** to provide **Nemotron 3 Ultra** free on [Nous Portal](https://portal.nousresearch.com) for two weeks (**June 4th – June 18th**). Follow the instructions below to try the model in your Prometheus Agent today.
+Prometheus has been inducted into the **Nemotron Coalition** of leading AI labs working with **NVIDIA** to advance open frontier foundation models. In honor of this, we've partnered with **Nebius** to provide **Nemotron 3 Ultra** free on [Prometheus Portal](https://geohot0199.github.io/prometheus-agent/portal) for two weeks (**June 4th – June 18th**). Follow the instructions below to try the model in your Prometheus Agent today.
 
 :::info Limited-time offer
 The `nvidia/nemotron-3-ultra:free` tier is available from **June 4th to June 18th**. The `:free` tag is what keeps it on the no-cost plan — pick that exact variant.
@@ -22,9 +22,9 @@ The simplest path: a one-click installer with a guided, point-and-click setup. N
 
 [Download the Prometheus Desktop installer](https://github.com/geohot0199/Prometheus-agent/) for macOS or Windows, then open it. On first launch it finishes setting itself up (usually under a minute).
 
-### 2. Connect Nous Portal
+### 2. Connect Prometheus Portal
 
-When the app opens, you'll see a "Let's get you set up" screen. Click **Nous Portal** (marked **Recommended**). Your browser opens — create a [Nous Portal](https://portal.nousresearch.com) account (or sign in), choose the **Free** plan, and authorize Prometheus. The app connects automatically.
+When the app opens, you'll see a "Let's get you set up" screen. Click **Prometheus Portal** (marked **Recommended**). Your browser opens — create a [Prometheus Portal](https://geohot0199.github.io/prometheus-agent/portal) account (or sign in), choose the **Free** plan, and authorize Prometheus. The app connects automatically.
 
 ### 3. Pick the free Nemotron 3 Ultra model
 
@@ -74,9 +74,9 @@ prometheus setup
 
 Select **Quick Setup**. Prometheus opens a browser tab and waits for you to finish the next steps.
 
-### 3. Create a Nous Portal account
+### 3. Create a Prometheus Portal account
 
-In the browser, create a [Nous Portal](https://portal.nousresearch.com) account (or sign in) and choose the **Free** plan.
+In the browser, create a [Prometheus Portal](https://geohot0199.github.io/prometheus-agent/portal) account (or sign in) and choose the **Free** plan.
 
 ### 4. Connect your account
 
@@ -111,13 +111,13 @@ Already set up with another model?
 
 ## Troubleshooting
 
-- **Don't see the model in the list?** Make sure you finished the Nous Portal connection and that you're on the **Free** plan. In the CLI, `prometheus portal info` confirms you're logged in and routing through Nous.
+- **Don't see the model in the list?** Make sure you finished the Prometheus Portal connection and that you're on the **Free** plan. In the CLI, `prometheus portal info` confirms you're logged in and routing through Prometheus.
 - **Picked the wrong variant?** Re-select `nvidia/nemotron-3-ultra:free` — the `:free` suffix is required to stay on the no-cost tier.
 - **Browser didn't open / you're on a remote host (CLI)?** See [OAuth over SSH / Remote Hosts](/guides/oauth-over-ssh) for port-forwarding workarounds.
 
 ## See also
 
 - **[Desktop App](/user-guide/desktop)** — The native one-click app (macOS, Windows, Linux)
-- **[Run Prometheus Agent with Nous Portal](/guides/run-prometheus-with-nous-portal)** — Full Portal walkthrough: models, Tool Gateway, and verification
-- **[Nous Portal integration](/integrations/nous-portal)** — What's in the subscription
+- **[Run Prometheus Agent with Prometheus Portal](/guides/run-prometheus-with-portal)** — Full Portal walkthrough: models, Tool Gateway, and verification
+- **[Prometheus Portal integration](/integrations/prometheus-portal)** — What's in the subscription
 - **[Quickstart](/getting-started/quickstart)** — Install-to-chat in under 5 minutes

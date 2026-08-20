@@ -46,36 +46,36 @@ class TestResolveOpenaiAudioClientConfig:
             )
 
 
-    def test_nous_selection_overrides_config_credentials(self):
-        """A stored 'nous' selection (or legacy use_gateway: true) routes
+    def test_prometheus_selection_overrides_config_credentials(self):
+        """A stored 'prometheus' selection (or legacy use_gateway: true) routes
         managed even when direct credentials are present."""
         config = {"openai": {"api_key": "cfg-key", "base_url": "http://localhost:4003/v1"}}
         managed = SimpleNamespace(
-            nous_user_token="managed-token",
-            gateway_origin="https://openai-audio-gateway.nousresearch.com",
+            prometheus_user_token="managed-token",
+            gateway_origin="https://geohot0199.github.io/prometheus-agent/audio-gateway",
         )
 
         with patch.object(tts_tool, "_load_tts_config", return_value=config), \
-             patch.object(tts_tool, "read_selection", return_value="nous"), \
+             patch.object(tts_tool, "read_selection", return_value="prometheus"), \
              patch.object(tts_tool, "resolve_openai_audio_api_key", return_value="env-key"), \
              patch.object(tts_tool, "resolve_managed_tool_gateway", return_value=managed):
             assert tts_tool._resolve_openai_audio_client_config() == (
                 "managed-token",
-                "https://openai-audio-gateway.nousresearch.com/v1",
+                "https://geohot0199.github.io/prometheus-agent/audio-gateway/v1",
                 True,
             )
 
-    def test_nous_selection_unentitled_raises_selection_error(self):
+    def test_prometheus_selection_unentitled_raises_selection_error(self):
         """Selected managed route + unavailable gateway = honest error naming
         the selection, never a silent fall back to direct credentials."""
         config = {"openai": {"api_key": "cfg-key"}}
         with patch.object(tts_tool, "_load_tts_config", return_value=config), \
-             patch.object(tts_tool, "read_selection", return_value="nous"), \
+             patch.object(tts_tool, "read_selection", return_value="prometheus"), \
              patch.object(tts_tool, "resolve_openai_audio_api_key", return_value="env-key"), \
              patch.object(tts_tool, "resolve_managed_tool_gateway", return_value=None):
             with pytest.raises(ValueError) as exc:
                 tts_tool._resolve_openai_audio_client_config()
-        assert "nous" in str(exc.value)
+        assert "prometheus" in str(exc.value)
         assert "prometheus tools" in str(exc.value)
 
     def test_vendor_selection_missing_key_raises_selection_error(self):
@@ -96,7 +96,7 @@ class TestResolveOpenaiAudioClientConfig:
              patch.object(tts_tool, "read_selection", return_value=None), \
              patch.object(tts_tool, "resolve_openai_audio_api_key", return_value=""), \
              patch.object(tts_tool, "resolve_managed_tool_gateway", return_value=None), \
-             patch.object(tts_tool, "managed_nous_tools_enabled", return_value=False):
+             patch.object(tts_tool, "managed_prometheus_tools_enabled", return_value=False):
             with pytest.raises(ValueError) as exc:
                 tts_tool._resolve_openai_audio_client_config()
 

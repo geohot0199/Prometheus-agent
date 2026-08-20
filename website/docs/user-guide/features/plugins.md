@@ -513,7 +513,7 @@ index and keep working exactly as before. An explicit `--ref <sha>` always
 overrides the index pin.
 
 **How the index is fetched.** The index lives at a canonical URL
-(`https://raw.githubusercontent.com/NousResearch/prometheus-plugin-index/main/index.json`,
+(`https://raw.githubusercontent.com/geohot0199/prometheus-plugin-index/main/index.json`,
 overridable via `prometheus config set plugins.index_url <url>`). Fetches are
 cached under `~/.prometheus/cache/plugin_index.json` for 24 hours; when the
 remote is unreachable the stale cache is used, and when there is no cache at
@@ -525,12 +525,12 @@ all a bundled seed copy ships with Prometheus — so search works fully offline.
 {
   "name": "prometheus-media-studio",
   "description": "Generative media workspace plugin.",
-  "author": "NousResearch",
+  "author": "geohot0199",
   "tags": ["media", "image-gen"],
-  "repo": "NousResearch/prometheus-media-studio",
+  "repo": "geohot0199/prometheus-media-studio",
   "ref": "<40-char commit SHA>",
   "subdir": null,
-  "homepage": "https://github.com/NousResearch/prometheus-media-studio",
+  "homepage": "https://github.com/geohot0199/prometheus-media-studio",
   "capabilities": ["tools", "dashboard"],
   "api_version": 1,
   "added_at": "2026-08-12"
@@ -543,7 +543,7 @@ SHA, and optional `subdir` supports monorepos. The bundled seed file
 
 **Submitting a plugin.** The index is maintained as a plain JSON file —
 submit a pull request to the
-[prometheus-plugin-index](https://github.com/NousResearch/prometheus-plugin-index)
+[prometheus-plugin-index](https://github.com/geohot0199/prometheus-plugin-index)
 repository adding your entry (name, description, author, tags, `owner/repo`,
 and a pinned commit SHA). Review covers the entry's *metadata* only.
 

@@ -95,7 +95,7 @@ describe('createGatewayEventHandler', () => {
     expect(getTurnState().todos).toEqual([])
   })
 
-  it('opens a billing confirm dialog routing Nous to /topup', () => {
+  it('opens a billing confirm dialog routing Prometheus to /topup', () => {
     const appended: Msg[] = []
     const ctx = buildCtx(appended)
     const onEvent = createGatewayEventHandler(ctx)
@@ -104,11 +104,11 @@ describe('createGatewayEventHandler', () => {
       payload: {
         billing: {
           billing_url: null,
-          is_nous: true,
+          is_prometheus: true,
           message: 'out of credits',
           model: 'm',
-          provider: 'nous',
-          provider_label: 'Nous Portal'
+          provider: 'prometheus',
+          provider_label: 'Prometheus Portal'
         },
         text: 'Billing or credits exhausted: ...'
       },
@@ -116,7 +116,7 @@ describe('createGatewayEventHandler', () => {
     } as any)
 
     const { confirm } = getOverlayState()
-    expect(confirm?.title).toContain('Nous')
+    expect(confirm?.title).toContain('Prometheus')
     expect(confirm?.confirmLabel).toBe('Top up')
 
     confirm!.onConfirm()
@@ -133,7 +133,7 @@ describe('createGatewayEventHandler', () => {
       payload: {
         billing: {
           billing_url: 'https://openrouter.ai/settings/credits',
-          is_nous: false,
+          is_prometheus: false,
           message: 'out of credits',
           model: 'm',
           provider: 'openrouter',

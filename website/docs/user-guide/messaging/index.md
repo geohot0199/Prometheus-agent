@@ -11,7 +11,7 @@ Chat with Prometheus from Telegram, Discord, Slack, WhatsApp, Signal, SMS, Email
 For the full voice feature set — including CLI microphone mode, spoken replies in messaging, and Discord voice-channel conversations — see [Voice Mode](/user-guide/features/voice-mode) and [Use Voice Mode with Prometheus](/guides/use-voice-mode-with-prometheus).
 
 :::tip
-Bots need both a model provider and tool providers (TTS, web). A [Nous Portal](/integrations/nous-portal) subscription bundles all of them.
+Bots need both a model provider and tool providers (TTS, web). A [Prometheus Portal](/integrations/prometheus-portal) subscription bundles all of them.
 :::
 
 ## Platform Comparison

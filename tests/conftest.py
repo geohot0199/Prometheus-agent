@@ -165,7 +165,7 @@ _CREDENTIAL_NAMES = frozenset({
     "GITHUB_TOKEN",
     "OPENAI_API_KEY",
     "OPENROUTER_API_KEY",
-    "NOUS_API_KEY",
+    "PROMETHEUS_API_KEY",
     "GEMINI_API_KEY",
     "GOOGLE_API_KEY",
     "GROQ_API_KEY",
@@ -324,7 +324,7 @@ _PROMETHEUS_BEHAVIORAL_VARS = frozenset({
     # otherwise-unrelated config tests away from the default "prometheus" host.
     "PROMETHEUS_HONCHO_HOST",
     # Dashboard OAuth auth gate (PR #30156). When set, the bundled
-    # dashboard-auth `nous` plugin auto-registers itself on plugin discovery,
+    # dashboard-auth `prometheus` plugin auto-registers itself on plugin discovery,
     # which is triggered by any `/api/status` call. That leaks a provider
     # into the dashboard_auth registry across tests in the same worker and
     # makes assertions like `auth_providers == []` flaky. CI never sets

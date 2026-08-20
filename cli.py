@@ -4676,30 +4676,26 @@ class ChatConsole:
         """
         yield self
 
-# ASCII Art - PROMETHEUS-AGENT logo (full width, single line - requires ~95 char terminal)
-PROMETHEUS_AGENT_LOGO = """[bold #FFD700]██████╗ ██████╗  ██████╗ ███╗   ███╗███████╗████████╗██╗  ██╗███████╗██╗   ██╗███████╗[/]
-[bold #FFD700]██╔══██╗██╔══██╗██╔═══██╗████╗ ████║██╔════╝╚══██╔══╝██║  ██║██╔════╝██║   ██║██╔════╝[/]
-[#FFBF00]██████╔╝██████╔╝██║   ██║██╔████╔██║█████╗     ██║   ███████║█████╗  ██║   ██║███████╗[/]
-[#FFBF00]██╔═══╝ ██╔══██╗██║   ██║██║╚██╔╝██║██╔══╝     ██║   ██╔══██║██╔══╝  ██║   ██║╚════██║[/]
-[#CD7F32]██║     ██║  ██║╚██████╔╝██║ ╚═╝ ██║███████╗   ██║   ██║  ██║███████╗╚██████╔╝███████║[/]
-[#CD7F32]╚═╝     ╚═╝  ╚═╝ ╚═════╝ ╚═╝     ╚═╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚══════╝[/]"""
+# ASCII Art - PROMETHEUS-AGENT logo (black-and-white block art, full width,
+# single line - requires ~95 char terminal)
+PROMETHEUS_AGENT_LOGO = """██████╗ ██████╗  ██████╗ ███╗   ███╗███████╗████████╗██╗  ██╗███████╗██╗   ██╗███████╗
+██╔══██╗██╔══██╗██╔═══██╗████╗ ████║██╔════╝╚══██╔══╝██║  ██║██╔════╝██║   ██║██╔════╝
+██████╔╝██████╔╝██║   ██║██╔████╔██║█████╗     ██║   ███████║█████╗  ██║   ██║███████╗
+██╔═══╝ ██╔══██╗██║   ██║██║╚██╔╝██║██╔══╝     ██║   ██╔══██║██╔══╝  ██║   ██║╚════██║
+██║     ██║  ██║╚██████╔╝██║ ╚═╝ ██║███████╗   ██║   ██║  ██║███████╗╚██████╔╝███████║
+╚═╝     ╚═╝  ╚═╝ ╚═════╝ ╚═╝     ╚═╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚══════╝"""
 
-# ASCII Art - Prometheus Caduceus (compact, fits in left panel)
-PROMETHEUS_CADUCEUS = """[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⡀⠀⣀⣀⠀⢀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#CD7F32]⠀⠀⠀⠀⠀⠀⢀⣠⣴⣾⣿⣿⣇⠸⣿⣿⠇⣸⣿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠀⠀[/]
-[#FFBF00]⠀⢀⣠⣴⣶⠿⠋⣩⡿⣿⡿⠻⣿⡇⢠⡄⢸⣿⠟⢿⣿⢿⣍⠙⠿⣶⣦⣄⡀⠀[/]
-[#FFBF00]⠀⠀⠉⠉⠁⠶⠟⠋⠀⠉⠀⢀⣈⣁⡈⢁⣈⣁⡀⠀⠉⠀⠙⠻⠶⠈⠉⠉⠀⠀[/]
-[#FFD700]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣴⣿⡿⠛⢁⡈⠛⢿⣿⣦⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#FFD700]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠿⣿⣦⣤⣈⠁⢠⣴⣿⠿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#FFBF00]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠉⠻⢿⣿⣦⡉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#FFBF00]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⢷⣦⣈⠛⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣴⠦⠈⠙⠿⣦⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⣿⣤⡈⠁⢤⣿⠇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#B8860B]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠛⠷⠄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#B8860B]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⠑⢶⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#B8860B]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⠁⢰⡆⠈⡿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#B8860B]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠳⠈⣡⠞⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#B8860B]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]"""
+# ASCII Art - Prometheus torch (black-and-white, compact, fits in left panel)
+PROMETHEUS_TORCH = """        ▄▄▄▄▄▄
+       █▀▀▀▀▀▀█
+      █  ▄▄▄▄  █
+     █  █▀▀▀▀█  █
+    █   █ ██ █   █
+   █    ▀▀██▀▀    █
+  █                █
+  █      ████      █
+   ▀█▄▄▄██████▄▄▄█▀
+     ▀▀▀▀▀▀▀▀▀▀▀▀"""
 
 
 
@@ -4717,8 +4713,8 @@ def _build_compact_banner() -> str:
     dim_color = _skin.get_color("banner_dim", "#B8860B") if _skin else "#B8860B"
 
     if skin_name == "default":
-        line1 = "⚕ NOUS PROMETHEUS - AI Agent Framework"
-        tiny_line = "⚕ NOUS PROMETHEUS"
+        line1 = "⚕ PROMETHEUS PROMETHEUS - AI Agent Framework"
+        tiny_line = "⚕ PROMETHEUS PROMETHEUS"
     else:
         agent_name = _skin.get_branding("agent_name", "Prometheus Agent") if _skin else "Prometheus Agent"
         line1 = f"{agent_name} - AI Agent Framework"
@@ -4734,7 +4730,7 @@ def _build_compact_banner() -> str:
 
     w = min(shutil.get_terminal_size().columns - 2, 88)
     if w < 30:
-        return f"\n[{title_color}]{tiny_line}[/] [dim {dim_color}]- Nous Research[/]\n"
+        return f"\n[{title_color}]{tiny_line}[/] [dim {dim_color}]- Prometheus[/]\n"
 
     inner = w - 2  # inside the box border
     bar = "═" * w
@@ -4998,7 +4994,7 @@ class PrometheusCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         Args:
             model: Model to use (default: from env or claude-sonnet)
             toolsets: List of toolsets to enable (default: all)
-            provider: Inference provider ("auto", "openrouter", "nous", "openai-codex", "zai", "kimi-coding", "minimax", "minimax-cn")
+            provider: Inference provider ("auto", "openrouter", "prometheus", "openai-codex", "zai", "kimi-coding", "minimax", "minimax-cn")
             reasoning: Reasoning effort override for this run (none|minimal|low|medium|high|xhigh|max|ultra). Wins over config.
             api_key: API key (default: from environment)
             base_url: API base URL (default: OpenRouter)
@@ -8519,14 +8515,14 @@ class PrometheusCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
                     "[dim]   Fix: Set model.context_length in config.yaml, or increase your server's context setting[/]"
                 )
 
-        # Warn if the configured model is a Nous Prometheus LLM (not agentic)
-        from prometheus_cli.model_switch import is_nous_prometheus_non_agentic
+        # Warn if the configured model is a Prometheus Prometheus LLM (not agentic)
+        from prometheus_cli.model_switch import is_prometheus_prometheus_non_agentic
 
         model_name = getattr(self, "model", "") or ""
-        if is_nous_prometheus_non_agentic(model_name):
+        if is_prometheus_prometheus_non_agentic(model_name):
             self._console_print()
             self._console_print(
-                "[bold yellow]⚠  Nous Research Prometheus 3 & 4 models are NOT agentic and are not "
+                "[bold yellow]⚠  Prometheus Prometheus 3 & 4 models are NOT agentic and are not "
                 "designed for use with Prometheus Agent.[/]"
             )
             self._console_print(
@@ -9513,10 +9509,10 @@ class PrometheusCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
 
         # Prefer the LIVE agent's credential when one exists: PrometheusCLI's
         # constructor seeds self.api_key from OPENAI/OPENROUTER env vars
-        # before provider resolution runs, so on non-OpenAI providers (Nous,
+        # before provider resolution runs, so on non-OpenAI providers (Prometheus,
         # Anthropic, ...) the constructor value is a different vendor's key
         # than the one actually authenticating requests. /config displaying
-        # an sk-proj-... OpenAI key next to a Nous base URL was the visible
+        # an sk-proj-... OpenAI key next to a Prometheus base URL was the visible
         # symptom (full-surface CLI QA sweep, Aug 2026).
         display_key = self.api_key
         agent = getattr(self, "agent", None)
@@ -11068,7 +11064,7 @@ class PrometheusCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         _cprint(f"    Provider: {provider_label}")
 
         # Context: always resolve via the provider-aware chain so Codex OAuth,
-        # Copilot, and Nous-enforced caps win over the raw models.dev entry
+        # Copilot, and Prometheus-enforced caps win over the raw models.dev entry
         # (e.g. gpt-5.5 is 1.05M on openai but 272K on Codex OAuth).
         mi = result.model_info
         try:
@@ -11465,7 +11461,7 @@ class PrometheusCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         _cprint(f"    Provider: {provider_label}")
 
         # Context: always resolve via the provider-aware chain so Codex OAuth,
-        # Copilot, and Nous-enforced caps win over the raw models.dev entry
+        # Copilot, and Prometheus-enforced caps win over the raw models.dev entry
         # (e.g. gpt-5.5 is 1.05M on openai but 272K on Codex OAuth).
         mi = result.model_info
         from prometheus_cli.model_switch import resolve_display_context_length
@@ -13516,15 +13512,15 @@ class PrometheusCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         print()
 
     def _show_usage(self):
-        """Rate limits + session token usage (when a live agent exists) + Nous credits.
+        """Rate limits + session token usage (when a live agent exists) + Prometheus credits.
 
-        The Nous credits block is agent-independent (a portal fetch), so it runs even
+        The Prometheus credits block is agent-independent (a portal fetch), so it runs even
         with no live agent — important for the TUI, where /usage runs in a slash-worker
         subprocess that resumes the session WITHOUT building an agent (self.agent is None),
         which would otherwise early-return before any credits showed.
         """
         if not self.agent:
-            if self._print_nous_credits_block():
+            if self._print_prometheus_credits_block():
                 self._print_usage_cta()
             else:
                 print("(._.) No active agent -- send a message first.")
@@ -13534,7 +13530,7 @@ class PrometheusCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         calls = agent.session_api_calls
 
         if calls == 0:
-            if self._print_nous_credits_block():
+            if self._print_prometheus_credits_block():
                 self._print_usage_cta()
             else:
                 print("(._.) No API calls made yet in this session.")
@@ -13605,9 +13601,9 @@ class PrometheusCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
             for line in account_lines:
                 print(line)
 
-        # Nous credits magnitudes + monthly-grant gauge (agent-independent — also
+        # Prometheus credits magnitudes + monthly-grant gauge (agent-independent — also
         # runs at the no-agent / no-calls early-returns above). See the helper.
-        if self._print_nous_credits_block():
+        if self._print_prometheus_credits_block():
             self._print_usage_cta()
 
         if self.verbose:
@@ -16780,12 +16776,12 @@ class PrometheusCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
 
                 # Durable, provider-agnostic billing CTA below the response. The
                 # response panel carries the full guidance; this pins the single
-                # action to take (Nous → /topup, other providers → their billing
+                # action to take (Prometheus → /topup, other providers → their billing
                 # page) so it stays visible instead of scrolling away as prose.
                 if result and result.get("failure_reason") == "billing":
                     _bb = result.get("billing_block") or {}
                     _prov_label = _bb.get("provider_label") or "your provider"
-                    if _bb.get("is_nous"):
+                    if _bb.get("is_prometheus"):
                         _cta_lines = [
                             "Run [bold]/topup[/] to add credits, or "
                             "[bold]/subscription[/] to change plan.",
@@ -20875,7 +20871,7 @@ def main(
         toolsets: Comma-separated list of toolsets to enable (e.g., "web,terminal")
         skills: Comma-separated or repeated list of skills to preload for the session
         model: Model to use (default: anthropic/claude-opus-4-20250514)
-        provider: Inference provider ("auto", "openrouter", "nous", "openai-codex", "zai", "kimi-coding", "minimax", "minimax-cn")
+        provider: Inference provider ("auto", "openrouter", "prometheus", "openai-codex", "zai", "kimi-coding", "minimax", "minimax-cn")
         reasoning: Reasoning effort for this run (none|minimal|low|medium|high|xhigh|max|ultra). Overrides agent.reasoning_effort.
         api_key: API key for authentication
         base_url: Base URL for the API

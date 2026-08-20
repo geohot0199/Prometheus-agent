@@ -21,8 +21,8 @@ codes below all trace to that document.
 
 --- ACCESS GATE (pre-launch) ---------------------------------------------
 Client sync is INERT (no push, no pull, no-op) unless the signed-in user is a
-**Nous admin**. We read that off the access token, which rides on the same
-bearer ``resolve_nous_runtime_credentials()`` returns; we decode the JWT
+**Prometheus admin**. We read that off the access token, which rides on the same
+bearer ``resolve_prometheus_runtime_credentials()`` returns; we decode the JWT
 payload (no signature verification -- the server re-verifies) and check the
 claim before doing any sync work.
 
@@ -34,7 +34,7 @@ first consumer. We keep the wire name (other services read it) but call it
 what it means everywhere on this side.
 
 This gate is pre-launch containment, not the shipping entitlement. Admin
-status conflates "may administer Nous" with "has Skill Sync enabled", and has
+status conflates "may administer Prometheus" with "has Skill Sync enabled", and has
 no middle setting for a beta cohort -- opening it up would mean handing out
 portal admin. Replace it with a real entitlement (a ``sync:*`` scope, a tier
 check, or a per-cohort feature flag) before shipping to users.
@@ -203,7 +203,7 @@ def canonical_json_bytes(obj: Dict[str, Any]) -> bytes:
 # ---------------------------------------------------------------------------
 # Identity & access gate
 #
-# We reuse resolve_nous_runtime_credentials() for the bearer (it honors the
+# We reuse resolve_prometheus_runtime_credentials() for the bearer (it honors the
 # cross-process file lock + portal host allowlist and refreshes as needed --
 # we do NOT reimplement refresh). The returned api_key IS the JWT bearer; we
 # decode its payload (unverified) to read the access-gate claim.
@@ -211,15 +211,15 @@ def canonical_json_bytes(obj: Dict[str, Any]) -> bytes:
 
 # Dev-phase gate claim (NAS access-token-issuer.ts:312). Sync is inert unless
 # the resolved token carries this claim === true. Remove when sync ships GA.
-# Wire claim name is NAS's; it means "this user is a Nous admin"
+# Wire claim name is NAS's; it means "this user is a Prometheus admin"
 # (populated from Permissions.ADMIN_ACCESS), NOT a tool-gateway right.
-NOUS_ADMIN_CLAIM = "tool_gateway_admin"
+PROMETHEUS_ADMIN_CLAIM = "tool_gateway_admin"
 
 
 class SyncInertError(RuntimeError):
     """Raised (and caught by the gate-and-swallow hooks) when sync must no-op:
 
-    not logged in, no bearer, or the caller is not a Nous admin.
+    not logged in, no bearer, or the caller is not a Prometheus admin.
     """
 
 
@@ -229,7 +229,7 @@ def _decode_jwt_payload_unverified(token: str) -> Dict[str, Any]:
     Safe here: we never trust these claims for authz -- the server re-verifies
     every call. We only read the dev-gate claim to decide whether to attempt
     sync at all. Mirrors the diagnostic decode in
-    plugins/dashboard_auth/nous/__init__.py:463.
+    plugins/dashboard_auth/prometheus/__init__.py:463.
     """
     try:
         import jwt  # PyJWT, a core dependency
@@ -244,9 +244,9 @@ def _decode_jwt_payload_unverified(token: str) -> Dict[str, Any]:
 
 
 def resolve_identity() -> Dict[str, Any]:
-    """Resolve the Nous bearer + owner + dev-gate flag.
+    """Resolve the Prometheus bearer + owner + dev-gate flag.
 
-    Returns a dict: ``{api_key, base_url, owner, nous_admin, claims}``.
+    Returns a dict: ``{api_key, base_url, owner, prometheus_admin, claims}``.
     Raises :class:`SyncInertError` if not logged in / no bearer.
 
     ``owner`` is the token-verified subject; the server derives the real owner
@@ -254,11 +254,11 @@ def resolve_identity() -> Dict[str, Any]:
     ref naming only.
     """
     try:
-        from prometheus_cli.auth import resolve_nous_runtime_credentials
+        from prometheus_cli.auth import resolve_prometheus_runtime_credentials
 
-        creds = resolve_nous_runtime_credentials()
+        creds = resolve_prometheus_runtime_credentials()
     except Exception as e:
-        raise SyncInertError(f"no Nous credentials: {e}") from e
+        raise SyncInertError(f"no Prometheus credentials: {e}") from e
 
     api_key = (creds or {}).get("api_key")
     if not api_key:
@@ -271,12 +271,12 @@ def resolve_identity() -> Dict[str, Any]:
         or claims.get("tid")
         or "unknown"
     )
-    nous_admin = claims.get(NOUS_ADMIN_CLAIM) is True
+    prometheus_admin = claims.get(PROMETHEUS_ADMIN_CLAIM) is True
     return {
         "api_key": api_key,
         "base_url": (creds or {}).get("base_url"),
         "owner": str(owner),
-        "nous_admin": nous_admin,
+        "prometheus_admin": prometheus_admin,
         "claims": claims,
     }
 
@@ -284,7 +284,7 @@ def resolve_identity() -> Dict[str, Any]:
 def dev_gate_open() -> bool:
     """Whether the access gate permits sync. Never raises."""
     try:
-        return bool(resolve_identity().get("nous_admin"))
+        return bool(resolve_identity().get("prometheus_admin"))
     except SyncInertError:
         return False
     except Exception as e:
@@ -302,7 +302,7 @@ def dev_gate_open() -> bool:
 # ---------------------------------------------------------------------------
 
 #: Production Skill Sync plane. Overridable per the resolution order below.
-DEFAULT_SYNC_BASE_URL = "https://gateway-gateway.nousresearch.com"
+DEFAULT_SYNC_BASE_URL = "https://gateway-geohot0199.github.io/prometheus-agent/gateway"
 
 def resolve_sync_base_url() -> Optional[str]:
     """Resolve the sync-plane base URL.
@@ -394,7 +394,7 @@ def sync_feature_enabled() -> bool:
     ``PROMETHEUS_SYNC_ENABLED`` -> ``sync.enabled`` -> False. This is the master
     switch a Prometheus Cloud deployment sets to opt its instances into sync by
     default. It is checked by the gate-and-swallow entrypoints IN ADDITION to
-    the Nous-admin token gate and a configured base URL — all three must hold for
+    the Prometheus-admin token gate and a configured base URL — all three must hold for
     background sync to run.
     """
     return _sync_config_bool("PROMETHEUS_SYNC_ENABLED", "enabled", default=False)
@@ -732,7 +732,7 @@ def set_device_name(name: str) -> str:
 #
 # Thin requests-based client for the endpoints in the sync contract- Uploads all
 # new objects (batch), then CAS-es the ref. A 409 returns the actual head for
-# the caller's three-way merge. Auth is the Nous bearer resolved above.
+# the caller's three-way merge. Auth is the Prometheus bearer resolved above.
 # ---------------------------------------------------------------------------
 
 class SyncError(RuntimeError):
@@ -1607,7 +1607,7 @@ def _opted_in_rel_paths() -> List[str]:
 # maybe_pull_skills / maybe_push_skills clone the shape of the curator's
 # maybe_run_curator (agent/curator.py:1998): best-effort, never raise, return
 # a result dict or None. The access gate is checked first -- sync is inert
-# (no push, no pull, no-op) unless the signed-in user is a Nous admin.
+# (no push, no pull, no-op) unless the signed-in user is a Prometheus admin.
 # ---------------------------------------------------------------------------
 
 def maybe_push_skills(*, message: str = "prometheus skill sync") -> Optional[Dict[str, Any]]:
@@ -1615,8 +1615,8 @@ def maybe_push_skills(*, message: str = "prometheus skill sync") -> Optional[Dic
     Never raises. Called from the debounced skill_manage push hook."""
     try:
         identity = resolve_identity()
-        if not identity.get("nous_admin"):
-            return None  # access gate: inert unless the user is a Nous admin
+        if not identity.get("prometheus_admin"):
+            return None  # access gate: inert unless the user is a Prometheus admin
         if not sync_feature_enabled():
             return None  # feature off for this instance (PROMETHEUS_SYNC_ENABLED)
         if not resolve_sync_base_url():
@@ -1635,8 +1635,8 @@ def maybe_pull_skills() -> Optional[Dict[str, Any]]:
     + CLI startup)."""
     try:
         identity = resolve_identity()
-        if not identity.get("nous_admin"):
-            return None  # access gate: inert unless the user is a Nous admin
+        if not identity.get("prometheus_admin"):
+            return None  # access gate: inert unless the user is a Prometheus admin
         if not sync_feature_enabled():
             return None  # feature off for this instance (PROMETHEUS_SYNC_ENABLED)
         if not resolve_sync_base_url():
@@ -1650,7 +1650,7 @@ def maybe_pull_skills() -> Optional[Dict[str, Any]]:
 def sync_status() -> Dict[str, Any]:
     """Return a status snapshot for ``prometheus sync status``. Never raises."""
     status: Dict[str, Any] = {
-        "nous_admin": False,
+        "prometheus_admin": False,
         "logged_in": False,
         "feature_enabled": sync_feature_enabled(),
         "default_opt_in": sync_default_opt_in(),
@@ -1672,7 +1672,7 @@ def sync_status() -> Dict[str, Any]:
         identity = resolve_identity()
         status["logged_in"] = True
         status["owner"] = identity.get("owner")
-        status["nous_admin"] = bool(identity.get("nous_admin"))
+        status["prometheus_admin"] = bool(identity.get("prometheus_admin"))
     except SyncInertError:
         pass
     except Exception as e:

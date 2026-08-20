@@ -95,14 +95,14 @@ class TestOpenRouterProfileParity:
 
 
 
-class TestNousProfileParity:
+class TestPrometheusProfileParity:
     def test_tags(self, transport):
         legacy = transport.build_kwargs(
-            model="prometheus-3", messages=_msgs(), tools=None, provider_profile=get_provider_profile("nous"),
+            model="prometheus-3", messages=_msgs(), tools=None, provider_profile=get_provider_profile("prometheus"),
         )
         profile = transport.build_kwargs(
             model="prometheus-3", messages=_msgs(), tools=None,
-            provider_profile=get_provider_profile("nous"),
+            provider_profile=get_provider_profile("prometheus"),
         )
         assert profile["extra_body"]["tags"] == legacy["extra_body"]["tags"]
 

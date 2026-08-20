@@ -52,9 +52,9 @@ def test_session_gateway_runtime_prefers_nested_key():
 
 def test_session_gateway_runtime_falls_back_to_top_level_keys():
     # The TUI gateway's _runtime_model_config writes top-level keys only.
-    meta = _row(model_config={"provider": "nous", "api_mode": "chat_completions"})
+    meta = _row(model_config={"provider": "prometheus", "api_mode": "chat_completions"})
     runtime = SessionDB.session_gateway_runtime(meta)
-    assert runtime == {"provider": "nous", "api_mode": "chat_completions"}
+    assert runtime == {"provider": "prometheus", "api_mode": "chat_completions"}
 
 
 def test_session_gateway_runtime_tolerates_garbage():
@@ -349,10 +349,10 @@ def test_session_gateway_runtime_billing_provider_bare_bucket_ignored():
 
 def test_session_gateway_runtime_explicit_provider_wins_over_billing():
     """Explicit model_config provider takes precedence over billing_provider."""
-    meta = _row(model_config={"provider": "nous"})
+    meta = _row(model_config={"provider": "prometheus"})
     meta["billing_provider"] = "minimax"
     runtime = SessionDB.session_gateway_runtime(meta)
-    assert runtime == {"provider": "nous"}
+    assert runtime == {"provider": "prometheus"}
 
 
 def test_restore_session_model_restores_billing_provider_fallback():

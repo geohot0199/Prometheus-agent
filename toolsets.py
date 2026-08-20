@@ -163,7 +163,7 @@ TOOLSETS = {
 
     "bfl": {
         "description": (
-            "Black Forest Labs FLUX 3 video generation through the Nous tool "
+            "Black Forest Labs FLUX 3 video generation through the Prometheus tool "
             "gateway: per-mode submit tools (text, image, keyframes, "
             "continuation), a poll tool, and a prompting guide. Generations "
             "take minutes, so submit returns a job id and the model polls for "

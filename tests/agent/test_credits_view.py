@@ -15,15 +15,15 @@ import pytest
 
 import agent.account_usage as account_usage
 from agent.account_usage import CreditsView, build_credits_view
-from prometheus_cli.nous_account import NousPortalAccountInfo, NousPaidServiceAccessInfo
+from prometheus_cli.prometheus_account import PrometheusPortalAccountInfo, PrometheusPaidServiceAccessInfo
 
 
-def _account(**kwargs) -> NousPortalAccountInfo:
+def _account(**kwargs) -> PrometheusPortalAccountInfo:
     kwargs.setdefault("logged_in", True)
     kwargs.setdefault("source", "account_api")
     kwargs.setdefault("fresh", True)
     kwargs.setdefault("portal_base_url", "https://portal.example.test")
-    return NousPortalAccountInfo(**kwargs)
+    return PrometheusPortalAccountInfo(**kwargs)
 
 
 @pytest.fixture
@@ -36,7 +36,7 @@ def _logged_in_account(monkeypatch):
 
     def _install(account):
         monkeypatch.setattr(
-            "prometheus_cli.nous_account.get_nous_portal_account_info",
+            "prometheus_cli.prometheus_account.get_prometheus_portal_account_info",
             lambda *a, **kw: account,
         )
 
@@ -55,7 +55,7 @@ def test_view_built_with_org_pinned_url_and_identity(_logged_in_account):
             org_name="Acme Inc",
             email="alice@example.test",
             paid_service_access=True,
-            paid_service_access_info=NousPaidServiceAccessInfo(
+            paid_service_access_info=PrometheusPaidServiceAccessInfo(
                 purchased_credits_remaining=30.0,
                 total_usable_credits=30.0,
             ),
@@ -108,7 +108,7 @@ def test_gateway_topup_not_logged_in(monkeypatch):
     )
     stub = _make_gateway_stub()
     out = asyncio.run(stub._handle_topup_command(_FakeEvent()))
-    assert "Not logged into Nous Portal" in out
+    assert "Not logged into Prometheus Portal" in out
 
 
 

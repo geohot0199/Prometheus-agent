@@ -132,14 +132,14 @@ def get_active_provider() -> Optional[VideoGenProvider]:
     except Exception as exc:
         logger.debug("Could not read video_gen.provider from config: %s", exc)
 
-    # The managed "Nous Subscription" selection is serviced by the FAL
+    # The managed "Prometheus Subscription" selection is serviced by the FAL
     # plugin through the managed fal-queue gateway (the plugin's resolver
-    # routes managed when the stored selection is "nous").
+    # routes managed when the stored selection is "prometheus").
     if configured:
         try:
-            from tools.tool_backend_helpers import NOUS_MANAGED_PROVIDER
+            from tools.tool_backend_helpers import PROMETHEUS_MANAGED_PROVIDER
 
-            if configured.lower() == NOUS_MANAGED_PROVIDER:
+            if configured.lower() == PROMETHEUS_MANAGED_PROVIDER:
                 configured = "fal"
         except Exception:  # pragma: no cover — helpers are in-repo
             pass

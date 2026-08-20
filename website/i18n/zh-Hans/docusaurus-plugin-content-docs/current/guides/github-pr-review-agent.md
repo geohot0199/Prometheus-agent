@@ -69,7 +69,7 @@ prometheus
 用一个简单命令测试：
 
 ```
-Run: gh pr list --repo NousResearch/prometheus-agent --state open --limit 3
+Run: gh pr list --repo geohot0199/Prometheus-agent --state open --limit 3
 ```
 
 你应该能看到一个开放 PR 的列表。如果成功，就可以继续了。
@@ -84,7 +84,7 @@ Run: gh pr list --repo NousResearch/prometheus-agent --state open --limit 3
 Review this pull request. Read the diff, check for bugs, security issues,
 and code quality. Be specific about line numbers and quote problematic code.
 
-Run: gh pr diff 3888 --repo NousResearch/prometheus-agent
+Run: gh pr diff 3888 --repo geohot0199/Prometheus-agent
 ```
 
 Prometheus 将会：

@@ -109,12 +109,12 @@ def test_load_fallback_model_static_unchanged_contract(tmp_path, monkeypatch):
         "  - provider: deepseek\n"
         "    model: deepseek-v4-flash\n"
         "fallback_model:\n"
-        "  provider: nous\n"
+        "  provider: prometheus\n"
         "  model: Prometheus-4\n"
     )
 
     chain = GatewayRunner._load_fallback_model()
     assert chain == [
         {"provider": "deepseek", "model": "deepseek-v4-flash"},
-        {"provider": "nous", "model": "Prometheus-4"},
+        {"provider": "prometheus", "model": "Prometheus-4"},
     ]

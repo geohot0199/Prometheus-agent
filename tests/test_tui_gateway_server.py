@@ -3944,10 +3944,10 @@ def test_resolve_model_strips_config_model(monkeypatch):
     monkeypatch.delenv("PROMETHEUS_MODEL", raising=False)
     monkeypatch.delenv("PROMETHEUS_INFERENCE_MODEL", raising=False)
     monkeypatch.setattr(
-        server, "_load_cfg", lambda: {"model": {"default": " nous/prometheus-test "}}
+        server, "_load_cfg", lambda: {"model": {"default": " prometheus/prometheus-test "}}
     )
 
-    assert server._resolve_model() == "nous/prometheus-test"
+    assert server._resolve_model() == "prometheus/prometheus-test"
 
 
 def _sync_test_session(**extra):
@@ -3969,8 +3969,8 @@ def _patch_config_model(monkeypatch, model, provider=""):
 
 
 def test_config_sync_switches_unpinned_session(monkeypatch):
-    _patch_config_model(monkeypatch, "new/model", provider="nous")
-    session = _sync_test_session(config_model_seen=("old/model", "nous"))
+    _patch_config_model(monkeypatch, "new/model", provider="prometheus")
+    session = _sync_test_session(config_model_seen=("old/model", "prometheus"))
     calls = []
     monkeypatch.setattr(
         server,
@@ -3983,7 +3983,7 @@ def test_config_sync_switches_unpinned_session(monkeypatch):
     assert calls == [
         (
             "sid",
-            "new/model --provider nous",
+            "new/model --provider prometheus",
             {
                 "confirm_expensive_model": True,
                 "pin_session_override": False,
@@ -3991,7 +3991,7 @@ def test_config_sync_switches_unpinned_session(monkeypatch):
             },
         )
     ]
-    assert session["config_model_seen"] == ("new/model", "nous")
+    assert session["config_model_seen"] == ("new/model", "prometheus")
 
 
 def test_config_sync_treats_auto_provider_as_unset(monkeypatch):
@@ -4053,7 +4053,7 @@ def test_config_sync_adopts_baseline_when_agent_already_on_target(monkeypatch):
 
 
 def test_config_sync_switches_when_only_provider_differs(monkeypatch):
-    _patch_config_model(monkeypatch, "old/model", provider="nous")
+    _patch_config_model(monkeypatch, "old/model", provider="prometheus")
     session = _sync_test_session(config_model_seen=("old/model", ""))
     calls = []
     monkeypatch.setattr(
@@ -4064,7 +4064,7 @@ def test_config_sync_switches_when_only_provider_differs(monkeypatch):
 
     server._sync_agent_model_with_config("sid", session)
 
-    assert calls == ["old/model --provider nous"]
+    assert calls == ["old/model --provider prometheus"]
 
 
 def test_config_sync_failure_emits_error_once_per_edit(monkeypatch):
@@ -4133,9 +4133,9 @@ def test_config_sync_ignores_env_seed_without_config_model(monkeypatch):
 def test_config_model_target_never_reads_env(monkeypatch):
     monkeypatch.setenv("PROMETHEUS_MODEL", "seed/model")
     monkeypatch.setenv("PROMETHEUS_INFERENCE_MODEL", "seed/model")
-    monkeypatch.setattr(server, "_load_cfg", lambda: {"model": {"provider": "nous"}})
+    monkeypatch.setattr(server, "_load_cfg", lambda: {"model": {"provider": "prometheus"}})
 
-    assert server._config_model_target() == ("", "nous")
+    assert server._config_model_target() == ("", "prometheus")
 
 
 def test_apply_model_switch_persist_override_false_never_persists(monkeypatch):
@@ -4147,7 +4147,7 @@ def test_apply_model_switch_persist_override_false_never_persists(monkeypatch):
     result = _types.SimpleNamespace(
         success=True,
         new_model="new/model",
-        target_provider="nous",
+        target_provider="prometheus",
         base_url="",
         api_key="key",
         api_mode="chat_completions",
@@ -4173,7 +4173,7 @@ def test_apply_model_switch_persist_override_false_never_persists(monkeypatch):
     session = {"agent": None}
 
     out = server._apply_model_switch(
-        "sid", session, "new/model --provider nous", persist_override=False
+        "sid", session, "new/model --provider prometheus", persist_override=False
     )
 
     assert out["value"] == "new/model"
@@ -4181,23 +4181,23 @@ def test_apply_model_switch_persist_override_false_never_persists(monkeypatch):
 
 
 def test_startup_runtime_uses_tui_provider_env(monkeypatch):
-    monkeypatch.setenv("PROMETHEUS_MODEL", "nous/prometheus-test")
-    monkeypatch.setenv("PROMETHEUS_TUI_PROVIDER", "nous")
+    monkeypatch.setenv("PROMETHEUS_MODEL", "prometheus/prometheus-test")
+    monkeypatch.setenv("PROMETHEUS_TUI_PROVIDER", "prometheus")
     monkeypatch.delenv("PROMETHEUS_INFERENCE_PROVIDER", raising=False)
 
-    assert server._resolve_startup_runtime() == ("nous/prometheus-test", "nous")
+    assert server._resolve_startup_runtime() == ("prometheus/prometheus-test", "prometheus")
 
 
 def test_startup_runtime_does_not_treat_inference_provider_as_explicit(monkeypatch):
-    monkeypatch.setenv("PROMETHEUS_MODEL", "nous/prometheus-test")
+    monkeypatch.setenv("PROMETHEUS_MODEL", "prometheus/prometheus-test")
     monkeypatch.delenv("PROMETHEUS_TUI_PROVIDER", raising=False)
-    monkeypatch.setenv("PROMETHEUS_INFERENCE_PROVIDER", "nous")
+    monkeypatch.setenv("PROMETHEUS_INFERENCE_PROVIDER", "prometheus")
     monkeypatch.setattr(
         "prometheus_cli.models.detect_static_provider_for_model",
         lambda model, provider: None,
     )
 
-    assert server._resolve_startup_runtime() == ("nous/prometheus-test", None)
+    assert server._resolve_startup_runtime() == ("prometheus/prometheus-test", None)
 
 
 def test_startup_runtime_detects_provider_for_model_env(monkeypatch):
@@ -7829,9 +7829,9 @@ def test_setup_runtime_check_honors_requested_provider(monkeypatch):
     monkeypatch.setattr("prometheus_cli.main._has_any_provider_configured", lambda: True)
 
     def fake_resolve(requested=None, **kwargs):
-        if requested == "nous":
+        if requested == "prometheus":
             return {
-                "provider": "nous",
+                "provider": "prometheus",
                 "api_key": "invoke-jwt",
                 "source": "portal",
             }
@@ -7847,10 +7847,10 @@ def test_setup_runtime_check_honors_requested_provider(monkeypatch):
     )
 
     scoped = server.handle_request(
-        {"id": "1", "method": "setup.runtime_check", "params": {"provider": "nous"}}
+        {"id": "1", "method": "setup.runtime_check", "params": {"provider": "prometheus"}}
     )
     assert scoped["result"]["ok"] is True
-    assert scoped["result"]["provider"] == "nous"
+    assert scoped["result"]["provider"] == "prometheus"
 
     default = server.handle_request({"id": "1", "method": "setup.runtime_check", "params": {}})
     assert default["result"]["ok"] is False
@@ -14017,13 +14017,13 @@ def test_model_options_does_not_overwrite_curated_models(monkeypatch):
     Regression: earlier versions of this handler unconditionally replaced
     each provider's curated ``models`` field with ``provider_model_ids()``
     (live /models catalog).  That pulled in hundreds of non-agentic models
-    for providers like Nous whose /models endpoint returns image/video
+    for providers like Prometheus whose /models endpoint returns image/video
     generators, rerankers, embeddings, and TTS models alongside chat models.
     """
     curated_providers = [
         {
-            "slug": "nous",
-            "name": "Nous",
+            "slug": "prometheus",
+            "name": "Prometheus",
             "models": ["moonshotai/kimi-k2.5", "anthropic/claude-opus-4.7"],
             "total_models": 30,
             "source": "built-in",
@@ -14050,13 +14050,13 @@ def test_model_options_does_not_overwrite_curated_models(monkeypatch):
 
     assert "result" in resp, resp
     providers = resp["result"]["providers"]
-    nous = next((p for p in providers if p.get("slug") == "nous"), None)
-    assert nous is not None
-    assert nous["models"] == [
+    prometheus = next((p for p in providers if p.get("slug") == "prometheus"), None)
+    assert prometheus is not None
+    assert prometheus["models"] == [
         "moonshotai/kimi-k2.5",
         "anthropic/claude-opus-4.7",
     ]
-    assert nous["total_models"] == 30
+    assert prometheus["total_models"] == 30
     # Handler must not consult the live catalog — curated is the truth.
     live_fetch.assert_not_called()
     # list_authenticated_providers is the single source.
@@ -17248,7 +17248,7 @@ class _BillingHeaders:
 def test_billing_error_serialization_preserves_server_code(
     status, error, retry_after
 ):
-    import prometheus_cli.nous_billing as nb
+    import prometheus_cli.prometheus_billing as nb
 
     headers = _BillingHeaders({"Retry-After": str(retry_after)}) if retry_after else None
     with pytest.raises(nb.BillingTransient) as ei:
@@ -17262,7 +17262,7 @@ def test_billing_error_serialization_preserves_server_code(
 
 
 def test_billing_rate_limit_without_error_defaults_wire_code():
-    import prometheus_cli.nous_billing as nb
+    import prometheus_cli.prometheus_billing as nb
 
     exc = nb.BillingRateLimited("slow down", status=429, retry_after=10)
 
@@ -17281,7 +17281,7 @@ def _sub_rpc(method, params):
 
 
 def test_subscription_preview_serializes_quote(monkeypatch):
-    import prometheus_cli.nous_billing as nb
+    import prometheus_cli.prometheus_billing as nb
 
     monkeypatch.setattr(
         nb,
@@ -17313,7 +17313,7 @@ def test_subscription_preview_requires_tier():
 
 
 def test_subscription_preview_scope_error_maps_to_step_up(monkeypatch):
-    import prometheus_cli.nous_billing as nb
+    import prometheus_cli.prometheus_billing as nb
 
     def _raise(subscription_type_id):
         raise nb.BillingScopeRequired("billing:manage required")
@@ -17325,7 +17325,7 @@ def test_subscription_preview_scope_error_maps_to_step_up(monkeypatch):
 
 
 def test_subscription_change_cancellation(monkeypatch):
-    import prometheus_cli.nous_billing as nb
+    import prometheus_cli.prometheus_billing as nb
 
     seen = {}
 
@@ -17342,7 +17342,7 @@ def test_subscription_change_cancellation(monkeypatch):
 
 
 def test_subscription_change_tier_downgrade(monkeypatch):
-    import prometheus_cli.nous_billing as nb
+    import prometheus_cli.prometheus_billing as nb
 
     seen = {}
 
@@ -17364,7 +17364,7 @@ def test_subscription_change_requires_tier_or_cancel():
 
 
 def test_subscription_resume(monkeypatch):
-    import prometheus_cli.nous_billing as nb
+    import prometheus_cli.prometheus_billing as nb
 
     monkeypatch.setattr(
         nb,
@@ -17377,7 +17377,7 @@ def test_subscription_resume(monkeypatch):
 
 
 def test_subscription_upgrade_echoes_status_and_idempotency(monkeypatch):
-    import prometheus_cli.nous_billing as nb
+    import prometheus_cli.prometheus_billing as nb
 
     seen = {}
 
@@ -17395,7 +17395,7 @@ def test_subscription_upgrade_echoes_status_and_idempotency(monkeypatch):
 
 
 def test_subscription_upgrade_requires_action_surfaces_recovery(monkeypatch):
-    import prometheus_cli.nous_billing as nb
+    import prometheus_cli.prometheus_billing as nb
 
     monkeypatch.setattr(
         nb,

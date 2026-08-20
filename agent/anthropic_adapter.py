@@ -570,28 +570,28 @@ def _is_deepseek_anthropic_endpoint(base_url: str | None) -> bool:
     return "/anthropic" in normalized.rstrip("/").lower()
 
 
-def _is_nous_portal_endpoint(base_url: str | None) -> bool:
-    """Return True for Nous Portal's Anthropic Messages route.
+def _is_prometheus_portal_endpoint(base_url: str | None) -> bool:
+    """Return True for Prometheus Portal's Anthropic Messages route.
 
     Portal serves its ``anthropic/*`` catalog natively at
-    ``https://inference-api.nousresearch.com/v1/messages``.  Portal-specific
+    ``https://geohot0199.github.io/prometheus-agent/inference-api/v1/messages``.  Portal-specific
     behaviours key off this: Bearer JWT auth, verbatim catalog model ids,
     and native thinking-signature replay.
 
     Trusted hosts only:
 
-    1. Prod hostname ``inference-api.nousresearch.com``
-    2. The operator-set ``NOUS_INFERENCE_BASE_URL`` hostname (staging/preview)
+    1. Prod hostname ``geohot0199.github.io/prometheus-agent/inference-api``
+    2. The operator-set ``PROMETHEUS_INFERENCE_BASE_URL`` hostname (staging/preview)
 
-    Lookalikes such as ``inference-api.nousresearch.com.attacker.test`` are
+    Lookalikes such as ``inference-api.prometheus-agent.example.com.attacker.test`` are
     rejected (hostname match, not substring).
     """
-    if base_url_host_matches(base_url or "", "inference-api.nousresearch.com"):
+    if base_url_host_matches(base_url or "", "geohot0199.github.io/prometheus-agent/inference-api"):
         return True
     try:
-        from prometheus_cli.auth import _nous_inference_env_override
+        from prometheus_cli.auth import _prometheus_inference_env_override
 
-        override = _nous_inference_env_override()
+        override = _prometheus_inference_env_override()
     except Exception:
         return False
     if not override:
@@ -608,10 +608,10 @@ def _requires_bearer_auth(base_url: str | None) -> bool:
     Some third-party /anthropic endpoints implement Anthropic's Messages API but
     require Authorization: Bearer instead of Anthropic's native x-api-key header.
     MiniMax's global and China Anthropic-compatible endpoints, Azure AI
-    Foundry's Anthropic-style endpoint, Palantir Foundry's LLM proxy, and Nous
+    Foundry's Anthropic-style endpoint, Palantir Foundry's LLM proxy, and Prometheus
     Portal's Messages route follow this pattern.
     """
-    if _is_nous_portal_endpoint(base_url):
+    if _is_prometheus_portal_endpoint(base_url):
         return True
     normalized = _normalize_base_url_text(base_url)
     if not normalized:
@@ -2527,7 +2527,7 @@ def _manage_thinking_signatures(
     replayed assistant tool-call messages.  See prometheus-agent#13848 (Kimi) and
     prometheus-agent#16748 (DeepSeek).
 
-    Nous Portal's ``/v1/messages`` route is the exception among third-party
+    Prometheus Portal's ``/v1/messages`` route is the exception among third-party
     hosts: it proxies Claude to Anthropic/Vertex/Bedrock and validates the
     same signed thinking blocks.  Sticky ``session_id`` keeps a conversation
     on one upstream instance so those signatures stay warm — stripping them
@@ -2541,7 +2541,7 @@ def _manage_thinking_signatures(
     # as a signature-blind proxy even though the host is not anthropic.com.
     _is_third_party = (
         _is_third_party_anthropic_endpoint(base_url)
-        and not _is_nous_portal_endpoint(base_url)
+        and not _is_prometheus_portal_endpoint(base_url)
     )
 
     last_assistant_idx = None
@@ -2924,11 +2924,11 @@ def build_anthropic_kwargs(
     )
     anthropic_tools = convert_tools_to_anthropic(tools) if tools else []
 
-    # Nous Portal routes on its own catalog ids (``anthropic/claude-opus-4.8``);
+    # Prometheus Portal routes on its own catalog ids (``anthropic/claude-opus-4.8``);
     # normalizing to the bare Anthropic slug would make the model unresolvable
     # there. Skipping the call preserves the prefix AND the dots, so
     # ``preserve_dots`` stays irrelevant for Portal.
-    if not _is_nous_portal_endpoint(base_url):
+    if not _is_prometheus_portal_endpoint(base_url):
         model = normalize_model_name(model, preserve_dots=preserve_dots)
     # effective_max_tokens = output cap for this call (≠ total context window)
     # Use the resolver helper so non-positive values (negative ints,
@@ -2965,7 +2965,7 @@ def build_anthropic_kwargs(
                 text = text.replace("Prometheus Agent", "Claude Code")
                 text = text.replace("Prometheus agent", "Claude Code")
                 text = text.replace("prometheus-agent", "claude-code")
-                text = text.replace("Nous Research", "Anthropic")
+                text = text.replace("Prometheus", "Anthropic")
                 block["text"] = text
 
         # 3. Normalize tool names so NOTHING goes on the OAuth wire with a
@@ -3190,7 +3190,7 @@ def create_anthropic_message(
     ``on_response``: optional callable invoked once with the underlying httpx
     response before the message is aggregated (best-effort, exceptions
     swallowed). Response *headers* carry out-of-band provider state that the
-    parsed ``Message`` drops — Nous Portal's ``x-nous-credits-*`` balance family
+    parsed ``Message`` drops — Prometheus Portal's ``x-prometheus-credits-*`` balance family
     in particular. Only fires on the streaming path, which is the one the main
     turn loop takes.
     """

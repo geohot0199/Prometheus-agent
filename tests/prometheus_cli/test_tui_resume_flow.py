@@ -237,14 +237,14 @@ def test_launch_tui_exports_model_provider_and_toolsets(monkeypatch, main_mod):
 
     with pytest.raises(SystemExit):
         main_mod._launch_tui(
-            model="nous/prometheus-test", provider="nous", toolsets="web, terminal"
+            model="prometheus/prometheus-test", provider="prometheus", toolsets="web, terminal"
         )
 
     env = captured["env"]
-    assert env["PROMETHEUS_MODEL"] == "nous/prometheus-test"
-    assert env["PROMETHEUS_INFERENCE_MODEL"] == "nous/prometheus-test"
-    assert env["PROMETHEUS_TUI_PROVIDER"] == "nous"
-    assert env["PROMETHEUS_INFERENCE_PROVIDER"] == "nous"
+    assert env["PROMETHEUS_MODEL"] == "prometheus/prometheus-test"
+    assert env["PROMETHEUS_INFERENCE_MODEL"] == "prometheus/prometheus-test"
+    assert env["PROMETHEUS_TUI_PROVIDER"] == "prometheus"
+    assert env["PROMETHEUS_INFERENCE_PROVIDER"] == "prometheus"
     assert env["PROMETHEUS_TUI_TOOLSETS"] == "web,terminal"
     active_path = Path(env["PROMETHEUS_TUI_ACTIVE_SESSION_FILE"])
     assert active_path.name.startswith("prometheus-tui-active-session-")

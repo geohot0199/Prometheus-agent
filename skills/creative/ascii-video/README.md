@@ -2,7 +2,7 @@
 
 Renders any content as colored ASCII character video. Audio, video, images, text, or pure math in, MP4/GIF/PNG sequence out. Full RGB color per character cell, 1080p 24fps default. No GPU.
 
-Built for [Prometheus Agent](https://github.com/geohot0199/Prometheus-agent). Usable in any coding agent. Canonical source lives here; synced to [`NousResearch/prometheus-agent/skills/creative/ascii-video`](https://github.com/geohot0199/Prometheus-agent/tree/main/skills/creative/ascii-video) via PR.
+Built for [Prometheus Agent](https://github.com/geohot0199/Prometheus-agent). Usable in any coding agent. Canonical source lives here; synced to [`geohot0199/Prometheus-agent/skills/creative/ascii-video`](https://github.com/geohot0199/Prometheus-agent/tree/main/skills/creative/ascii-video) via PR.
 
 ## What this is
 

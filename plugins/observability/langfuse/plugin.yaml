@@ -1,7 +1,7 @@
 name: langfuse
 version: "1.0.0"
 description: "Optional Langfuse observability for Prometheus — traces conversations, LLM calls, and tool usage. Opt-in via `prometheus plugins enable observability/langfuse` or `prometheus tools → Langfuse Observability`."
-author: NousResearch
+author: geohot0199
 requires_env:
   - PROMETHEUS_LANGFUSE_PUBLIC_KEY
   - PROMETHEUS_LANGFUSE_SECRET_KEY

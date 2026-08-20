@@ -898,8 +898,8 @@ def test_opencode_go_model_derivation_beats_stale_persisted_api_mode(monkeypatch
 
 
 
-def test_auto_detected_nous_auth_failure_falls_through_to_openrouter(monkeypatch):
-    """When auto-detect picks Nous but credentials are revoked, fall through to OpenRouter."""
+def test_auto_detected_prometheus_auth_failure_falls_through_to_openrouter(monkeypatch):
+    """When auto-detect picks Prometheus but credentials are revoked, fall through to OpenRouter."""
     from prometheus_cli.auth import AuthError
 
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-or-key")
@@ -908,18 +908,18 @@ def test_auto_detected_nous_auth_failure_falls_through_to_openrouter(monkeypatch
     monkeypatch.delenv("OPENROUTER_BASE_URL", raising=False)
     monkeypatch.setattr(rp, "load_config", lambda: {})
 
-    # resolve_provider returns "nous" (stale active_provider in auth.json)
-    monkeypatch.setattr(rp, "resolve_provider", lambda *a, **k: "nous")
+    # resolve_provider returns "prometheus" (stale active_provider in auth.json)
+    monkeypatch.setattr(rp, "resolve_provider", lambda *a, **k: "prometheus")
     # load_pool returns empty pool so we hit the direct credential resolution
     monkeypatch.setattr(rp, "load_pool", lambda p: type("P", (), {
         "has_credentials": lambda self: False,
     })())
-    # Nous credential resolution fails with revoked token
+    # Prometheus credential resolution fails with revoked token
     monkeypatch.setattr(
-        rp, "resolve_nous_runtime_credentials",
+        rp, "resolve_prometheus_runtime_credentials",
         lambda **kw: (_ for _ in ()).throw(
             AuthError("Refresh session has been revoked",
-                      provider="nous", code="invalid_grant", relogin_required=True)
+                      provider="prometheus", code="invalid_grant", relogin_required=True)
         ),
     )
 

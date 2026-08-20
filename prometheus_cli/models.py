@@ -258,7 +258,7 @@ def _xai_curated_models() -> list[str]:
 
 _PROVIDER_MODELS: dict[str, list[str]] = {
     "moa": ["default"],
-    "nous": [
+    "prometheus": [
         # Anthropic
         "anthropic/claude-fable-5",
         "anthropic/claude-opus-5",
@@ -662,9 +662,9 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
 _PROVIDER_MODELS["ai-gateway"] = [mid for mid, _ in VERCEL_AI_GATEWAY_MODELS]
 
 # ---------------------------------------------------------------------------
-# Nous Portal free-model helper
+# Prometheus Portal free-model helper
 # ---------------------------------------------------------------------------
-# The Nous Portal models endpoint is the source of truth for which models
+# The Prometheus Portal models endpoint is the source of truth for which models
 # are currently offered (free or paid). We trust whatever it returns and
 # surface it to users as-is — no local allowlist filtering.
 
@@ -681,9 +681,9 @@ def _is_model_free(model_id: str, pricing: dict[str, dict[str, str]]) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Nous Portal account tier detection
+# Prometheus Portal account tier detection
 # ---------------------------------------------------------------------------
-def is_nous_free_tier(account_info: dict[str, Any]) -> bool:
+def is_prometheus_free_tier(account_info: dict[str, Any]) -> bool:
     """Return True if the account info indicates a free (unpaid) tier.
 
     Prefer the Portal's explicit ``paid_service_access.allowed`` entitlement
@@ -711,12 +711,12 @@ def is_nous_free_tier(account_info: dict[str, Any]) -> bool:
         return False
 
 
-def partition_nous_models_by_tier(
+def partition_prometheus_models_by_tier(
     model_ids: list[str],
     pricing: dict[str, dict[str, str]],
     free_tier: bool,
 ) -> tuple[list[str], list[str]]:
-    """Split Nous models into (selectable, unavailable) based on user tier.
+    """Split Prometheus models into (selectable, unavailable) based on user tier.
 
     For paid-tier users: all models are selectable, none unavailable.
 
@@ -748,9 +748,9 @@ def union_with_portal_free_recommendations(
 ) -> tuple[list[str], dict[str, dict[str, str]]]:
     """Augment curated list + pricing with the Portal's ``freeRecommendedModels``.
 
-    The Portal's ``/api/nous/recommended-models`` endpoint advertises which
+    The Portal's ``/api/prometheus/recommended-models`` endpoint advertises which
     models are free *right now* — independent of what the in-repo
-    ``_PROVIDER_MODELS["nous"]`` list happens to contain or whether the
+    ``_PROVIDER_MODELS["prometheus"]`` list happens to contain or whether the
     docs-hosted catalog manifest has been rebuilt since the last release.
 
     For free-tier users this is the source of truth: any model the Portal
@@ -764,13 +764,13 @@ def union_with_portal_free_recommendations(
       show first and Portal-only picks follow).
     * ``pricing`` gets a synthetic ``{"prompt": "0", "completion": "0"}``
       entry for any free recommendation missing from the live pricing
-      map, so :func:`partition_nous_models_by_tier` keeps it.
+      map, so :func:`partition_prometheus_models_by_tier` keeps it.
 
     Failures (network, parse, missing field) are silent and degrade to
     returning the inputs unchanged.
     """
     try:
-        payload = fetch_nous_recommended_models(
+        payload = fetch_prometheus_recommended_models(
             portal_base_url, force_refresh=force_refresh
         )
     except Exception:
@@ -815,9 +815,9 @@ def union_with_portal_paid_recommendations(
     """Augment curated list with the Portal's ``paidRecommendedModels``.
 
     Mirror of :func:`union_with_portal_free_recommendations` for paid-tier
-    users. The Portal's ``/api/nous/recommended-models`` endpoint advertises
+    users. The Portal's ``/api/prometheus/recommended-models`` endpoint advertises
     which paid models are blessed *right now* — independent of what the
-    in-repo ``_PROVIDER_MODELS["nous"]`` list happens to contain or whether
+    in-repo ``_PROVIDER_MODELS["prometheus"]`` list happens to contain or whether
     the docs-hosted catalog manifest has been rebuilt since the last release.
 
     For paid-tier users this lets newly-launched paid models surface in the
@@ -833,7 +833,7 @@ def union_with_portal_paid_recommendations(
       via :func:`get_pricing_for_provider`; if the live endpoint hasn't
       published pricing yet, the picker shows a blank price column rather
       than fabricating numbers. (The free helper synthesizes ``$0`` so
-      :func:`partition_nous_models_by_tier` keeps free models selectable;
+      :func:`partition_prometheus_models_by_tier` keeps free models selectable;
       no equivalent gating applies on the paid side, so synthesis would
       only mislead the user.)
 
@@ -842,7 +842,7 @@ def union_with_portal_paid_recommendations(
     Portal-side hiccup.
     """
     try:
-        payload = fetch_nous_recommended_models(
+        payload = fetch_prometheus_recommended_models(
             portal_base_url, force_refresh=force_refresh
         )
     except Exception:
@@ -879,8 +879,8 @@ _FREE_TIER_CACHE_TTL: int = 180  # seconds (3 minutes)
 _free_tier_cache: tuple[bool, float] | None = None  # (result, timestamp)
 
 
-def check_nous_free_tier(*, force_fresh: bool = False) -> bool:
-    """Check if the current Nous Portal user is on a free (unpaid) tier.
+def check_prometheus_free_tier(*, force_fresh: bool = False) -> bool:
+    """Check if the current Prometheus Portal user is on a free (unpaid) tier.
 
     Results are cached for ``_FREE_TIER_CACHE_TTL`` seconds to avoid
     hitting the Portal API on every call.  The cache is short-lived so
@@ -897,9 +897,9 @@ def check_nous_free_tier(*, force_fresh: bool = False) -> bool:
             return cached_result
 
     try:
-        from prometheus_cli.nous_account import get_nous_portal_account_info
+        from prometheus_cli.prometheus_account import get_prometheus_portal_account_info
 
-        account_info = get_nous_portal_account_info(force_fresh=force_fresh)
+        account_info = get_prometheus_portal_account_info(force_fresh=force_fresh)
         result = account_info.is_free_tier
         _free_tier_cache = (result, now)
         return result
@@ -909,7 +909,7 @@ def check_nous_free_tier(*, force_fresh: bool = False) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Nous Portal recommended models
+# Prometheus Portal recommended models
 #
 # The Portal publishes a curated list of suggested models (separated into
 # paid and free tiers) plus dedicated recommendations for compaction (text
@@ -928,19 +928,19 @@ def check_nous_free_tier(*, force_fresh: bool = False) -> bool:
 #   }
 # ---------------------------------------------------------------------------
 
-NOUS_RECOMMENDED_MODELS_PATH = "/api/nous/recommended-models"
-_NOUS_RECOMMENDED_CACHE_TTL: int = 600  # seconds (10 minutes)
+PROMETHEUS_RECOMMENDED_MODELS_PATH = "/api/prometheus/recommended-models"
+_PROMETHEUS_RECOMMENDED_CACHE_TTL: int = 600  # seconds (10 minutes)
 # (result_dict, timestamp) keyed by portal_base_url so staging vs prod don't collide.
-_nous_recommended_cache: dict[str, tuple[dict[str, Any], float]] = {}
+_prometheus_recommended_cache: dict[str, tuple[dict[str, Any], float]] = {}
 
 
-def _nous_recommended_disk_path() -> "Path":
+def _prometheus_recommended_disk_path() -> "Path":
     """Disk path for the persisted recommended-models cache."""
     from prometheus_constants import get_prometheus_home
-    return get_prometheus_home() / "cache" / "nous_recommended_cache.json"
+    return get_prometheus_home() / "cache" / "prometheus_recommended_cache.json"
 
 
-def _read_nous_recommended_disk(base: str) -> dict[str, Any] | None:
+def _read_prometheus_recommended_disk(base: str) -> dict[str, Any] | None:
     """Return the last-known-good payload for ``base`` from disk, or None.
 
     The disk file is a JSON object keyed by portal base URL so staging and
@@ -948,7 +948,7 @@ def _read_nous_recommended_disk(base: str) -> dict[str, Any] | None:
     ``{"<base>": {"data": {...}, "ts": <epoch_seconds>}}``.
     """
     try:
-        with open(_nous_recommended_disk_path(), encoding="utf-8") as fh:
+        with open(_prometheus_recommended_disk_path(), encoding="utf-8") as fh:
             blob = json.load(fh)
     except (OSError, json.JSONDecodeError):
         return None
@@ -961,7 +961,7 @@ def _read_nous_recommended_disk(base: str) -> dict[str, Any] | None:
     return data if isinstance(data, dict) and data else None
 
 
-def _write_nous_recommended_disk(base: str, data: dict[str, Any]) -> None:
+def _write_prometheus_recommended_disk(base: str, data: dict[str, Any]) -> None:
     """Persist ``data`` as the last-known-good payload for ``base``.
 
     Merges into any existing per-base map, then writes atomically. Failures
@@ -969,7 +969,7 @@ def _write_nous_recommended_disk(base: str, data: dict[str, Any]) -> None:
     """
     if not data:
         return
-    path = _nous_recommended_disk_path()
+    path = _prometheus_recommended_disk_path()
     try:
         try:
             with open(path, encoding="utf-8") as fh:
@@ -988,25 +988,25 @@ def _write_nous_recommended_disk(base: str, data: dict[str, Any]) -> None:
     except OSError as exc:
         import logging
         logging.getLogger(__name__).debug(
-            "nous recommended-models disk cache write failed: %s", exc
+            "prometheus recommended-models disk cache write failed: %s", exc
         )
 
 
-def fetch_nous_recommended_models(
+def fetch_prometheus_recommended_models(
     portal_base_url: str = "",
     timeout: float = 5.0,
     *,
     force_refresh: bool = False,
 ) -> dict[str, Any]:
-    """Fetch the Nous Portal's curated recommended-models payload.
+    """Fetch the Prometheus Portal's curated recommended-models payload.
 
-    Hits ``<portal>/api/nous/recommended-models``. The endpoint is public —
+    Hits ``<portal>/api/prometheus/recommended-models``. The endpoint is public —
     no auth is required. Results are cached per portal URL for
-    ``_NOUS_RECOMMENDED_CACHE_TTL`` seconds in process; pass
+    ``_PROMETHEUS_RECOMMENDED_CACHE_TTL`` seconds in process; pass
     ``force_refresh=True`` to bypass the in-process cache.
 
     A successful live fetch is also persisted to a per-base disk cache
-    (``$PROMETHEUS_HOME/cache/nous_recommended_cache.json``) as last-known-good.
+    (``$PROMETHEUS_HOME/cache/prometheus_recommended_cache.json``) as last-known-good.
     When the live fetch fails (network, parse, non-2xx) and the in-process
     cache is empty, the disk copy is returned instead of ``{}`` — so a
     transient Portal hiccup no longer silently drops the free/paid model
@@ -1016,15 +1016,15 @@ def fetch_nous_recommended_models(
     any cache layer can supply data. Callers must treat missing/null fields
     as "no recommendation" and fall back to their own default.
     """
-    base = (portal_base_url or "https://portal.nousresearch.com").rstrip("/")
+    base = (portal_base_url or "https://geohot0199.github.io/prometheus-agent/portal").rstrip("/")
     now = time.monotonic()
-    cached = _nous_recommended_cache.get(base)
+    cached = _prometheus_recommended_cache.get(base)
     if not force_refresh and cached is not None:
         payload, cached_at = cached
-        if now - cached_at < _NOUS_RECOMMENDED_CACHE_TTL:
+        if now - cached_at < _PROMETHEUS_RECOMMENDED_CACHE_TTL:
             return payload
 
-    url = f"{base}{NOUS_RECOMMENDED_MODELS_PATH}"
+    url = f"{base}{PROMETHEUS_RECOMMENDED_MODELS_PATH}"
     try:
         req = urllib.request.Request(
             url,
@@ -1039,35 +1039,35 @@ def fetch_nous_recommended_models(
 
     if data:
         # Live fetch succeeded — refresh both cache layers.
-        _nous_recommended_cache[base] = (data, now)
-        _write_nous_recommended_disk(base, data)
+        _prometheus_recommended_cache[base] = (data, now)
+        _write_prometheus_recommended_disk(base, data)
         return data
 
     # Live fetch failed. Fall back to the last-known-good disk copy so a
     # transient Portal hiccup doesn't drop the recommendations entirely.
-    disk = _read_nous_recommended_disk(base)
+    disk = _read_prometheus_recommended_disk(base)
     if disk:
-        _nous_recommended_cache[base] = (disk, now)
+        _prometheus_recommended_cache[base] = (disk, now)
         return disk
 
-    _nous_recommended_cache[base] = (data, now)
+    _prometheus_recommended_cache[base] = (data, now)
     return data
 
 
-def _resolve_nous_portal_url() -> str:
+def _resolve_prometheus_portal_url() -> str:
     """Best-effort lookup of the Portal base URL the user is authed against."""
     try:
         from prometheus_cli.auth import (
-            DEFAULT_NOUS_PORTAL_URL,
+            DEFAULT_PROMETHEUS_PORTAL_URL,
             get_provider_auth_state,
         )
-        state = get_provider_auth_state("nous") or {}
+        state = get_provider_auth_state("prometheus") or {}
         portal = str(state.get("portal_base_url") or "").strip()
         if portal:
             return portal.rstrip("/")
-        return str(DEFAULT_NOUS_PORTAL_URL).rstrip("/")
+        return str(DEFAULT_PROMETHEUS_PORTAL_URL).rstrip("/")
     except Exception:
-        return "https://portal.nousresearch.com"
+        return "https://geohot0199.github.io/prometheus-agent/portal"
 
 
 def _extract_model_name(entry: Any) -> Optional[str]:
@@ -1080,7 +1080,7 @@ def _extract_model_name(entry: Any) -> Optional[str]:
     return None
 
 
-def get_nous_recommended_aux_model(
+def get_prometheus_recommended_aux_model(
     *,
     vision: bool = False,
     free_tier: Optional[bool] = None,
@@ -1097,7 +1097,7 @@ def get_nous_recommended_aux_model(
                          ``freeRecommendedCompactionModel``
 
     When ``free_tier`` is ``None`` (default) the user's tier is auto-detected
-    via :func:`check_nous_free_tier`. Pass an explicit bool to bypass the
+    via :func:`check_prometheus_free_tier`. Pass an explicit bool to bypass the
     detection — useful for tests or when the caller already knows the tier.
 
     For paid-tier users we prefer the paid recommendation but gracefully fall
@@ -1108,14 +1108,14 @@ def get_nous_recommended_aux_model(
     fails — callers should fall back to their own default (currently
     ``google/gemini-3-flash-preview``).
     """
-    base = portal_base_url or _resolve_nous_portal_url()
-    payload = fetch_nous_recommended_models(base, force_refresh=force_refresh)
+    base = portal_base_url or _resolve_prometheus_portal_url()
+    payload = fetch_prometheus_recommended_models(base, force_refresh=force_refresh)
     if not payload:
         return None
 
     if free_tier is None:
         try:
-            free_tier = check_nous_free_tier()
+            free_tier = check_prometheus_free_tier()
         except Exception:
             # On any detection error, assume paid — paid users see both fields
             # anyway so this is a safe default that maximises model quality.
@@ -1154,7 +1154,7 @@ class ProviderEntry(NamedTuple):
     tui_desc: str   # detailed description for `prometheus model` TUI
 
 CANONICAL_PROVIDERS: list[ProviderEntry] = [
-    ProviderEntry("nous",           "Nous Portal",              "Nous Portal (Everything your agent needs, 300+ models with bundled tool use)"),
+    ProviderEntry("prometheus",           "Prometheus Portal",              "Prometheus Portal (Everything your agent needs, 300+ models with bundled tool use)"),
     ProviderEntry("fireworks",      "Fireworks AI",             "Fireworks AI (OpenAI-compatible direct model API)"),
     ProviderEntry("openrouter",     "OpenRouter",               "OpenRouter (Pay-per-use API aggregator)"),
     ProviderEntry("moa",            "Mixture of Agents",        "Mixture of Agents (named presets; aggregator acts after reference models)"),
@@ -1462,7 +1462,7 @@ def pick_silent_default_model(model_ids: list[str], provider: str = "openrouter"
 
 # Providers whose *silent* auto-default must go through the cost-safe
 # catalog-labeled default (``get_preferred_silent_default_model``) instead of
-# curated-list entry [0]. Metered aggregators (Nous Portal, OpenRouter) order
+# curated-list entry [0]. Metered aggregators (Prometheus Portal, OpenRouter) order
 # their lists best-/most-capable-first — entry [0] is the priciest flagship
 # (``anthropic/claude-fable-5``). Using that as the non-interactive fallback
 # when a profile sets a provider with no model silently bills the most
@@ -1476,8 +1476,8 @@ def pick_silent_default_model(model_ids: list[str], provider: str = "openrouter"
 # (cache-only catalog read). The *interactive* default (GUI onboarding /
 # ``prometheus model``) uses the richer free/paid-tier-aware resolver — see
 # ``get_recommended_default_model`` in prometheus_cli/web_server.py and
-# ``partition_nous_models_by_tier`` — which can hit the Portal.
-_SILENT_DEFAULT_PROVIDERS: frozenset[str] = frozenset({"nous", "openrouter"})
+# ``partition_prometheus_models_by_tier`` — which can hit the Portal.
+_SILENT_DEFAULT_PROVIDERS: frozenset[str] = frozenset({"prometheus", "openrouter"})
 
 
 def get_default_model_for_provider(provider: str) -> str:
@@ -1525,7 +1525,7 @@ def _openrouter_model_supports_tools(item: Any) -> bool:
     be driven by the agent loop and would fail at the first tool call.
 
     **Permissive when the field is missing.** Some OpenRouter-compatible gateways
-    (Nous Portal, private mirrors, older catalog snapshots) don't populate
+    (Prometheus Portal, private mirrors, older catalog snapshots) don't populate
     ``supported_parameters`` at all. Treat that as "unknown capability → allow"
     so the picker doesn't silently empty for those users. Only hide models
     whose ``supported_parameters`` is an explicit list that omits ``tools``.
@@ -1610,7 +1610,7 @@ _openrouter_reasoning_caps_failed_at: float | None = None
 # the first correct from its first turn.
 #
 # One file holds every catalog, keyed by the URL it came from: OpenRouter and
-# the Nous Portal list different models, and a staging Portal must not answer
+# the Prometheus Portal list different models, and a staging Portal must not answer
 # for production.
 _REASONING_CAPS_DISK_TTL_SECONDS = 24 * 3600
 
@@ -1724,7 +1724,7 @@ def _fetch_reasoning_caps_catalog(
     """Fetch one OpenRouter-shaped ``/v1/models`` catalog → per-model caps.
 
     Shared by every aggregator that serves OpenRouter's catalog schema
-    (OpenRouter itself, Nous Portal). Returns None when the catalog is
+    (OpenRouter itself, Prometheus Portal). Returns None when the catalog is
     unreachable or carries no usable entries, so callers can remember the
     failure and fall back rather than caching an empty result.
 
@@ -1834,98 +1834,98 @@ def warm_openrouter_reasoning_caps_async() -> None:
     _warm_reasoning_caps_async(_refresh_openrouter_reasoning_caps)
 
 
-# Nous Portal serves OpenRouter's catalog schema, so the same parser and
+# Prometheus Portal serves OpenRouter's catalog schema, so the same parser and
 # tri-state contract apply. Kept in its own cache because the two catalogs
 # list different models (and different capabilities for shared ids).
-_nous_reasoning_caps_cache: dict[str, Optional[dict[str, Any]]] | None = None
-_nous_reasoning_caps_failed_at: float | None = None
+_prometheus_reasoning_caps_cache: dict[str, Optional[dict[str, Any]]] | None = None
+_prometheus_reasoning_caps_failed_at: float | None = None
 
 
-def nous_catalog_url() -> str:
+def prometheus_catalog_url() -> str:
     """The Portal ``/v1/models`` URL for the endpoint we actually talk to.
 
     Resolved through the documented ladder rather than pinned to production —
-    ``NOUS_INFERENCE_BASE_URL`` → resolved credential base → prod — so a
+    ``PROMETHEUS_INFERENCE_BASE_URL`` → resolved credential base → prod — so a
     staging profile reads staging's capabilities. Reading prod's would answer
     the reasoning-mandatory question for the wrong deployment.
     """
-    return f"{_resolve_nous_pricing_credentials()[1]}/v1/models"
+    return f"{_resolve_prometheus_pricing_credentials()[1]}/v1/models"
 
 
-def _fetch_nous_reasoning_caps(
+def _fetch_prometheus_reasoning_caps(
     timeout: float = 6.0, *, force: bool = False
 ) -> Optional[dict[str, Optional[dict[str, Any]]]]:
-    """Nous Portal counterpart of :func:`_fetch_openrouter_reasoning_caps`."""
-    global _nous_reasoning_caps_cache, _nous_reasoning_caps_failed_at
-    if _nous_reasoning_caps_cache is not None and not force:
-        return _nous_reasoning_caps_cache
+    """Prometheus Portal counterpart of :func:`_fetch_openrouter_reasoning_caps`."""
+    global _prometheus_reasoning_caps_cache, _prometheus_reasoning_caps_failed_at
+    if _prometheus_reasoning_caps_cache is not None and not force:
+        return _prometheus_reasoning_caps_cache
     if (
-        _nous_reasoning_caps_failed_at is not None
-        and (time.monotonic() - _nous_reasoning_caps_failed_at) < 60
+        _prometheus_reasoning_caps_failed_at is not None
+        and (time.monotonic() - _prometheus_reasoning_caps_failed_at) < 60
     ):
         return None
-    caps_by_id = _fetch_reasoning_caps_catalog(nous_catalog_url(), timeout)
+    caps_by_id = _fetch_reasoning_caps_catalog(prometheus_catalog_url(), timeout)
     if caps_by_id is None:
-        _nous_reasoning_caps_failed_at = time.monotonic()
+        _prometheus_reasoning_caps_failed_at = time.monotonic()
         return None
-    _nous_reasoning_caps_cache = caps_by_id
+    _prometheus_reasoning_caps_cache = caps_by_id
     return caps_by_id
 
 
-def _refresh_nous_reasoning_caps() -> None:
-    _fetch_nous_reasoning_caps(force=True)
+def _refresh_prometheus_reasoning_caps() -> None:
+    _fetch_prometheus_reasoning_caps(force=True)
 
 
-def nous_model_reasoning_capabilities(
+def prometheus_model_reasoning_capabilities(
     model_id: Optional[str],
     *,
     timeout: float = 6.0,
     allow_fetch: bool = False,
 ) -> Optional[dict[str, Any]]:
-    """Return live-catalog reasoning capabilities for a Nous Portal model.
+    """Return live-catalog reasoning capabilities for a Prometheus Portal model.
 
     Same tri-state contract and cache-only default as
     :func:`openrouter_model_reasoning_capabilities`; warm the cache with
-    :func:`warm_nous_reasoning_caps_async` from hot paths.
+    :func:`warm_prometheus_reasoning_caps_async` from hot paths.
     """
     model = str(model_id or "").strip()
     if not model:
         return None
-    caps_by_id = _nous_caps_cached()
+    caps_by_id = _prometheus_caps_cached()
     if caps_by_id is None and allow_fetch:
-        caps_by_id = _fetch_nous_reasoning_caps(timeout=timeout)
+        caps_by_id = _fetch_prometheus_reasoning_caps(timeout=timeout)
     if caps_by_id is None:
         return None
     return caps_by_id.get(model)
 
 
-_nous_caps_disk_checked = False
-_nous_caps_warm_started = False
+_prometheus_caps_disk_checked = False
+_prometheus_caps_warm_started = False
 
 
-def _nous_caps_cached() -> Optional[dict[str, Optional[dict[str, Any]]]]:
+def _prometheus_caps_cached() -> Optional[dict[str, Optional[dict[str, Any]]]]:
     """Cache-only Portal caps: memory, else the disk mirror. Never HTTP.
 
     Guarded to one attempt per process because naming the catalog means
     resolving Portal credentials, which can itself reach the network to
     refresh a token — far too expensive for a caller that runs every turn.
     """
-    global _nous_reasoning_caps_cache, _nous_caps_disk_checked
-    if _nous_reasoning_caps_cache is None and not _nous_caps_disk_checked:
-        _nous_caps_disk_checked = True
-        _nous_reasoning_caps_cache = _hydrate_reasoning_caps_from_disk(
-            nous_catalog_url(), _refresh_nous_reasoning_caps
+    global _prometheus_reasoning_caps_cache, _prometheus_caps_disk_checked
+    if _prometheus_reasoning_caps_cache is None and not _prometheus_caps_disk_checked:
+        _prometheus_caps_disk_checked = True
+        _prometheus_reasoning_caps_cache = _hydrate_reasoning_caps_from_disk(
+            prometheus_catalog_url(), _refresh_prometheus_reasoning_caps
         )
-    return _nous_reasoning_caps_cache
+    return _prometheus_reasoning_caps_cache
 
 
-def warm_nous_reasoning_caps_async() -> None:
-    """Nous Portal counterpart of :func:`warm_openrouter_reasoning_caps_async`."""
-    global _nous_caps_warm_started
-    if _nous_caps_warm_started or _nous_caps_cached() is not None:
+def warm_prometheus_reasoning_caps_async() -> None:
+    """Prometheus Portal counterpart of :func:`warm_openrouter_reasoning_caps_async`."""
+    global _prometheus_caps_warm_started
+    if _prometheus_caps_warm_started or _prometheus_caps_cached() is not None:
         return
-    _nous_caps_warm_started = True
-    _warm_reasoning_caps_async(_refresh_nous_reasoning_caps)
+    _prometheus_caps_warm_started = True
+    _warm_reasoning_caps_async(_refresh_prometheus_reasoning_caps)
 
 
 # Canonical low→high ordering used for nearest-level clamping. Kept as an
@@ -2042,22 +2042,22 @@ def model_ids(*, force_refresh: bool = False) -> list[str]:
     return [mid for mid, _ in fetch_openrouter_models(force_refresh=force_refresh)]
 
 
-def get_curated_nous_model_ids() -> list[str]:
-    """Return the curated Nous Portal model-id list.
+def get_curated_prometheus_model_ids() -> list[str]:
+    """Return the curated Prometheus Portal model-id list.
 
     Prefers the remotely-hosted catalog manifest (published under
     ``website/static/api/model-catalog.json``); falls back to the in-repo
-    snapshot in ``_PROVIDER_MODELS["nous"]`` when the manifest is
+    snapshot in ``_PROVIDER_MODELS["prometheus"]`` when the manifest is
     unreachable. Always returns a list (never None).
     """
     try:
-        from prometheus_cli.model_catalog import get_curated_nous_models
-        remote = get_curated_nous_models()
+        from prometheus_cli.model_catalog import get_curated_prometheus_models
+        remote = get_curated_prometheus_models()
     except Exception:
         remote = None
     if remote:
         return list(remote)
-    return list(_PROVIDER_MODELS.get("nous", []))
+    return list(_PROVIDER_MODELS.get("prometheus", []))
 
 
 def _ai_gateway_model_is_free(pricing: Any) -> bool:
@@ -2239,8 +2239,8 @@ def compute_sale_discount(
 ) -> tuple[int, str, str] | None:
     """Derive sale chrome from gateway ``pricing.original`` when cheaper.
 
-    Nous Portal-only feature: callers gate on the provider; this helper only
-    sees ``original`` because the Nous fetch path opted in via
+    Prometheus Portal-only feature: callers gate on the provider; this helper only
+    sees ``original`` because the Prometheus fetch path opted in via
     ``include_sale_original=True``.
 
     Returns ``(discount_percent, was_prompt_raw, was_completion_raw)`` only when
@@ -2318,9 +2318,9 @@ def fetch_models_with_pricing(
     """Fetch ``/v1/models`` and return ``{model_id: {prompt, completion, ...}}``.
 
     Results are cached per *base_url* so repeated calls are free.
-    Works with any OpenRouter-compatible endpoint (OpenRouter, Nous Portal).
+    Works with any OpenRouter-compatible endpoint (OpenRouter, Prometheus Portal).
 
-    When *include_sale_original* is true (Nous Portal only) and the gateway
+    When *include_sale_original* is true (Prometheus Portal only) and the gateway
     advertises a global discount under ``pricing.original``, those
     pre-discount rates are copied through as a nested ``original`` dict so
     pickers can show sale chrome. Other providers never opt in — OpenRouter
@@ -2367,7 +2367,7 @@ def fetch_models_with_pricing(
                 entry["input_cache_read"] = str(pricing["input_cache_read"])
             if pricing.get("input_cache_write"):
                 entry["input_cache_write"] = str(pricing["input_cache_write"])
-            # Sale chrome is Nous Portal-only. Never copy pricing.original for
+            # Sale chrome is Prometheus Portal-only. Never copy pricing.original for
             # OpenRouter / other OpenAI-compatible catalogs.
             if include_sale_original:
                 original = pricing.get("original")
@@ -2443,13 +2443,13 @@ def _resolve_openrouter_api_key() -> str:
     return os.getenv("OPENROUTER_API_KEY", "").strip()
 
 
-_DEFAULT_NOUS_INFERENCE_BASE = "https://inference-api.nousresearch.com"
+_DEFAULT_PROMETHEUS_INFERENCE_BASE = "https://geohot0199.github.io/prometheus-agent/inference-api"
 
 
-def _resolve_nous_pricing_credentials() -> tuple[str, str]:
-    """Return ``(api_key, base_url)`` for Nous Portal pricing.
+def _resolve_prometheus_pricing_credentials() -> tuple[str, str]:
+    """Return ``(api_key, base_url)`` for Prometheus Portal pricing.
 
-    The Nous inference ``/v1/models`` endpoint exposes pricing without
+    The Prometheus inference ``/v1/models`` endpoint exposes pricing without
     authentication, so the api_key is best-effort: when runtime credential
     resolution fails (expired refresh token, missing auth.json, etc.) we
     still return a usable inference base URL so the picker keeps working
@@ -2459,7 +2459,7 @@ def _resolve_nous_pricing_credentials() -> tuple[str, str]:
     models currently available").
 
     Base URL precedence (mirrors runtime credential resolution):
-    1. ``NOUS_INFERENCE_BASE_URL`` env override (staging / preview)
+    1. ``PROMETHEUS_INFERENCE_BASE_URL`` env override (staging / preview)
     2. Resolved runtime credential ``base_url``
     3. Production default
 
@@ -2469,25 +2469,25 @@ def _resolve_nous_pricing_credentials() -> tuple[str, str]:
     """
     env_base = None
     try:
-        from prometheus_cli.auth import _nous_inference_env_override
+        from prometheus_cli.auth import _prometheus_inference_env_override
 
-        env_base = _nous_inference_env_override()
+        env_base = _prometheus_inference_env_override()
     except Exception:
         env_base = None
 
     api_key = ""
     creds_base = ""
     try:
-        from prometheus_cli.auth import resolve_nous_runtime_credentials
+        from prometheus_cli.auth import resolve_prometheus_runtime_credentials
 
-        creds = resolve_nous_runtime_credentials()
+        creds = resolve_prometheus_runtime_credentials()
         if creds:
             api_key = creds.get("api_key", "") or ""
             creds_base = (creds.get("base_url", "") or "").strip()
     except Exception:
         pass
 
-    base_url = (env_base or creds_base or _DEFAULT_NOUS_INFERENCE_BASE).rstrip("/")
+    base_url = (env_base or creds_base or _DEFAULT_PROMETHEUS_INFERENCE_BASE).rstrip("/")
     # Credential bases arrive with or without the ``/v1`` suffix. Callers
     # append their own path, so hand back the bare origin.
     if base_url.endswith("/v1"):
@@ -2496,7 +2496,7 @@ def _resolve_nous_pricing_credentials() -> tuple[str, str]:
 
 
 def get_pricing_for_provider(provider: str, *, force_refresh: bool = False) -> dict[str, dict[str, str]]:
-    """Return live pricing for providers that support it (openrouter, nous, ai-gateway, novita)."""
+    """Return live pricing for providers that support it (openrouter, prometheus, ai-gateway, novita)."""
     normalized = normalize_provider(provider)
     if normalized == "openrouter":
         return fetch_models_with_pricing(
@@ -2512,14 +2512,14 @@ def get_pricing_for_provider(provider: str, *, force_refresh: bool = False) -> d
         return _fetch_deepinfra_pricing(force_refresh=force_refresh)
     if normalized == "fireworks":
         return _fireworks_pricing_from_models_dev(force_refresh=force_refresh)
-    if normalized == "nous":
-        api_key, base_url = _resolve_nous_pricing_credentials()
+    if normalized == "prometheus":
+        api_key, base_url = _resolve_prometheus_pricing_credentials()
         if base_url:
             return fetch_models_with_pricing(
                 api_key=api_key,
                 base_url=base_url,
                 force_refresh=force_refresh,
-                # Sale chrome (pricing.original) is Nous Portal-only.
+                # Sale chrome (pricing.original) is Prometheus Portal-only.
                 include_sale_original=True,
             )
     return {}
@@ -2714,7 +2714,7 @@ def parse_model_input(raw: str, current_provider: str) -> tuple[str, str]:
     Supports ``provider:model`` syntax to switch providers at runtime::
 
         openrouter:anthropic/claude-sonnet-4.5  →  ("openrouter", "anthropic/claude-sonnet-4.5")
-        nous:prometheus-3                           →  ("nous", "prometheus-3")
+        prometheus:prometheus-3                           →  ("prometheus", "prometheus-3")
         anthropic/claude-sonnet-4.5             →  (current_provider, "anthropic/claude-sonnet-4.5")
         gpt-5.4                                 →  (current_provider, "gpt-5.4")
 
@@ -3113,7 +3113,7 @@ def should_use_ollama_native_catalog(
 
     known_non_local_providers = {
         "openrouter",
-        "nous",
+        "prometheus",
         "anthropic",
         "openai",
         "openai-codex",
@@ -3210,7 +3210,7 @@ def curated_models_for_provider(
     if normalized == "openrouter":
         return fetch_openrouter_models(force_refresh=force_refresh)
 
-    # Try live API first (Codex, Nous, etc. all support /models)
+    # Try live API first (Codex, Prometheus, etc. all support /models)
     live = provider_model_ids(normalized)
     if live:
         return [(m, "") for m in live]
@@ -3249,7 +3249,7 @@ def _model_in_provider_catalog(name_lower: str, providers: set[str]) -> bool:
 
 
 _AGGREGATOR_PROVIDERS = frozenset(
-    {"nous", "openrouter", "ai-gateway", "copilot", "kilocode"}
+    {"prometheus", "openrouter", "ai-gateway", "copilot", "kilocode"}
 )
 
 # Subscription/OAuth providers whose catalogs RE-EXPOSE other vendors' models
@@ -3351,7 +3351,7 @@ def detect_static_provider_for_model(
         return alias_match
 
     # --- Step 0: bare provider name typed as model ---
-    # If someone types `/model nous` or `/model anthropic`, treat it as a
+    # If someone types `/model prometheus` or `/model anthropic`, treat it as a
     # provider switch and pick the first model from that provider's catalog.
     # Skip "custom" and "openrouter" — custom has no model catalog, and
     # openrouter requires an explicit model name to be useful.
@@ -3365,8 +3365,8 @@ def detect_static_provider_for_model(
         ):
             # Route through the cost-safe default rather than picking
             # ``default_models[0]`` directly. For metered aggregators whose
-            # curated list is ordered most-capable-first (e.g. Nous Portal),
-            # entry [0] is the priciest flagship, and typing ``/model nous``
+            # curated list is ordered most-capable-first (e.g. Prometheus Portal),
+            # entry [0] is the priciest flagship, and typing ``/model prometheus``
             # would silently escalate to it — the exact billing footgun the
             # catalog-labeled silent default (``_SILENT_DEFAULT_PROVIDERS``)
             # exists to prevent. For providers outside that set this is
@@ -3663,7 +3663,7 @@ def _resolve_copilot_catalog_api_key() -> str:
 # DELIBERATELY EXCLUDED:
 #   - "openrouter": curated list is already a hand-picked agentic subset of
 #     OpenRouter's 400+ catalog. Blindly merging would dump everything.
-#   - "nous": curated list and Portal /models endpoint are the source of
+#   - "prometheus": curated list and Portal /models endpoint are the source of
 #     truth for the subscription tier.
 # Also excluded: providers that already have dedicated live-endpoint
 # branches below (copilot, anthropic, ai-gateway, ollama-cloud, custom,
@@ -3772,7 +3772,7 @@ def _openai_discovery_base_url(provider: str) -> str:
 def provider_model_ids(provider: Optional[str], *, force_refresh: bool = False) -> list[str]:
     """Return the best known model catalog for a provider.
 
-    Tries live API endpoints for providers that support them (Codex, Nous),
+    Tries live API endpoints for providers that support them (Codex, Prometheus),
     falling back to static lists. For providers in ``_MODELS_DEV_PREFERRED``
     (opencode-go/zen, xiaomi, deepseek, smaller inference providers, etc.),
     models.dev entries are merged on top of curated so new models released
@@ -3850,21 +3850,21 @@ def provider_model_ids(provider: Optional[str], *, force_refresh: bool = False) 
             pass
         if normalized == "copilot-acp":
             return list(_PROVIDER_MODELS.get("copilot", []))
-    if normalized == "nous":
-        # Try live Nous Portal /models endpoint
+    if normalized == "prometheus":
+        # Try live Prometheus Portal /models endpoint
         try:
-            from prometheus_cli.auth import fetch_nous_models, resolve_nous_runtime_credentials
-            creds = resolve_nous_runtime_credentials()
+            from prometheus_cli.auth import fetch_prometheus_models, resolve_prometheus_runtime_credentials
+            creds = resolve_prometheus_runtime_credentials()
             if creds:
-                live = fetch_nous_models(api_key=creds.get("api_key", ""), inference_base_url=creds.get("base_url", ""))
+                live = fetch_prometheus_models(api_key=creds.get("api_key", ""), inference_base_url=creds.get("base_url", ""))
                 if live:
                     return live
         except Exception:
             pass
         # Live failed (or no creds). Fall back to the docs-hosted manifest
-        # — NOT the in-repo _PROVIDER_MODELS["nous"] snapshot — so newly
+        # — NOT the in-repo _PROVIDER_MODELS["prometheus"] snapshot — so newly
         # added Portal models still surface without a Prometheus release.
-        manifest_ids = get_curated_nous_model_ids()
+        manifest_ids = get_curated_prometheus_model_ids()
         if manifest_ids:
             return manifest_ids
     if normalized == "stepfun":
@@ -4176,7 +4176,7 @@ def _credential_fingerprint(provider: str) -> str:
     Rotating any of the relevant env vars invalidates the cached entry
     for that provider. We hash AT LEAST the api-key + base-url env vars
     declared in ``PROVIDER_REGISTRY``. For OAuth-backed providers
-    (codex, copilot, anthropic-via-claude-code, nous portal), the
+    (codex, copilot, anthropic-via-claude-code, prometheus portal), the
     relevant tokens live in ``$PROMETHEUS_HOME/auth.json`` and external
     credential files. Rather than parse every shape, we additionally
     fold the mtime of those files into the fingerprint so refreshes

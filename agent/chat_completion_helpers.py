@@ -597,28 +597,28 @@ def _prompt_cache_scope_for_agent(agent) -> "str | None":
         return None
 
 
-def _merge_nous_portal_messages_extra_body(agent, anthropic_kwargs: dict) -> dict:
+def _merge_prometheus_portal_messages_extra_body(agent, anthropic_kwargs: dict) -> dict:
     """Merge Portal ``tags`` / ``session_id`` onto an Anthropic Messages kwargs dict.
 
-    The Nous provider profile is only consulted by the OpenAI-wire transport;
+    The Prometheus provider profile is only consulted by the OpenAI-wire transport;
     anthropic_messages callers must merge it themselves. Passes ``session_id``
     only — not ``provider_preferences`` (those become a top-level ``provider``
     routing object on the OpenAI wire). Never blocks a turn on tagging.
     """
-    if getattr(agent, "provider", None) not in {"nous", "nous-portal", "nousresearch"}:
+    if getattr(agent, "provider", None) not in {"prometheus", "prometheus-portal", "geohot0199"}:
         return anthropic_kwargs
     try:
         from providers import get_provider_profile
 
-        nous_profile = get_provider_profile("nous")
-        if nous_profile is not None:
+        prometheus_profile = get_provider_profile("prometheus")
+        if prometheus_profile is not None:
             anthropic_kwargs.setdefault("extra_body", {}).update(
-                nous_profile.build_extra_body(
+                prometheus_profile.build_extra_body(
                     session_id=getattr(agent, "session_id", None)
                 )
             )
     except Exception as exc:  # noqa: BLE001 — never block a turn on tagging
-        logger.debug("Nous Portal extra_body merge failed: %s", exc)
+        logger.debug("Prometheus Portal extra_body merge failed: %s", exc)
     return anthropic_kwargs
 
 
@@ -1848,12 +1848,12 @@ def build_api_kwargs(agent, api_messages: list, tools_for_api: list | None = Non
             fast_mode=(agent.request_overrides or {}).get("speed") == "fast",
             drop_context_1m_beta=bool(getattr(agent, "_oauth_1m_beta_disabled", False)),
         )
-        # Nous Portal reads ``tags`` and ``session_id`` as top-level body fields
+        # Prometheus Portal reads ``tags`` and ``session_id`` as top-level body fields
         # on its Messages route the same way it does on /chat/completions, but
         # the profile hook that produces them is only consulted by the
         # OpenAI-wire transport. Merge them here so Messages traffic keeps
         # product attribution and sticky routing.
-        return _merge_nous_portal_messages_extra_body(agent, anthropic_kwargs)
+        return _merge_prometheus_portal_messages_extra_body(agent, anthropic_kwargs)
 
     # AWS Bedrock native Converse API — bypasses the OpenAI client entirely.
     # The adapter handles message/tool conversion and boto3 calls directly.
@@ -1967,7 +1967,7 @@ def build_api_kwargs(agent, api_messages: list, tools_for_api: list | None = Non
         base_url_host_matches(agent._base_url_lower, "models.github.ai")
         or base_url_host_matches(agent._base_url_lower, "githubcopilot.com")
     )
-    _is_nous = base_url_host_matches(agent._base_url_lower, "nousresearch.com")
+    _is_prometheus = base_url_host_matches(agent._base_url_lower, "geohot0199.github.io/prometheus-agent")
     _is_nvidia = base_url_host_matches(agent._base_url_lower, "integrate.api.nvidia.com")
     _is_kimi = (
         base_url_host_matches(agent.base_url, "api.kimi.com")
@@ -1998,7 +1998,7 @@ def build_api_kwargs(agent, api_messages: list, tools_for_api: list | None = Non
     # Anthropic Messages API treats it as mandatory and proxies that omit it
     # (AWS Bedrock, NVIDIA, LiteLLM, vLLM, corporate gateways) default as low
     # as 4096 output tokens — easily exhausted by thinking + large tool calls
-    # like write_file/patch.  OpenRouter/Nous were the only routes covered
+    # like write_file/patch.  OpenRouter/Prometheus were the only routes covered
     # before; gating on _ANTHROPIC_OUTPUT_LIMITS membership covers them all.
     _ant_max = None
     try:
@@ -2087,7 +2087,7 @@ def build_api_kwargs(agent, api_messages: list, tools_for_api: list | None = Non
         cache_scope_id=_cache_scope_id,
         model_lower=(agent.model or "").lower(),
         is_openrouter=_is_or,
-        is_nous=_is_nous,
+        is_prometheus=_is_prometheus,
         is_qwen_portal=_is_qwen,
         is_github_models=_is_gh,
         is_nvidia_nim=_is_nvidia,
@@ -2406,20 +2406,20 @@ def _fallback_entry_key(fb: dict) -> tuple[str, str, str]:
 def _fallback_entry_unavailable_without_network(agent, fb: dict) -> Optional[str]:
     """Return a skip reason for fallback entries known to be unusable locally."""
     fb_provider = (fb.get("provider") or "").strip().lower()
-    if fb_provider != "nous":
+    if fb_provider != "prometheus":
         return None
     try:
         from prometheus_cli.auth import get_provider_auth_state
 
-        state = get_provider_auth_state("nous") or {}
+        state = get_provider_auth_state("prometheus") or {}
     except Exception as exc:
-        return f"nous_auth_unreadable:{type(exc).__name__}"
+        return f"prometheus_auth_unreadable:{type(exc).__name__}"
     access_value = state.get("access_token")
     refresh_value = state.get("refresh_token")
     has_access = isinstance(access_value, str) and bool(access_value.strip())
     has_refresh = isinstance(refresh_value, str) and bool(refresh_value.strip())
     if not (has_access or has_refresh):
-        return "nous_token_missing"
+        return "prometheus_token_missing"
     return None
 
 
@@ -2602,14 +2602,14 @@ def try_activate_fallback(agent, reason: "FailoverReason | None" = None) -> bool
         if not fb_api_mode_explicit and fb_api_mode == "chat_completions":
             if fb_provider == "openai-codex":
                 fb_api_mode = "codex_responses"
-            elif fb_provider in {"nous", "nous-portal", "nousresearch"}:
+            elif fb_provider in {"prometheus", "prometheus-portal", "geohot0199"}:
                 # Portal is dual-wire: anthropic/* must land on /v1/messages.
                 # resolve_provider_client still returns an OpenAI client for
-                # Nous; the anthropic_messages branch below rebuilds the native
+                # Prometheus; the anthropic_messages branch below rebuilds the native
                 # client from that credential + base_url.
-                from prometheus_cli.providers import nous_api_mode
+                from prometheus_cli.providers import prometheus_api_mode
 
-                fb_api_mode = nous_api_mode(fb_model)
+                fb_api_mode = prometheus_api_mode(fb_model)
             elif (
                 fb_base_url.rstrip("/").lower().endswith("/anthropic")
                 or base_url_hostname(fb_base_url) == "api.anthropic.com"
@@ -2839,7 +2839,7 @@ def try_activate_fallback(agent, reason: "FailoverReason | None" = None) -> bool
         _reset_stale_streak(agent)
         return True
     except Exception as e:
-        if fb_provider == "nous":
+        if fb_provider == "prometheus":
             unavailable.add(fb_key)
         logger.error("Failed to activate fallback %s: %s", fb_model, e)
         return agent._try_activate_fallback(reason)  # try next in chain
@@ -2971,7 +2971,7 @@ def handle_max_iterations(agent, messages: list, api_call_count: int) -> str:
         )
         _omit_summary_temperature = _raw_summary_temp is _OMIT_TEMP
         _summary_temperature = None if _omit_summary_temperature else _raw_summary_temp
-        _is_nous = "nousresearch" in agent._base_url_lower
+        _is_prometheus = "geohot0199" in agent._base_url_lower
         # LM Studio uses top-level `reasoning_effort` (not extra_body.reasoning).
         # Mirror ChatCompletionsTransport.build_kwargs() so the summary path
         # — which calls chat.completions.create() directly without going
@@ -2992,8 +2992,8 @@ def handle_max_iterations(agent, messages: list, api_call_count: int) -> str:
                     "enabled": True,
                     "effort": "medium"
                 }
-        if _is_nous:
-            from agent.portal_tags import nous_portal_tags as _portal_tags
+        if _is_prometheus:
+            from agent.portal_tags import prometheus_portal_tags as _portal_tags
             summary_extra_body["tags"] = _portal_tags()
 
         if agent.api_mode == "codex_responses":
@@ -3078,7 +3078,7 @@ def handle_max_iterations(agent, messages: list, api_call_count: int) -> str:
                     preserve_dots=agent._anthropic_preserve_dots(),
                     base_url=getattr(agent, "_anthropic_base_url", None),
                 )
-                _ant_kw = _merge_nous_portal_messages_extra_body(agent, _ant_kw)
+                _ant_kw = _merge_prometheus_portal_messages_extra_body(agent, _ant_kw)
                 summary_response = _managed_summary_call(
                     _ant_kw,
                     agent._anthropic_messages_create,
@@ -3130,7 +3130,7 @@ def handle_max_iterations(agent, messages: list, api_call_count: int) -> str:
                     preserve_dots=agent._anthropic_preserve_dots(),
                     base_url=getattr(agent, "_anthropic_base_url", None),
                 )
-                _ant_kw2 = _merge_nous_portal_messages_extra_body(agent, _ant_kw2)
+                _ant_kw2 = _merge_prometheus_portal_messages_extra_body(agent, _ant_kw2)
                 retry_response = _managed_summary_call(
                     _ant_kw2,
                     agent._anthropic_messages_create,
@@ -4384,7 +4384,7 @@ def interruptible_streaming_api_call(agent, api_kwargs: dict, *, on_first_delta=
         #      upstream dropped/stalled the connection mid tool-call.  This
         #      is NOT an output cap — the model never reported hitting one.
         #      Some dedicated endpoints (e.g. NVIDIA Nemotron Ultra on the
-        #      Nous dedicated endpoint) stall for minutes during large
+        #      Prometheus dedicated endpoint) stall for minutes during large
         #      tool-arg generation, then close the stream cleanly without a
         #      finish_reason.  Stamping "length" here sends it down the
         #      max_tokens-boost truncation path, which retries 3× to no

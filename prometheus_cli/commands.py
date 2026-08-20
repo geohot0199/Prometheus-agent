@@ -28,7 +28,7 @@ from prometheus_constants import INDICATOR_STYLES
 # and the completer runs on every keystroke of /personality. The personalities
 # list only changes when the config file changes on disk, so keying on
 # path+mtime keeps the memo freshness-correct (same pattern as load_env and
-# _nous_auth_status_cache). Falls back to a fresh load when the file cannot
+# _prometheus_auth_status_cache). Falls back to a fresh load when the file cannot
 # be stat'ed.
 _personalities_memo: Optional[
     Tuple[Tuple[Optional[str], Optional[int], Optional[int]], Dict[str, Any]]
@@ -366,9 +366,9 @@ COMMAND_REGISTRY: list[CommandDef] = [
                gateway_only=True, busy_policy="dispatch"),
     CommandDef("usage", "Show token usage and rate limits; `reset` redeems a banked Codex limit reset", "Info",
                args_hint="[reset [--force]]"),
-    CommandDef("subscription", "View your Nous plan and change it in the browser", "Info",
+    CommandDef("subscription", "View your Prometheus plan and change it in the browser", "Info",
                cli_only=True, aliases=("upgrade",)),
-    CommandDef("topup", "Show your Nous balance and manage billing on the portal", "Info"),
+    CommandDef("topup", "Show your Prometheus balance and manage billing on the portal", "Info"),
     CommandDef("insights", "Show usage insights and analytics", "Info",
                args_hint="[days]"),
     CommandDef("platforms", "Show gateway/messaging platform status", "Info",
@@ -386,7 +386,7 @@ COMMAND_REGISTRY: list[CommandDef] = [
     CommandDef("version", "Show Prometheus Agent version", "Info", aliases=("v",),
                busy_policy="dispatch", execute="version"),
     CommandDef("debug", "Upload debug report (system info + logs) and get shareable links", "Info",
-               args_hint="[nous|local]"),
+               args_hint="[prometheus|local]"),
 
     # Exit
     CommandDef("quit", "Exit the CLI (use --delete to also remove session history)", "Exit",
@@ -2136,7 +2136,7 @@ class SlashCommandCompleter(Completer):
             # merge of the built-in defaults on every call, and this completer
             # runs on every keystroke of /personality. The personalities list
             # only changes when config.yaml changes on disk, so the memo stays
-            # freshness-correct (same pattern as load_env / _nous_auth_status_cache).
+            # freshness-correct (same pattern as load_env / _prometheus_auth_status_cache).
             personalities = _personalities_from_cli_config()
 
             if "none".startswith(sub_lower) and "none" != sub_lower:

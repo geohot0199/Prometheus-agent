@@ -33,8 +33,8 @@ Prometheus Agent 内置完整的浏览器自动化工具集，支持多种后端
 
 ## 配置
 
-:::tip Nous 订阅用户
-如果您拥有付费 [Nous Portal](https://portal.nousresearch.com) 订阅，可通过 **[Tool Gateway](tool-gateway.md)** 使用浏览器自动化功能，无需单独的 API 密钥。新安装可运行 `prometheus setup --portal` 登录并一次性开启所有 gateway 工具；已有安装可通过 `prometheus model` 或 `prometheus tools` 选择 **Nous Subscription** 作为浏览器提供商。
+:::tip Prometheus 订阅用户
+如果您拥有付费 [Prometheus Portal](https://geohot0199.github.io/prometheus-agent/portal) 订阅，可通过 **[Tool Gateway](tool-gateway.md)** 使用浏览器自动化功能，无需单独的 API 密钥。新安装可运行 `prometheus setup --portal` 登录并一次性开启所有 gateway 工具；已有安装可通过 `prometheus model` 或 `prometheus tools` 选择 **Prometheus Subscription** 作为浏览器提供商。
 :::
 
 ### Browserbase 云端模式
@@ -395,7 +395,7 @@ npm install
 导航到指定 URL。必须在其他任何浏览器工具之前调用。初始化 Browserbase 会话。
 
 ```
-Navigate to https://github.com/NousResearch
+Navigate to https://github.com/geohot0199
 ```
 
 :::tip

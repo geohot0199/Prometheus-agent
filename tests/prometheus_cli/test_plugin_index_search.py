@@ -37,26 +37,26 @@ SAMPLE = _index_doc(
         {
             "name": "prometheus-media-studio",
             "description": "Generative media workspace plugin.",
-            "author": "NousResearch",
+            "author": "geohot0199",
             "tags": ["media", "image-gen"],
-            "repo": "NousResearch/prometheus-media-studio",
+            "repo": "geohot0199/prometheus-media-studio",
             "ref": "e" * 40,
         },
         {
             "name": "prometheus-telegram-business",
             "description": "Telegram secretary bot with owner approval.",
-            "author": "NousResearch",
+            "author": "geohot0199",
             "tags": ["telegram", "gateway"],
-            "repo": "NousResearch/prometheus-telegram-business",
+            "repo": "geohot0199/prometheus-telegram-business",
             "ref": "f" * 40,
             "capabilities": ["platform"],
         },
         {
             "name": "plugin-llm-example",
             "description": "Reference plugin for structured LLM access.",
-            "author": "NousResearch",
+            "author": "geohot0199",
             "tags": ["example", "llm"],
-            "repo": "NousResearch/prometheus-example-plugins",
+            "repo": "geohot0199/prometheus-example-plugins",
             "subdir": "plugin-llm-example",
             "ref": "a" * 40,
             "capabilities": ["commands", "llm"],
@@ -99,9 +99,9 @@ class TestParsing:
         ]
         assert entries[2].subdir == "plugin-llm-example"
         assert entries[2].install_identifier == (
-            "NousResearch/prometheus-example-plugins/plugin-llm-example"
+            "geohot0199/prometheus-example-plugins/plugin-llm-example"
         )
-        assert entries[0].install_identifier == "NousResearch/prometheus-media-studio"
+        assert entries[0].install_identifier == "geohot0199/prometheus-media-studio"
 
     def test_parses_bare_list_form(self):
         entries = _parse_entries(SAMPLE["plugins"])
@@ -285,7 +285,7 @@ class TestResolveName:
 
     def test_exact_unique(self):
         entry, candidates = resolve_name(self.entries, "prometheus-media-studio")
-        assert entry is not None and entry.repo == "NousResearch/prometheus-media-studio"
+        assert entry is not None and entry.repo == "geohot0199/prometheus-media-studio"
 
     def test_case_insensitive(self):
         entry, _ = resolve_name(self.entries, "Prometheus-Media-Studio")
@@ -337,7 +337,7 @@ class TestInstallResolution:
         monkeypatch.setattr(plugins_cmd, "_install_plugin_core", fake_core)
         with pytest.raises(SystemExit):
             plugins_cmd.cmd_install("prometheus-media-studio", enable=False)
-        assert captured["identifier"] == "NousResearch/prometheus-media-studio"
+        assert captured["identifier"] == "geohot0199/prometheus-media-studio"
         assert captured["ref"] == "e" * 40
 
     def test_install_explicit_ref_beats_index_pin(self, prometheus_home, monkeypatch):
@@ -430,7 +430,7 @@ class TestCmdSearch:
         assert payload["source"] == "seed"
         assert payload["query"] == "telegram"
         assert payload["results"][0]["name"] == "prometheus-telegram-business"
-        assert payload["results"][0]["repo"] == "NousResearch/prometheus-telegram-business"
+        assert payload["results"][0]["repo"] == "geohot0199/prometheus-telegram-business"
         assert payload["results"][0]["ref"] == "f" * 40
         assert "audited" in payload["note"]
 

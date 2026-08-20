@@ -118,8 +118,8 @@ class TestProviderRegistry:
 
     def test_oauth_providers_unchanged(self):
         """Ensure we didn't break the existing OAuth providers."""
-        assert "nous" in PROVIDER_REGISTRY
-        assert PROVIDER_REGISTRY["nous"].auth_type == "oauth_device_code"
+        assert "prometheus" in PROVIDER_REGISTRY
+        assert PROVIDER_REGISTRY["prometheus"].auth_type == "oauth_device_code"
         assert "openai-codex" in PROVIDER_REGISTRY
         assert PROVIDER_REGISTRY["openai-codex"].auth_type == "oauth_external"
 
@@ -136,7 +136,7 @@ from prometheus_cli.auth import PROVIDER_REGISTRY as _REGISTRY
 
 _EXTRA_ENV_VARS = (
     # Checked directly in resolve_provider("auto"), not via the registry.
-    "OPENROUTER_API_KEY", "NOUS_API_KEY",
+    "OPENROUTER_API_KEY", "PROMETHEUS_API_KEY",
     # Base URLs / paths that influence detection but aren't api_key_env_vars.
     "LM_BASE_URL", "KIMI_BASE_URL", "STEPFUN_BASE_URL", "KILOCODE_BASE_URL",
     "GMI_BASE_URL", "OPENAI_BASE_URL",
@@ -647,19 +647,19 @@ class TestHasAnyProviderConfigured:
         import json
         prometheus_home = self._setup_home(monkeypatch, tmp_path)
         (prometheus_home / "auth.json").write_text(json.dumps({
-            "active_provider": "nous",
+            "active_provider": "prometheus",
         }))
         calls = []
 
         def _guarded_status(provider_id):
             calls.append(provider_id)
-            assert provider_id == "nous", "sweep must be skipped"
+            assert provider_id == "prometheus", "sweep must be skipped"
             return {"logged_in": True}
 
         monkeypatch.setattr("prometheus_cli.auth.get_auth_status", _guarded_status)
         from prometheus_cli.main import _has_any_provider_configured
         assert _has_any_provider_configured() is True
-        assert calls == ["nous"], (
+        assert calls == ["prometheus"], (
             f"provider registry sweep ran before auth.json short-circuit: {calls}"
         )
 

@@ -1,8 +1,8 @@
 {
-  "client_id": "https://nousresearch.github.io/prometheus-agent/docs/oauth/client-metadata.json",
+  "client_id": "https://geohot0199.github.io/prometheus-agent/docs/oauth/client-metadata.json",
   "client_name": "Prometheus Agent",
   "client_uri": "https://github.com/geohot0199/Prometheus-agent",
-  "logo_uri": "https://nousresearch.github.io/prometheus-agent/docs/img/logo.png",
+  "logo_uri": "https://geohot0199.github.io/prometheus-agent/docs/img/logo.png",
   "application_type": "native",
   "grant_types": ["authorization_code", "refresh_token"],
   "response_types": ["code"],

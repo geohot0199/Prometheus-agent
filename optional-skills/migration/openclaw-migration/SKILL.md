@@ -2,7 +2,7 @@
 name: openclaw-migration
 description: Import an OpenClaw setup (memories, skills) into Prometheus.
 version: 1.0.0
-author: Prometheus Agent (Nous Research)
+author: Prometheus Agent (Prometheus)
 license: MIT
 platforms: [linux, macos, windows]
 metadata:

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from prometheus_cli.nous_account import NousPortalAccountInfo
+from prometheus_cli.prometheus_account import PrometheusPortalAccountInfo
 
 
 TOOLS_DIR = Path(__file__).resolve().parents[2] / "tools"
@@ -47,12 +47,12 @@ def _restore_tool_and_agent_modules():
 
 
 @pytest.fixture(autouse=True)
-def _enable_managed_nous_tools(monkeypatch):
-    """Patch the source modules so managed_nous_tools_enabled() returns True
+def _enable_managed_prometheus_tools(monkeypatch):
+    """Patch the source modules so managed_prometheus_tools_enabled() returns True
     even after tool modules are dynamically reloaded."""
     monkeypatch.setattr(
-        "prometheus_cli.nous_account.get_nous_portal_account_info",
-        lambda: NousPortalAccountInfo(
+        "prometheus_cli.prometheus_account.get_prometheus_portal_account_info",
+        lambda: PrometheusPortalAccountInfo(
             logged_in=True,
             source="jwt",
             fresh=False,
@@ -174,13 +174,13 @@ def _install_fake_openai_module(captured, transcription_response=None):
     sys.modules["openai"] = fake_module
 
 
-def test_managed_fal_submit_uses_gateway_origin_and_nous_token(monkeypatch):
+def test_managed_fal_submit_uses_gateway_origin_and_prometheus_token(monkeypatch):
     captured = {}
     _install_fake_tools_package()
     _install_fake_fal_client(captured)
     monkeypatch.delenv("FAL_KEY", raising=False)
     monkeypatch.setenv("FAL_QUEUE_GATEWAY_URL", "http://127.0.0.1:3009")
-    monkeypatch.setenv("TOOL_GATEWAY_USER_TOKEN", "nous-token")
+    monkeypatch.setenv("TOOL_GATEWAY_USER_TOKEN", "prometheus-token")
 
     image_generation_tool = _load_tool_module(
         "tools.image_generation_tool",
@@ -194,7 +194,7 @@ def test_managed_fal_submit_uses_gateway_origin_and_nous_token(monkeypatch):
     )
 
     assert captured["submit_via"] == "managed_client"
-    assert captured["client_key"] == "nous-token"
+    assert captured["client_key"] == "prometheus-token"
     assert captured["submit_url"] == "http://127.0.0.1:3009/fal-ai/flux-2-pro"
     assert captured["method"] == "POST"
     assert captured["arguments"] == {"prompt": "test prompt", "num_images": 1}
@@ -208,16 +208,16 @@ def test_openai_tts_uses_managed_audio_gateway_when_direct_key_absent(monkeypatc
     _install_fake_openai_module(captured)
     monkeypatch.delenv("VOICE_TOOLS_OPENAI_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    monkeypatch.setenv("TOOL_GATEWAY_DOMAIN", "nousresearch.com")
-    monkeypatch.setenv("TOOL_GATEWAY_USER_TOKEN", "nous-token")
+    monkeypatch.setenv("TOOL_GATEWAY_DOMAIN", "geohot0199.github.io/prometheus-agent")
+    monkeypatch.setenv("TOOL_GATEWAY_USER_TOKEN", "prometheus-token")
 
     tts_tool = _load_tool_module("tools.tts_tool", "tts_tool.py")
     monkeypatch.setattr(tts_tool.uuid, "uuid4", lambda: "tts-call-123")
     output_path = tmp_path / "speech.mp3"
     tts_tool._generate_openai_tts("hello world", str(output_path), {"openai": {}})
 
-    assert captured["api_key"] == "nous-token"
-    assert captured["base_url"] == "https://openai-audio-gateway.nousresearch.com/v1"
+    assert captured["api_key"] == "prometheus-token"
+    assert captured["base_url"] == "https://geohot0199.github.io/prometheus-agent/audio-gateway/v1"
     assert captured["speech_kwargs"]["model"] == "gpt-4o-mini-tts"
     assert captured["speech_kwargs"]["extra_headers"] == {"x-idempotency-key": "tts-call-123"}
     assert captured["stream_to_file"] == str(output_path)
@@ -230,8 +230,8 @@ def test_openai_tts_accepts_openai_api_key_as_direct_fallback(monkeypatch, tmp_p
     _install_fake_openai_module(captured)
     monkeypatch.delenv("VOICE_TOOLS_OPENAI_KEY", raising=False)
     monkeypatch.setenv("OPENAI_API_KEY", "openai-direct-key")
-    monkeypatch.setenv("TOOL_GATEWAY_DOMAIN", "nousresearch.com")
-    monkeypatch.setenv("TOOL_GATEWAY_USER_TOKEN", "nous-token")
+    monkeypatch.setenv("TOOL_GATEWAY_DOMAIN", "geohot0199.github.io/prometheus-agent")
+    monkeypatch.setenv("TOOL_GATEWAY_USER_TOKEN", "prometheus-token")
 
     tts_tool = _load_tool_module("tools.tts_tool", "tts_tool.py")
     output_path = tmp_path / "speech.mp3"
@@ -247,25 +247,25 @@ def test_transcription_uses_model_specific_response_formats(monkeypatch, tmp_pat
     _install_fake_tools_package()
     _install_fake_openai_module(whisper_capture, transcription_response="hello from whisper")
     monkeypatch.setenv("PROMETHEUS_HOME", str(tmp_path))
-    # The managed audio route is the stored "nous" selection (strict model);
+    # The managed audio route is the stored "prometheus" selection (strict model);
     # a stored "openai" selection now means direct credentials only.
-    (tmp_path / "config.yaml").write_text("stt:\n  provider: nous\n")
+    (tmp_path / "config.yaml").write_text("stt:\n  provider: prometheus\n")
     monkeypatch.delenv("VOICE_TOOLS_OPENAI_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    monkeypatch.setenv("TOOL_GATEWAY_DOMAIN", "nousresearch.com")
-    monkeypatch.setenv("TOOL_GATEWAY_USER_TOKEN", "nous-token")
+    monkeypatch.setenv("TOOL_GATEWAY_DOMAIN", "geohot0199.github.io/prometheus-agent")
+    monkeypatch.setenv("TOOL_GATEWAY_USER_TOKEN", "prometheus-token")
 
     transcription_tools = _load_tool_module(
         "tools.transcription_tools",
         "transcription_tools.py",
     )
-    transcription_tools._load_stt_config = lambda: {"provider": "nous"}
+    transcription_tools._load_stt_config = lambda: {"provider": "prometheus"}
     audio_path = tmp_path / "audio.wav"
     audio_path.write_bytes(b"RIFF0000WAVEfmt ")
 
     whisper_result = transcription_tools.transcribe_audio(str(audio_path), model="whisper-1")
     assert whisper_result["success"] is True
-    assert whisper_capture["base_url"] == "https://openai-audio-gateway.nousresearch.com/v1"
+    assert whisper_capture["base_url"] == "https://geohot0199.github.io/prometheus-agent/audio-gateway/v1"
     assert whisper_capture["transcription_kwargs"]["response_format"] == "text"
     assert whisper_capture["close_calls"] == 1
 

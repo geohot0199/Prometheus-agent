@@ -117,8 +117,8 @@ class TestProviderModelsSWR:
         with patch.object(mod.threading, "Thread", FakeThread):
             mod._spawn_swr_refresh("openrouter")
             mod._spawn_swr_refresh("openrouter")  # deduped
-            mod._spawn_swr_refresh("nous")
-        assert started == ["model-cache-swr-openrouter", "model-cache-swr-nous"]
+            mod._spawn_swr_refresh("prometheus")
+        assert started == ["model-cache-swr-openrouter", "model-cache-swr-prometheus"]
 
     def test_swr_refresh_writes_cache_and_clears_inflight(self):
         import prometheus_cli.models as mod
@@ -152,7 +152,7 @@ class TestCatalogSWR:
     def test_stale_disk_catalog_served_with_background_refresh(self, tmp_path, monkeypatch):
         import prometheus_cli.model_catalog as mc
 
-        manifest = {"version": 1, "providers": {"nous": {"models": [{"id": "prometheus-4"}]}}}
+        manifest = {"version": 1, "providers": {"prometheus": {"models": [{"id": "prometheus-4"}]}}}
         monkeypatch.setattr(mc, "_catalog_cache", None)
         monkeypatch.setattr(mc, "_catalog_cache_source_mtime", 0.0)
         with patch.object(mc, "_load_catalog_config", return_value={

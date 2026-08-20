@@ -46,21 +46,21 @@ class TestReadChain:
         cfg = {
             "fallback_providers": [
                 {"provider": "openrouter", "model": "anthropic/claude-sonnet-4.6"},
-                {"provider": "nous", "model": "Prometheus-4-Llama-3.1-405B"},
+                {"provider": "prometheus", "model": "Prometheus-4-Llama-3.1-405B"},
             ]
         }
         assert _read_chain(cfg) == [
             {"provider": "openrouter", "model": "anthropic/claude-sonnet-4.6"},
-            {"provider": "nous", "model": "Prometheus-4-Llama-3.1-405B"},
+            {"provider": "prometheus", "model": "Prometheus-4-Llama-3.1-405B"},
         ]
 
 
     def test_returns_copies_not_aliases(self):
         from prometheus_cli.fallback_cmd import _read_chain
-        cfg = {"fallback_providers": [{"provider": "nous", "model": "foo"}]}
+        cfg = {"fallback_providers": [{"provider": "prometheus", "model": "foo"}]}
         result = _read_chain(cfg)
         result[0]["provider"] = "mutated"
-        assert cfg["fallback_providers"][0]["provider"] == "nous"
+        assert cfg["fallback_providers"][0]["provider"] == "prometheus"
 
 
 # ---------------------------------------------------------------------------
@@ -100,7 +100,7 @@ class TestListCommand:
             "model": {"provider": "anthropic", "default": "claude-sonnet-4-6"},
             "fallback_providers": [
                 {"provider": "openrouter", "model": "anthropic/claude-sonnet-4.6"},
-                {"provider": "nous", "model": "Prometheus-4"},
+                {"provider": "prometheus", "model": "Prometheus-4"},
             ],
         })
         from prometheus_cli.fallback_cmd import cmd_fallback_list
@@ -227,12 +227,12 @@ class TestRemoveCommand:
         _write_config(isolated_home, {
             "fallback_providers": [
                 {"provider": "openrouter", "model": "gpt-5.4"},
-                {"provider": "nous", "model": "Prometheus-4"},
+                {"provider": "prometheus", "model": "Prometheus-4"},
                 {"provider": "anthropic", "model": "claude-sonnet-4-6"},
             ],
         })
 
-        # Picker returns index 1 (the middle entry, "nous / Prometheus-4")
+        # Picker returns index 1 (the middle entry, "prometheus / Prometheus-4")
         with patch("prometheus_cli.setup._curses_prompt_choice", return_value=1):
             from prometheus_cli.fallback_cmd import cmd_fallback_remove
             cmd_fallback_remove(types.SimpleNamespace())
@@ -257,7 +257,7 @@ class TestClearCommand:
         _write_config(isolated_home, {
             "fallback_providers": [
                 {"provider": "openrouter", "model": "gpt-5.4"},
-                {"provider": "nous", "model": "Prometheus-4"},
+                {"provider": "prometheus", "model": "Prometheus-4"},
             ],
         })
         monkeypatch.setattr("builtins.input", lambda *a, **kw: "y")

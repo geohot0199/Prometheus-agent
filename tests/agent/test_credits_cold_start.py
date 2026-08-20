@@ -78,7 +78,7 @@ class _FakeAgent:
     the real policy against the latch (mirroring run_agent._emit_credits_notices,
     including the free-model suppression flag)."""
 
-    def __init__(self, provider="nous", model=""):
+    def __init__(self, provider="prometheus", model=""):
         from agent.credits_tracker import evaluate_credits_notices, is_free_tier_model
 
         self.provider = provider
@@ -151,7 +151,7 @@ def test_seed_is_idempotent():
     assert a.emitted == []
 
 
-def test_seed_skips_non_nous():
+def test_seed_skips_non_prometheus():
     from agent.credits_tracker import seed_credits_at_session_start
 
     a = _FakeAgent(provider="openrouter")

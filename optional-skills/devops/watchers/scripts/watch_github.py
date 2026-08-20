@@ -6,7 +6,7 @@ Usage (via cron with --no-agent):
     prometheus cron create prometheus-issues \\
       --schedule "*/5 * * * *" --no-agent \\
       --script "$PROMETHEUS_HOME/skills/devops/watchers/scripts/watch_github.py" \\
-      --script-args "--name prometheus-issues --repo NousResearch/prometheus-agent --scope issues"
+      --script-args "--name prometheus-issues --repo geohot0199/Prometheus-agent --scope issues"
 
 Set GITHUB_TOKEN (or GH_TOKEN) in the Prometheus .env file
 (``${PROMETHEUS_HOME:-~/.prometheus}/.env``) to avoid the 60 req/hr

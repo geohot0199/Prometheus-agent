@@ -216,8 +216,6 @@ tool_prefix: "▏"
 
 [Prometheus Mod](https://github.com/cocktailpeanut/prometheus-mod) is a community-built web UI for creating and managing skins visually. Instead of writing YAML by hand, you get a point-and-click editor with live preview.
 
-![Prometheus Mod skin editor](https://raw.githubusercontent.com/cocktailpeanut/prometheus-mod/master/nous.png)
-
 **What it does:**
 
 - Lists all built-in and custom skins

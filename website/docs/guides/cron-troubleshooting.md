@@ -214,7 +214,7 @@ If you've worked through this guide and the issue persists:
 
 1. Run the job with `prometheus cron run <job_id>` (fires on next gateway tick) and watch for errors in the chat output
 2. Check `~/.prometheus/logs/agent.log` for scheduler messages and `~/.prometheus/logs/errors.log` for warnings
-3. Open an issue at [github.com/NousResearch/prometheus-agent](https://github.com/geohot0199/Prometheus-agent) with:
+3. Open an issue at [github.com/geohot0199/Prometheus-agent-agent](https://github.com/geohot0199/Prometheus-agent) with:
    - The job ID and schedule
    - The delivery target
    - What you expected vs. what happened

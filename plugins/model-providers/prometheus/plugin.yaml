@@ -1,0 +1,5 @@
+name: prometheus-provider
+kind: model-provider
+version: 1.0.0
+description: Prometheus Portal
+author: Prometheus

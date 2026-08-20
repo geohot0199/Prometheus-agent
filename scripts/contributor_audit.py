@@ -49,7 +49,7 @@ IGNORED_PATTERNS = [
     re.compile(r"^dependabot", re.IGNORECASE),
     re.compile(r"^renovate", re.IGNORECASE),
     re.compile(r"^Prometheus\s+(Agent|Audit)$", re.IGNORECASE),
-    re.compile(r"^nousbot(-eng)?$", re.IGNORECASE),
+    re.compile(r"^prometheusbot(-eng)?$", re.IGNORECASE),
     re.compile(r"^Ubuntu$", re.IGNORECASE),
     # v0.20.0 audit additions:
     re.compile(r"^Blut-?Agent$", re.IGNORECASE),          # self-described AI agent account
@@ -62,11 +62,11 @@ IGNORED_PATTERNS = [
 IGNORED_EMAILS = {
     "noreply@anthropic.com",
     "noreply@github.com",
-    "noreply@nousresearch.com",
+    "noreply@github.com",
     "cursoragent@cursor.com",
-    "prometheus@nousresearch.com",
+    "prometheus-agent@users.noreply.github.com",
     "prometheus-audit@example.com",
-    "nousbot@nousresearch.com",
+    "prometheusbot@users.noreply.github.com",
     "prometheus@habibilabs.dev",
     "omx@oh-my-codex.dev",
     "codex@openai.com",
@@ -116,7 +116,7 @@ def gh_pr_list():
         result = subprocess.run(
             [
                 "gh", "pr", "list",
-                "--repo", "NousResearch/prometheus-agent",
+                "--repo", "geohot0199/Prometheus-agent",
                 "--state", "merged",
                 "--json", "number,title,body,author,mergedAt",
                 "--limit", "300",

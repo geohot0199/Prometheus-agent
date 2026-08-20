@@ -81,7 +81,7 @@ Watch a GitHub repo (set `GITHUB_TOKEN` in `${PROMETHEUS_HOME:-~/.prometheus}/.e
 
 ```bash
 python $PROMETHEUS_HOME/skills/devops/watchers/scripts/watch_github.py \
-  --name prometheus-issues --repo NousResearch/prometheus-agent --scope issues
+  --name prometheus-issues --repo geohot0199/Prometheus-agent --scope issues
 ```
 
 Poll an arbitrary JSON API:

@@ -226,7 +226,7 @@ _LONG_HANDLERS = frozenset(
         "complete.slash",
         "llm.oneshot",
         # model.options builds the full picker payload — per-provider credential
-        # pool checks, pricing fetch, Nous tier check, optional custom-provider
+        # pool checks, pricing fetch, Prometheus tier check, optional custom-provider
         # probe — measured seconds inline. While it runs on the reader thread,
         # prompt.submit / session.interrupt sit unread (same class as #21123),
         # and the Desktop model pill / picker block on it every open.
@@ -9294,12 +9294,12 @@ def _pet_cancel_release(token: str) -> None:
 # Ink side can branch on the typed billing error code (insufficient_scope,
 # rate_limited, no_payment_method, …) to render the right affordance instead of
 # landing in a generic catch. The data-building lives in the shared core
-# (agent/billing_view.py + prometheus_cli/nous_billing.py) — same as /topup.
+# (agent/billing_view.py + prometheus_cli/prometheus_billing.py) — same as /topup.
 
 
 def _serialize_billing_error(exc) -> dict:
     """Map a BillingError into the result.error envelope the TUI branches on."""
-    from prometheus_cli.nous_billing import (
+    from prometheus_cli.prometheus_billing import (
         BillingRemoteSpendingRevoked,
         BillingScopeRequired,
         BillingSessionRevoked,
@@ -11203,7 +11203,7 @@ def _run_prompt_submit(
             if result.get("response_previewed"):
                 payload["response_previewed"] = True
             # Forward the structured billing-wall descriptor (provider,
-            # billing_url, is_nous, message) so the TUI/desktop render a
+            # billing_url, is_prometheus, message) so the TUI/desktop render a
             # billing-specific recovery surface instead of re-parsing text.
             _billing_block = result.get("billing_block") if isinstance(result, dict) else None
             if _billing_block:

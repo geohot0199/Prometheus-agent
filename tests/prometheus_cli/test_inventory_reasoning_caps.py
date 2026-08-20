@@ -13,10 +13,10 @@ import prometheus_cli.inventory as inv
 import prometheus_cli.models as models_mod
 
 
-def _patch_catalog(monkeypatch, caps_by_model, *, provider="nous"):
-    """Point the Nous/OpenRouter catalog readers at a fixed capability map."""
+def _patch_catalog(monkeypatch, caps_by_model, *, provider="prometheus"):
+    """Point the Prometheus/OpenRouter catalog readers at a fixed capability map."""
     monkeypatch.setattr(models_mod, "model_supports_fast_mode", lambda model: False)
-    monkeypatch.setattr(models_mod, "warm_nous_reasoning_caps_async", lambda: None)
+    monkeypatch.setattr(models_mod, "warm_prometheus_reasoning_caps_async", lambda: None)
     monkeypatch.setattr(models_mod, "warm_openrouter_reasoning_caps_async", lambda: None)
     monkeypatch.setattr(
         models_mod,
@@ -34,7 +34,7 @@ def test_optional_reasoning_route_can_disable(monkeypatch):
             "mandatory": False,
         },
     })
-    rows = [{"slug": "nous", "models": ["deepseek/deepseek-v4-pro"]}]
+    rows = [{"slug": "prometheus", "models": ["deepseek/deepseek-v4-pro"]}]
     inv._apply_capabilities(rows)
 
     assert rows[0]["capabilities"]["deepseek/deepseek-v4-pro"]["can_disable_reasoning"] is True
@@ -53,7 +53,7 @@ def test_advertised_efforts_never_reach_the_picker(monkeypatch):
             "mandatory": False,
         },
     })
-    rows = [{"slug": "nous", "models": ["deepseek/deepseek-v4-pro"]}]
+    rows = [{"slug": "prometheus", "models": ["deepseek/deepseek-v4-pro"]}]
     inv._apply_capabilities(rows)
 
     assert "supported_efforts" not in rows[0]["capabilities"]["deepseek/deepseek-v4-pro"]
@@ -70,7 +70,7 @@ def test_non_reasoning_route_offers_no_reasoning_controls(monkeypatch):
     _patch_catalog(monkeypatch, {
         "moonshotai/kimi-k3-instruct": {"supports_reasoning": False},
     })
-    rows = [{"slug": "nous", "models": ["moonshotai/kimi-k3-instruct"]}]
+    rows = [{"slug": "prometheus", "models": ["moonshotai/kimi-k3-instruct"]}]
     inv._apply_capabilities(rows)
 
     caps = rows[0]["capabilities"]["moonshotai/kimi-k3-instruct"]
@@ -91,7 +91,7 @@ def test_reasoning_mandatory_route_cannot_disable(monkeypatch):
             "mandatory": True,
         },
     })
-    rows = [{"slug": "nous", "models": ["z-ai/glm-5.3"]}]
+    rows = [{"slug": "prometheus", "models": ["z-ai/glm-5.3"]}]
     inv._apply_capabilities(rows)
 
     assert rows[0]["capabilities"]["z-ai/glm-5.3"]["can_disable_reasoning"] is False
@@ -105,7 +105,7 @@ def test_unlisted_model_states_no_restriction(monkeypatch):
     actually accepts.
     """
     _patch_catalog(monkeypatch, {})
-    rows = [{"slug": "nous", "models": ["mystery/model"]}]
+    rows = [{"slug": "prometheus", "models": ["mystery/model"]}]
     inv._apply_capabilities(rows)
 
     caps = rows[0]["capabilities"]["mystery/model"]
@@ -143,13 +143,13 @@ def test_openrouter_uses_its_own_catalog(monkeypatch):
 def test_catalog_failure_never_breaks_the_picker(monkeypatch):
     """A raising catalog reader degrades to "unknown", not to a broken payload."""
     monkeypatch.setattr(models_mod, "model_supports_fast_mode", lambda model: False)
-    monkeypatch.setattr(models_mod, "warm_nous_reasoning_caps_async", lambda: None)
+    monkeypatch.setattr(models_mod, "warm_prometheus_reasoning_caps_async", lambda: None)
 
     def _boom(model, **kw):
         raise RuntimeError("catalog exploded")
 
-    monkeypatch.setattr(models_mod, "nous_model_reasoning_capabilities", _boom)
-    rows = [{"slug": "nous", "models": ["deepseek/deepseek-v4-pro"]}]
+    monkeypatch.setattr(models_mod, "prometheus_model_reasoning_capabilities", _boom)
+    rows = [{"slug": "prometheus", "models": ["deepseek/deepseek-v4-pro"]}]
     inv._apply_capabilities(rows)
 
     caps = rows[0]["capabilities"]["deepseek/deepseek-v4-pro"]

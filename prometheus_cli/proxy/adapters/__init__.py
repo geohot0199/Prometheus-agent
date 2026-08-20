@@ -8,13 +8,13 @@ token. See :class:`UpstreamAdapter` for the contract.
 from typing import Dict, Type
 
 from prometheus_cli.proxy.adapters.base import UpstreamAdapter
-from prometheus_cli.proxy.adapters.nous_portal import NousPortalAdapter
+from prometheus_cli.proxy.adapters.prometheus_portal import PrometheusPortalAdapter
 from prometheus_cli.proxy.adapters.xai import XAIGrokAdapter
 
 # Registry of available adapter classes keyed by provider name as used on
 # the ``prometheus proxy start --provider <name>`` CLI flag.
 ADAPTERS: Dict[str, Type[UpstreamAdapter]] = {
-    "nous": NousPortalAdapter,
+    "prometheus": PrometheusPortalAdapter,
     "xai": XAIGrokAdapter,
 }
 

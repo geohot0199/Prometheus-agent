@@ -8,7 +8,7 @@ that the setup wizard correctly syncs config from disk after the call.
 from __future__ import annotations
 
 from prometheus_cli.config import load_config, save_config, save_env_value
-from prometheus_cli.nous_subscription import NousFeatureState, NousSubscriptionFeatures
+from prometheus_cli.prometheus_subscription import PrometheusFeatureState, PrometheusSubscriptionFeatures
 from prometheus_cli.setup import _print_setup_summary, setup_model_provider
 
 
@@ -136,7 +136,7 @@ def test_setup_summary_local_browser_unavailable_without_chromium(
     render as unavailable with an install hint — not a false 'available'.
 
     Unlike the mocked-feature tests above, this drives the real
-    ``get_nous_subscription_features`` so the surface stays aligned with the
+    ``get_prometheus_subscription_features`` so the surface stays aligned with the
     runtime gate in ``tools.browser_tool.check_browser_requirements``.
     """
     monkeypatch.setenv("PROMETHEUS_HOME", str(tmp_path))
@@ -151,9 +151,9 @@ def test_setup_summary_local_browser_unavailable_without_chromium(
     save_config(cfg)
 
     # Only stub the readiness probes; the feature resolver itself is real.
-    monkeypatch.setattr("prometheus_cli.nous_subscription._has_agent_browser", lambda: True)
+    monkeypatch.setattr("prometheus_cli.prometheus_subscription._has_agent_browser", lambda: True)
     monkeypatch.setattr(
-        "prometheus_cli.nous_subscription.get_nous_portal_account_info",
+        "prometheus_cli.prometheus_subscription.get_prometheus_portal_account_info",
         lambda *a, **k: None,
     )
     monkeypatch.setattr("tools.browser_tool._chromium_installed", lambda: False)

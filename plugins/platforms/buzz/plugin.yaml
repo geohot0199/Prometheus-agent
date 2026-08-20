@@ -8,7 +8,7 @@ description: >
   collaboration platform built on Nostr) and relays messages between
   channels/DMs and the Prometheus agent.  Pure stdlib — shells out to the
   buzz CLI binary (JSON in/out); no Python packages required.
-author: Nous Research
+author: Prometheus
 # ``requires_env`` entries are surfaced in ``prometheus config`` UI via the
 # platform-plugin env var injector in ``prometheus_cli/config.py``.
 requires_env:

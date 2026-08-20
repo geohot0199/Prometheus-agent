@@ -138,7 +138,7 @@ describe('one label per reference, on every surface', () => {
 
     act(() => result.current.replaceTriggerWithChip(item))
 
-    const expected = 'github.com/NousResearch/prometheus-agent/pull/74533'
+    const expected = 'github.com/geohot0199/Prometheus-agent-agent/pull/74533'
 
     expect(item.label).toBe(expected)
     expect(editor.querySelector('[data-ref-text]')?.textContent).toBe(expected)

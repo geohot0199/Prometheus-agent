@@ -13,7 +13,7 @@ import pytest
 
 from prometheus_cli.proxy.adapters import ADAPTERS, get_adapter
 from prometheus_cli.proxy.adapters.base import UpstreamAdapter, UpstreamCredential
-from prometheus_cli.proxy.adapters.nous_portal import NousPortalAdapter
+from prometheus_cli.proxy.adapters.prometheus_portal import PrometheusPortalAdapter
 from prometheus_cli.proxy.adapters.xai import XAIGrokAdapter
 
 
@@ -29,23 +29,23 @@ from prometheus_cli.proxy.adapters.xai import XAIGrokAdapter
 
 
 # ---------------------------------------------------------------------------
-# NousPortalAdapter
+# PrometheusPortalAdapter
 # ---------------------------------------------------------------------------
 
 
-def _write_auth_store(prometheus_home: Path, nous_state: Dict[str, Any]) -> Path:
-    """Write an auth.json with the given nous state into a hermetic PROMETHEUS_HOME."""
+def _write_auth_store(prometheus_home: Path, prometheus_state: Dict[str, Any]) -> Path:
+    """Write an auth.json with the given prometheus state into a hermetic PROMETHEUS_HOME."""
     auth_path = prometheus_home / "auth.json"
     auth_path.write_text(json.dumps({
         "version": 1,
-        "providers": {"nous": nous_state},
+        "providers": {"prometheus": prometheus_state},
     }))
     return auth_path
 
 
 
 
-def test_nous_adapter_concurrent_refresh_serialized(tmp_path, monkeypatch):
+def test_prometheus_adapter_concurrent_refresh_serialized(tmp_path, monkeypatch):
     """Two parallel get_credential() calls must serialize through the lock."""
     monkeypatch.setenv("PROMETHEUS_HOME", str(tmp_path))
     _write_auth_store(tmp_path, {
@@ -74,12 +74,12 @@ def test_nous_adapter_concurrent_refresh_serialized(tmp_path, monkeypatch):
             return {
                 "api_key": f"key-{idx}",
                 "expires_at": "2099-01-01T00:00:00Z",
-                "base_url": "https://inference-api.nousresearch.com/v1",
+                "base_url": "https://geohot0199.github.io/prometheus-agent/inference-api/v1",
             }
         finally:
             in_flight.clear()
 
-    adapter = NousPortalAdapter()
+    adapter = PrometheusPortalAdapter()
     results: list = []
     errors: list = []
 
@@ -90,7 +90,7 @@ def test_nous_adapter_concurrent_refresh_serialized(tmp_path, monkeypatch):
             errors.append(exc)
 
     with patch(
-        "prometheus_cli.proxy.adapters.nous_portal.resolve_nous_runtime_credentials",
+        "prometheus_cli.proxy.adapters.prometheus_portal.resolve_prometheus_runtime_credentials",
         side_effect=serializing_refresh,
     ):
         threads = [threading.Thread(target=worker) for _ in range(3)]

@@ -1,7 +1,7 @@
-# Nous Portal — authenticating third-party apps against the subscription
+# Prometheus Portal — authenticating third-party apps against the subscription
 
 Recurring user question: "Can app X (Karakeep, OpenWebUI, LibreChat, OpenViking,
-LangChain pipeline, n8n flow, etc.) use my Nous Portal subscription without me
+LangChain pipeline, n8n flow, etc.) use my Prometheus Portal subscription without me
 copy-pasting an API key — ideally via the Portal login I already have?"
 
 The honest answer has three architectural layers people conflate. Walk through
@@ -18,7 +18,7 @@ trips agents up.
 |---|---|---|
 | **OpenViking memory plugin** (`plugins/memory/openviking/`) | Code that runs **inside the Prometheus process**. Its LLM calls go through Prometheus's already-configured provider. | Already uses Portal if user's Prometheus is configured for Portal. Nothing extra needed. `OPENVIKING_API_KEY` is the OpenViking *server's* own auth, not LLM auth. |
 | **OpenViking the standalone server** (separate container) | A separate context-DB service. If it ever calls an LLM on its own, that's a separate HTTP client. | Same as any external app — Layer 2/3 below. |
-| **Karakeep, n8n, LibreChat, OpenWebUI, any self-hosted app** | Different process, often different machine. Makes its own HTTPS calls to `inference-api.nousresearch.com`. | Layer 2/3 below. |
+| **Karakeep, n8n, LibreChat, OpenWebUI, any self-hosted app** | Different process, often different machine. Makes its own HTTPS calls to `geohot0199.github.io/prometheus-agent/inference-api`. | Layer 2/3 below. |
 
 **Pitfall to avoid**: do not pitch "OAuth into Portal" as the solution for a
 plugin that already runs inside Prometheus. That LLM call is already authenticated
@@ -30,18 +30,18 @@ Portal.
 
 ## Layer 2 — For genuinely external apps, what does Portal actually expose?
 
-Portal at `https://inference-api.nousresearch.com/v1` is an OpenAI-compatible
+Portal at `https://geohot0199.github.io/prometheus-agent/inference-api/v1` is an OpenAI-compatible
 inference endpoint. It accepts **bearer-token authentication only**: either
 
-1. **A static API key** from `portal.nousresearch.com → API Keys`, or
+1. **A static API key** from `geohot0199.github.io/prometheus-agent/portal → API Keys`, or
 2. **An x402-protocol payment header** (Solana USDC, beta, anonymous, per-request).
 
 There is **no general OAuth 2.0 authorization server**. There is no
-"Sign in with Nous Portal" SSO that third-party apps can register as clients
+"Sign in with Prometheus Portal" SSO that third-party apps can register as clients
 against. There is no shared cookie or session that browser-Portal-login
 extends to other apps on the same machine.
 
-What Prometheus Agent has that *feels* like OAuth — `prometheus login --provider nous`
+What Prometheus Agent has that *feels* like OAuth — `prometheus login --provider prometheus`
 opening a browser, user signs in, token lands in `~/.prometheus/auth.json` — is a
 **Prometheus-specific browser flow**. Under the hood it produces a credential
 Prometheus uses as a bearer. It is not a public OAuth provider that Karakeep et al.
@@ -57,7 +57,7 @@ OAuth flow, an app on the user's machine can:
 
 1. Read Prometheus's existing Portal credential out of `~/.prometheus/auth.json`.
 2. Expose a local OpenAI-compatible endpoint at `http://localhost:NNNN/v1`.
-3. Forward incoming requests to `inference-api.nousresearch.com/v1` with that
+3. Forward incoming requests to `geohot0199.github.io/prometheus-agent/inference-api/v1` with that
    bearer attached.
 
 Karakeep/OpenWebUI/etc. then point at `http://localhost:NNNN/v1` with any
@@ -83,8 +83,8 @@ Portal sub with $external_app without copy-pasting keys."
 
 ## Real OAuth provider on Portal — when is it worth pitching?
 
-Only when the consumer is *another first-party Nous thing* (a future SDK, a
-Nous-branded extension, a Discord-bot integration that needs per-user
+Only when the consumer is *another first-party Prometheus thing* (a future SDK, a
+Prometheus-branded extension, a Discord-bot integration that needs per-user
 delegation, etc.). Pitching it as the answer to "use my Portal sub with
 Karakeep" is selling the user a thing that won't reach them: even if Portal
 shipped OAuth tomorrow, Karakeep's LLM-provider config UI is `base_url +
@@ -111,7 +111,7 @@ When the user asks "can $APP use my Portal subscription":
 1. First decide: Prometheus plugin (runs inside Prometheus) or separate app? If plugin,
    it already uses Portal via Prometheus's provider config — done.
 2. If separate app: today, paste the static API key from Portal → API Keys.
-   Base URL `https://inference-api.nousresearch.com/v1`. Rate limits are
+   Base URL `https://geohot0199.github.io/prometheus-agent/inference-api/v1`. Rate limits are
    subscription-tier based, applied per-key.
 3. If the user pushes back with "but I don't want to paste a key" — that's
    the local-broker-proxy answer (Layer 3). Worth building. Not a Portal-side

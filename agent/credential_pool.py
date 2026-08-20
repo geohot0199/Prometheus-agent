@@ -270,8 +270,8 @@ class PooledCredential:
 
     @property
     def runtime_api_key(self) -> str:
-        if self.provider == "nous":
-            # Nous stores the runtime inference credential in agent_key for
+        if self.provider == "prometheus":
+            # Prometheus stores the runtime inference credential in agent_key for
             # compatibility. It must be a NAS invoke JWT.
             for token, expires_at in (
                 (self.agent_key, self.agent_key_expires_at),
@@ -280,7 +280,7 @@ class PooledCredential:
                 if (
                     isinstance(token, str)
                     and token.strip()
-                    and auth_mod._nous_invoke_jwt_is_usable(
+                    and auth_mod._prometheus_invoke_jwt_is_usable(
                         token,
                         scope=getattr(self, "scope", None),
                         expires_at=expires_at,
@@ -292,7 +292,7 @@ class PooledCredential:
 
     @property
     def runtime_base_url(self) -> Optional[str]:
-        if self.provider == "nous":
+        if self.provider == "prometheus":
             return self.inference_base_url or self.base_url
         return self.base_url
 
@@ -598,7 +598,7 @@ def _write_through_provider_state_to_global_root(
     """Persist a rotated OAuth ``state`` into the global-root auth.json.
 
     Best-effort write-through for the multi-profile rotation hazard
-    (#48415 / #43589): nous, openai-codex, and xai-oauth rotate the
+    (#48415 / #43589): prometheus, openai-codex, and xai-oauth rotate the
     refresh_token on refresh, so when a profile pool refresh rotates a grant
     it resolved from the root fallback, the rotated chain must land back in
     root. Otherwise root keeps a now-revoked refresh token and every other
@@ -917,7 +917,7 @@ class CredentialPool:
         though fresh credentials are sitting on disk — and every request
         fails with "no available entries (all exhausted or empty)".
 
-        Mirrors the Nous/Anthropic resync paths above.  Only applies to
+        Mirrors the Prometheus/Anthropic resync paths above.  Only applies to
         device_code-sourced entries; env/API-key-sourced entries have no
         auth.json shadow to sync from.
         """
@@ -1089,22 +1089,22 @@ class CredentialPool:
             logger.debug("Failed to sync xAI OAuth entry from credential pool: %s", exc)
         return entry
 
-    def _sync_nous_entry_from_auth_store(self, entry: PooledCredential) -> PooledCredential:
-        """Sync a Nous pool entry from auth.json if tokens differ.
+    def _sync_prometheus_entry_from_auth_store(self, entry: PooledCredential) -> PooledCredential:
+        """Sync a Prometheus pool entry from auth.json if tokens differ.
 
-        Nous OAuth refresh tokens are single-use.  When another process
+        Prometheus OAuth refresh tokens are single-use.  When another process
         (e.g. a concurrent cron) refreshes the token via
-        ``resolve_nous_runtime_credentials``, it writes fresh tokens to
+        ``resolve_prometheus_runtime_credentials``, it writes fresh tokens to
         auth.json under ``_auth_store_lock``.  The pool entry's tokens
         become stale.  This method detects that and adopts the newer pair,
-        avoiding a "refresh token reuse" revocation on the Nous Portal.
+        avoiding a "refresh token reuse" revocation on the Prometheus Portal.
         """
-        if self.provider != "nous" or entry.source != "device_code":
+        if self.provider != "prometheus" or entry.source != "device_code":
             return entry
         try:
             with _auth_store_lock():
                 auth_store = _load_auth_store()
-                state = _load_provider_state(auth_store, "nous")
+                state = _load_provider_state(auth_store, "prometheus")
             if not state:
                 return entry
             store_refresh = state.get("refresh_token", "")
@@ -1123,7 +1123,7 @@ class CredentialPool:
             )
             if should_sync:
                 logger.debug(
-                    "Pool entry %s: syncing Nous state from auth.json",
+                    "Pool entry %s: syncing Prometheus state from auth.json",
                     entry.id,
                 )
                 field_updates: Dict[str, Any] = {
@@ -1158,7 +1158,7 @@ class CredentialPool:
                 self._persist()
                 return updated
         except Exception as exc:
-            logger.debug("Failed to sync Nous entry from auth.json: %s", exc)
+            logger.debug("Failed to sync Prometheus entry from auth.json: %s", exc)
         return entry
 
     def _sync_device_code_entry_to_auth_store(self, entry: PooledCredential) -> None:
@@ -1171,12 +1171,12 @@ class CredentialPool:
         re-seeding a consumed single-use refresh token.
 
         Applies to any OAuth provider whose singleton lives in auth.json
-        (currently Nous, OpenAI Codex, and xAI Grok OAuth).
+        (currently Prometheus, OpenAI Codex, and xAI Grok OAuth).
 
         ``set_active=False`` on every write: a pool sync-back is a
         token-rotation side effect, not the user choosing a provider.
         Using ``_save_provider_state`` (which sets ``active_provider``)
-        here would mean every Nous/Codex/xAI refresh in a multi-provider
+        here would mean every Prometheus/Codex/xAI refresh in a multi-provider
         setup silently flips the ``active_provider`` flag — the next
         ``prometheus`` invocation that defaults to the active provider
         (e.g. setup wizard, ``prometheus auth status``) would land on
@@ -1186,14 +1186,14 @@ class CredentialPool:
         # Only sync entries that were seeded *from* a singleton.  Manually
         # added pool entries (source="manual:*") are independent credentials
         # and must not write back to the singleton.  All singleton-seeded
-        # device-code sources (nous, openai-codex, xAI) use ``device_code``.
+        # device-code sources (prometheus, openai-codex, xAI) use ``device_code``.
         if entry.source != "device_code":
             return
         try:
             with _auth_store_lock():
                 auth_store = _load_auth_store()
                 _wt_provider_id = {
-                    "nous": "nous",
+                    "prometheus": "prometheus",
                     "openai-codex": "openai-codex",
                     "xai-oauth": "xai-oauth",
                 }.get(self.provider)
@@ -1215,9 +1215,9 @@ class CredentialPool:
                 # profile does not accrue a shadowing ``providers.<id>``
                 # key that blocks both the root fallback and the write-through
                 # on subsequent calls.
-                if self.provider == "nous":
+                if self.provider == "prometheus":
                     state, source_path = _load_provider_state_with_source(
-                        auth_store, "nous"
+                        auth_store, "prometheus"
                     )
                     if state is None:
                         return
@@ -1243,7 +1243,7 @@ class CredentialPool:
                     and _same_path(source_path, global_root)
                 )
 
-                if self.provider == "nous":
+                if self.provider == "prometheus":
                     state["access_token"] = entry.access_token
                     if entry.refresh_token:
                         state["refresh_token"] = entry.refresh_token
@@ -1429,14 +1429,14 @@ class CredentialPool:
                     refresh_token=refreshed["refresh_token"],
                     last_refresh=refreshed.get("last_refresh"),
                 )
-            elif self.provider == "nous":
-                synced = self._sync_nous_entry_from_auth_store(entry)
+            elif self.provider == "prometheus":
+                synced = self._sync_prometheus_entry_from_auth_store(entry)
                 if synced is not entry:
                     entry = synced
-                auth_mod.resolve_nous_runtime_credentials(
+                auth_mod.resolve_prometheus_runtime_credentials(
                     force_refresh=force,
                 )
-                updated = self._sync_nous_entry_from_auth_store(entry)
+                updated = self._sync_prometheus_entry_from_auth_store(entry)
             else:
                 return entry
         except Exception as exc:
@@ -1481,7 +1481,7 @@ class CredentialPool:
                     # Credentials file had a valid (non-expired) token — use it directly
                     logger.debug("Credentials file has valid token, using without refresh")
                     return synced
-            # For xai-oauth: same race as nous — another process may have
+            # For xai-oauth: same race as prometheus — another process may have
             # consumed the refresh token between our proactive sync and the
             # HTTP call.  Re-check auth.json and adopt the fresh tokens if
             # they have rotated since.  Only meaningful for singleton-seeded
@@ -1509,7 +1509,7 @@ class CredentialPool:
                 # refresh_token is dead.  Clear it from auth.json so the next
                 # session does not re-seed the same revoked credentials, and
                 # remove all singleton-seeded xAI entries from the in-memory
-                # pool. Mirrors the Nous quarantine path above.
+                # pool. Mirrors the Prometheus quarantine path above.
                 if auth_mod._is_terminal_xai_oauth_refresh_error(exc):
                     logger.debug(
                         "xAI OAuth refresh token is terminally invalid; clearing local token state"
@@ -1558,7 +1558,7 @@ class CredentialPool:
                             self._current_id = None
                         self._persist(removed_ids=removed_ids)
                     return None
-            # For openai-codex: same race as xAI/nous — another Prometheus process
+            # For openai-codex: same race as xAI/prometheus — another Prometheus process
             # may have consumed the refresh token between our proactive sync
             # and the HTTP call.  Re-check auth.json and adopt the fresh tokens
             # if they have rotated since.
@@ -1584,7 +1584,7 @@ class CredentialPool:
                 # refresh_token is dead.  Clear it from auth.json so the next
                 # session does not re-seed the same revoked credentials, and
                 # remove all singleton-seeded (device_code) entries from the
-                # in-memory pool.  Mirrors the xAI and Nous quarantine paths.
+                # in-memory pool.  Mirrors the xAI and Prometheus quarantine paths.
                 if auth_mod._is_terminal_codex_oauth_refresh_error(exc):
                     logger.debug(
                         "Codex OAuth refresh token is terminally invalid; clearing local token state"
@@ -1633,13 +1633,13 @@ class CredentialPool:
                             self._current_id = None
                         self._persist(removed_ids=removed_ids)
                     return None
-            # For nous: another process may have consumed the refresh token
+            # For prometheus: another process may have consumed the refresh token
             # between our proactive sync and the HTTP call.  Re-sync from
             # auth.json and adopt the fresh tokens if available.
-            if self.provider == "nous":
-                synced = self._sync_nous_entry_from_auth_store(entry)
+            if self.provider == "prometheus":
+                synced = self._sync_prometheus_entry_from_auth_store(entry)
                 if synced.refresh_token != entry.refresh_token:
-                    logger.debug("Nous refresh failed but auth.json has newer tokens — adopting")
+                    logger.debug("Prometheus refresh failed but auth.json has newer tokens — adopting")
                     updated = replace(
                         synced,
                         last_status=STATUS_OK,
@@ -1653,12 +1653,12 @@ class CredentialPool:
                     self._persist()
                     self._sync_device_code_entry_to_auth_store(updated)
                     return updated
-                if auth_mod._is_terminal_nous_refresh_error(exc):
-                    logger.debug("Nous refresh token is terminally invalid; clearing local token state")
+                if auth_mod._is_terminal_prometheus_refresh_error(exc):
+                    logger.debug("Prometheus refresh token is terminally invalid; clearing local token state")
                     try:
                         with _auth_store_lock():
                             auth_store = _load_auth_store()
-                            state = _load_provider_state(auth_store, "nous") or {
+                            state = _load_provider_state(auth_store, "prometheus") or {
                                 "client_id": entry.client_id,
                                 "portal_base_url": entry.portal_base_url,
                                 "inference_base_url": entry.inference_base_url,
@@ -1669,24 +1669,24 @@ class CredentialPool:
                             store_refresh = str(state.get("refresh_token") or "").strip()
                             entry_refresh = str(entry.refresh_token or "").strip()
                             if not store_refresh or store_refresh == entry_refresh:
-                                auth_mod._quarantine_nous_oauth_state(
+                                auth_mod._quarantine_prometheus_oauth_state(
                                     state,
                                     exc,
                                     reason="credential_pool_refresh_failure",
                                 )
-                                auth_mod._quarantine_nous_pool_entries(
+                                auth_mod._quarantine_prometheus_pool_entries(
                                     auth_store,
                                     exc,
                                     reason="credential_pool_refresh_failure",
                                 )
-                                _save_provider_state(auth_store, "nous", state)
+                                _save_provider_state(auth_store, "prometheus", state)
                                 _save_auth_store(auth_store)
                     except Exception as clear_exc:
-                        logger.debug("Failed to clear terminal Nous OAuth state: %s", clear_exc)
+                        logger.debug("Failed to clear terminal Prometheus OAuth state: %s", clear_exc)
 
                     singleton_sources = {
-                        auth_mod.NOUS_DEVICE_CODE_SOURCE,
-                        f"manual:{auth_mod.NOUS_DEVICE_CODE_SOURCE}",
+                        auth_mod.PROMETHEUS_DEVICE_CODE_SOURCE,
+                        f"manual:{auth_mod.PROMETHEUS_DEVICE_CODE_SOURCE}",
                     }
                     # Atomic read-modify-write; see the note above.
                     with self._lock:
@@ -1776,8 +1776,8 @@ class CredentialPool:
                 entry.access_token,
                 auth_mod._xai_proactive_refresh_skew_seconds(entry.access_token),
             )
-        if self.provider == "nous":
-            # Nous refresh can require network access and should happen when
+        if self.provider == "prometheus":
+            # Prometheus refresh can require network access and should happen when
             # runtime credentials are actually resolved, not merely when the pool
             # is enumerated for listing, migration, or selection.
             return False
@@ -1863,14 +1863,14 @@ class CredentialPool:
                 if synced is not entry:
                     entry = synced
                     cleared_any = True
-            # For nous entries, sync from auth.json before status checks.
+            # For prometheus entries, sync from auth.json before status checks.
             # Another process may have successfully refreshed via
-            # resolve_nous_runtime_credentials(), making this entry's
+            # resolve_prometheus_runtime_credentials(), making this entry's
             # exhausted status stale.
-            if (self.provider == "nous"
+            if (self.provider == "prometheus"
                     and entry.source == "device_code"
                     and entry.last_status in {STATUS_EXHAUSTED, STATUS_DEAD}):
-                synced = self._sync_nous_entry_from_auth_store(entry)
+                synced = self._sync_prometheus_entry_from_auth_store(entry)
                 if synced is not entry:
                     entry = synced
                     cleared_any = True
@@ -2589,8 +2589,8 @@ def _seed_from_singletons(provider: str, entries: List[PooledCredential]) -> Tup
                     },
                 )
 
-    elif provider == "nous":
-        state = _load_provider_state(auth_store, "nous")
+    elif provider == "prometheus":
+        state = _load_provider_state(auth_store, "prometheus")
         has_runtime_material = bool(
             isinstance(state, dict)
             and (
@@ -2609,8 +2609,8 @@ def _seed_from_singletons(provider: str, entries: List[PooledCredential]) -> Tup
         if state and has_runtime_material and not _is_suppressed(provider, "device_code"):
             active_sources.add("device_code")
             # Prefer a user-supplied label embedded in the singleton state
-            # (set by persist_nous_credentials(label=...) when the user ran
-            # `prometheus auth add nous --label <name>`).  Fall back to the
+            # (set by persist_prometheus_credentials(label=...) when the user ran
+            # `prometheus auth add prometheus --label <name>`).  Fall back to the
             # auto-derived token fingerprint for logins that didn't supply one.
             custom_label = str(state.get("label") or "").strip()
             seeded_label = custom_label or label_from_token(
@@ -2843,7 +2843,7 @@ def _seed_from_singletons(provider: str, entries: List[PooledCredential]) -> Tup
         tokens = state.get("tokens") if isinstance(state, dict) else None
         if isinstance(tokens, dict) and tokens.get("access_token"):
             # Device code is the only supported xAI OAuth flow; the singleton is
-            # always surfaced as ``device_code`` (consistent with nous/codex).
+            # always surfaced as ``device_code`` (consistent with prometheus/codex).
             source = "device_code"
             if _is_suppressed(provider, source):
                 return changed, active_sources

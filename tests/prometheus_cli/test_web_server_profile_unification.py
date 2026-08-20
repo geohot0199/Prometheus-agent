@@ -264,7 +264,7 @@ class TestProfileScopedModel:
             "/api/model/set",
             json={
                 "scope": "main",
-                "provider": "nous",
+                "provider": "prometheus",
                 "model": "new/model",
                 "confirm_expensive_model": True,
                 "profile": "worker_beta",
@@ -297,7 +297,7 @@ class TestProfileScopedModel:
             "/api/model/set",
             json={
                 "scope": "main",
-                "provider": "nous",
+                "provider": "prometheus",
                 "model": "new/model",
                 "confirm_expensive_model": True,
                 "profile": "worker_beta",
@@ -328,7 +328,7 @@ class TestProfileScopedModel:
             "/api/model/set",
             json={
                 "scope": "auxiliary",
-                "provider": "nous",
+                "provider": "prometheus",
                 "model": "new/model",
                 "profile": "worker_beta",
             },

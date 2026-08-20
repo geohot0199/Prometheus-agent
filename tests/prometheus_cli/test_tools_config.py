@@ -8,8 +8,8 @@ from unittest.mock import patch
 import pytest
 
 from tools.browser_tool import AGENT_BROWSER_NPX_SPEC
-from prometheus_cli.nous_account import NousPortalAccountInfo, NousToolAccessInfo
-from prometheus_cli.nous_subscription import NousSubscriptionFeatures
+from prometheus_cli.prometheus_account import PrometheusPortalAccountInfo, PrometheusToolAccessInfo
+from prometheus_cli.prometheus_subscription import PrometheusSubscriptionFeatures
 from prometheus_cli.tools_config import (
     _DEFAULT_OFF_TOOLSETS,
     _RECENTLY_SHIPPED_TOOLSETS,
@@ -203,15 +203,15 @@ def test_save_platform_tools_preserves_mcp_server_names():
 
 
 
-def test_first_install_nous_auto_configures_video_gen(monkeypatch):
-    """When a Nous subscriber checks video_gen in the toolset checklist,
-    apply_nous_managed_defaults must write video_gen.provider and
+def test_first_install_prometheus_auto_configures_video_gen(monkeypatch):
+    """When a Prometheus subscriber checks video_gen in the toolset checklist,
+    apply_prometheus_managed_defaults must write video_gen.provider and
     video_gen.use_gateway so the FAL plugin can route through the gateway
     at runtime.  Regression test for the bug where video_gen was marked as
     auto-configured but no config was actually written."""
-    monkeypatch.setattr("prometheus_cli.nous_subscription.managed_nous_tools_enabled", lambda: True)
+    monkeypatch.setattr("prometheus_cli.prometheus_subscription.managed_prometheus_tools_enabled", lambda: True)
     config = {
-        "model": {"provider": "nous"},
+        "model": {"provider": "prometheus"},
         "platform_toolsets": {"cli": []},
     }
     for env_var in (
@@ -239,8 +239,8 @@ def test_first_install_nous_auto_configures_video_gen(monkeypatch):
         lambda: ["cli"],
     )
     monkeypatch.setattr(
-        "prometheus_cli.nous_subscription.get_nous_portal_account_info",
-        lambda *args, **kwargs: NousPortalAccountInfo(
+        "prometheus_cli.prometheus_subscription.get_prometheus_portal_account_info",
+        lambda *args, **kwargs: PrometheusPortalAccountInfo(
             logged_in=True,
             source="jwt",
             fresh=False,
@@ -256,7 +256,7 @@ def test_first_install_nous_auto_configures_video_gen(monkeypatch):
 
     tools_command(first_install=True, config=config)
 
-    assert config["video_gen"]["provider"] == "nous"
+    assert config["video_gen"]["provider"] == "prometheus"
     assert "use_gateway" not in config["video_gen"]
     # video_gen should NOT appear in the manual configure list — it's auto-configured
     assert "video_gen" not in configured
@@ -697,7 +697,7 @@ class TestImagegenBackendRegistry:
         assert "fal-ai/flux-2-pro" in catalog
 
     def test_image_gen_providers_tagged_with_fal_backend(self):
-        """Both Nous Subscription and FAL.ai providers must carry the
+        """Both Prometheus Subscription and FAL.ai providers must carry the
         imagegen_backend tag so _configure_provider fires the picker."""
         from prometheus_cli.tools_config import TOOL_CATEGORIES
         providers = TOOL_CATEGORIES["image_gen"]["providers"]
@@ -811,7 +811,7 @@ def test_get_effective_configurable_toolsets_dedupes_bundled_plugins():
 
 
 # ---------------------------------------------------------------------------
-# Inline Nous Portal login gate on managed-provider selection
+# Inline Prometheus Portal login gate on managed-provider selection
 # ---------------------------------------------------------------------------
 
 
@@ -884,42 +884,42 @@ def test_vision_picker_custom_endpoint(tmp_path, monkeypatch):
 # ─── provider_readiness_status ────────────────────────────────────────────────
 #
 # Server-side truth for the GUI "Ready" pill (issue: Capabilities tab showed
-# Ready for every zero-env-var provider row, including logged-out Nous
+# Ready for every zero-env-var provider row, including logged-out Prometheus
 # Subscription rows and never-installed KittenTTS/Piper).
 
 
 def _fake_features(*, logged_in: bool, paid: bool = True):
     account = (
-        NousPortalAccountInfo(
+        PrometheusPortalAccountInfo(
             logged_in=True, source="jwt", fresh=False, paid_service_access=paid
         )
         if logged_in
-        else NousPortalAccountInfo(
+        else PrometheusPortalAccountInfo(
             logged_in=False, source="none", fresh=False, paid_service_access=None
         )
     )
-    return SimpleNamespace(nous_auth_present=logged_in, account_info=account)
+    return SimpleNamespace(prometheus_auth_present=logged_in, account_info=account)
 
 
 def test_visible_providers_reuses_logged_out_feature_snapshot(monkeypatch):
     import prometheus_cli.tools_config as tools_config
 
-    account = NousPortalAccountInfo(
+    account = PrometheusPortalAccountInfo(
         logged_in=False,
         source="none",
         fresh=False,
         paid_service_access=None,
     )
-    features = NousSubscriptionFeatures(
+    features = PrometheusSubscriptionFeatures(
         subscribed=False,
-        nous_auth_present=False,
-        provider_is_nous=False,
+        prometheus_auth_present=False,
+        provider_is_prometheus=False,
         features={},
         account_info=account,
     )
     monkeypatch.setattr(
         tools_config,
-        "get_nous_subscription_features",
+        "get_prometheus_subscription_features",
         lambda *args, **kwargs: pytest.fail("feature snapshot was resolved again"),
     )
 
@@ -928,7 +928,7 @@ def test_visible_providers_reuses_logged_out_feature_snapshot(monkeypatch):
     )
 
     assert any(
-        provider.get("managed_nous_feature") == "image_gen"
+        provider.get("managed_prometheus_feature") == "image_gen"
         for provider in providers
     )
 
@@ -936,26 +936,26 @@ def test_visible_providers_reuses_logged_out_feature_snapshot(monkeypatch):
 def test_visible_providers_reuses_pool_video_feature_snapshot(monkeypatch):
     import prometheus_cli.tools_config as tools_config
 
-    account = NousPortalAccountInfo(
+    account = PrometheusPortalAccountInfo(
         logged_in=True,
         source="jwt",
         fresh=False,
         paid_service_access=False,
-        tool_access=NousToolAccessInfo(
+        tool_access=PrometheusToolAccessInfo(
             enabled=True,
             coverage={"fal-video": False},
         ),
     )
-    features = NousSubscriptionFeatures(
+    features = PrometheusSubscriptionFeatures(
         subscribed=True,
-        nous_auth_present=True,
-        provider_is_nous=False,
+        prometheus_auth_present=True,
+        provider_is_prometheus=False,
         features={},
         account_info=account,
     )
     monkeypatch.setattr(
         tools_config,
-        "get_nous_subscription_features",
+        "get_prometheus_subscription_features",
         lambda *args, **kwargs: pytest.fail("feature snapshot was resolved again"),
     )
 
@@ -964,7 +964,7 @@ def test_visible_providers_reuses_pool_video_feature_snapshot(monkeypatch):
     )
 
     assert not any(
-        provider.get("managed_nous_feature") == "video_gen"
+        provider.get("managed_prometheus_feature") == "video_gen"
         for provider in providers
     )
 
@@ -1034,7 +1034,7 @@ def _saved_list_from_before(platform="cli"):
 
 @_requires_recently_shipped
 def test_saved_list_gains_toolsets_that_shipped_after_it_was_written():
-    """The bug: a frozen list never gained bfl, so composite users got Nous
+    """The bug: a frozen list never gained bfl, so composite users got Prometheus
     Portal video generation on upgrade and picker users silently did not."""
     on_composite = _get_platform_tools(
         {"platform_toolsets": {"cli": ["prometheus-cli"]}},

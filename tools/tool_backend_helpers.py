@@ -17,10 +17,10 @@ _DEFAULT_MODAL_MODE = "auto"
 _VALID_MODAL_MODES = {"auto", "direct", "managed"}
 
 
-def managed_nous_tools_enabled(*, force_fresh: bool = False) -> bool:
-    """Return True when the user is entitled to the Nous Tool Gateway.
+def managed_prometheus_tools_enabled(*, force_fresh: bool = False) -> bool:
+    """Return True when the user is entitled to the Prometheus Tool Gateway.
 
-    Entitlement is paid Nous Portal service access OR a live free tool pool
+    Entitlement is paid Prometheus Portal service access OR a live free tool pool
     (``tool_gateway_entitled``). Per-category coverage (the pool funds image but
     not video, etc.) is narrowed by callers via ``tool_gateway_entitled_for``;
     this coarse gate only answers "is any managed tool usable at all".
@@ -31,12 +31,12 @@ def managed_nous_tools_enabled(*, force_fresh: bool = False) -> bool:
     reflect a just-purchased subscription, credits, or pool grant immediately.
     """
     try:
-        from prometheus_cli.nous_account import get_nous_portal_account_info
+        from prometheus_cli.prometheus_account import get_prometheus_portal_account_info
 
         if force_fresh:
-            account_info = get_nous_portal_account_info(force_fresh=True)
+            account_info = get_prometheus_portal_account_info(force_fresh=True)
         else:
-            account_info = get_nous_portal_account_info()
+            account_info = get_prometheus_portal_account_info()
         if not account_info.logged_in:
             return False
         return account_info.tool_gateway_entitled
@@ -44,20 +44,20 @@ def managed_nous_tools_enabled(*, force_fresh: bool = False) -> bool:
         return False
 
 
-def nous_tool_gateway_unavailable_message(
-    capability: str = "the Nous Tool Gateway",
+def prometheus_tool_gateway_unavailable_message(
+    capability: str = "the Prometheus Tool Gateway",
     *,
     force_fresh: bool = False,
 ) -> str:
-    """Return account-aware guidance for an unavailable Nous Tool Gateway path."""
+    """Return account-aware guidance for an unavailable Prometheus Tool Gateway path."""
     try:
-        from prometheus_cli.nous_account import (
-            format_nous_portal_entitlement_message,
-            get_nous_portal_account_info,
+        from prometheus_cli.prometheus_account import (
+            format_prometheus_portal_entitlement_message,
+            get_prometheus_portal_account_info,
         )
 
-        account_info = get_nous_portal_account_info(force_fresh=force_fresh)
-        message = format_nous_portal_entitlement_message(
+        account_info = get_prometheus_portal_account_info(force_fresh=force_fresh)
+        message = format_prometheus_portal_entitlement_message(
             account_info,
             capability=capability,
         )
@@ -67,7 +67,7 @@ def nous_tool_gateway_unavailable_message(
         pass
     return (
         f"{capability} is unavailable. Run `prometheus model` to refresh your "
-        "Nous Portal login and billing status."
+        "Prometheus Portal login and billing status."
     )
 
 
@@ -119,7 +119,7 @@ def resolve_modal_backend_state(
     requested_mode = coerce_modal_mode(modal_mode)
     normalized_mode = normalize_modal_mode(modal_mode)
     if managed_enabled is None:
-        managed_enabled = managed_nous_tools_enabled()
+        managed_enabled = managed_prometheus_tools_enabled()
     managed_mode_blocked = (
         requested_mode == "managed" and not managed_enabled
     )
@@ -290,13 +290,13 @@ def prefers_gateway(config_section: str) -> bool:
     return False
 
 
-# The provider value the managed "Nous Subscription" picker rows write for
-# every category (image_gen.provider: nous, web.backend: nous,
-# browser.cloud_provider: nous, ...). Runtime dispatch is a plain switch on
-# the stored string: "nous" → managed gateway client; any vendor name → that
+# The provider value the managed "Prometheus Subscription" picker rows write for
+# every category (image_gen.provider: prometheus, web.backend: prometheus,
+# browser.cloud_provider: prometheus, ...). Runtime dispatch is a plain switch on
+# the stored string: "prometheus" → managed gateway client; any vendor name → that
 # vendor direct with the user's own credentials; no key ever written →
 # legacy credential autodetect.
-NOUS_MANAGED_PROVIDER = "nous"
+PROMETHEUS_MANAGED_PROVIDER = "prometheus"
 
 # Per-capability keys that also count as "this category has been configured".
 _EXTRA_SELECTION_KEYS = {
@@ -317,7 +317,7 @@ def read_selection(section: str) -> str | None:
     """Return the stored `prometheus tools` provider string for a config section.
 
     THE single runtime read of the persisted selection. Returns:
-    - ``"nous"`` — the managed Nous Tool Gateway row was selected,
+    - ``"prometheus"`` — the managed Prometheus Tool Gateway row was selected,
     - a vendor name (``"fal"``, ``"openai"``, ``"firecrawl"``, ...) — that
       vendor, direct, with the user's own credentials,
     - ``None`` — the category has NEVER been configured; the legacy
@@ -329,8 +329,8 @@ def read_selection(section: str) -> str | None:
 
     Legacy interpretation (read-time only — nothing is migrated on disk):
     older picker versions wrote ``<section>.use_gateway`` beside the name
-    key. ``use_gateway: true`` was only ever written by the managed "Nous
-    Subscription" row, so it maps to ``"nous"`` regardless of the name key;
+    key. ``use_gateway: true`` was only ever written by the managed "Prometheus
+    Subscription" row, so it maps to ``"prometheus"`` regardless of the name key;
     ``use_gateway: false`` beside a name key maps to that name.
     """
     try:
@@ -359,7 +359,7 @@ def read_selection(section: str) -> str | None:
     # Legacy shim: a truthy use_gateway means the managed row was picked
     # (it was the only writer of use_gateway: true).
     if "use_gateway" in raw and is_truthy_value(raw.get("use_gateway"), default=False):
-        return NOUS_MANAGED_PROVIDER
+        return PROMETHEUS_MANAGED_PROVIDER
 
     # NOTE on the legacy DEFAULT_CONFIG ``stt.provider: local`` seed: it never
     # reached the raw config.yaml (``save_config`` strips schema defaults),

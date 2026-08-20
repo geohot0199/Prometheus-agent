@@ -25,7 +25,7 @@ prometheus chat -q "Hello"
 prometheus chat --model "anthropic/claude-sonnet-4"
 
 # 使用指定提供商
-prometheus chat --provider nous        # 使用 Nous Portal
+prometheus chat --provider prometheus        # 使用 Prometheus Portal
 prometheus chat --provider openrouter  # 强制使用 OpenRouter
 
 # 使用指定工具集

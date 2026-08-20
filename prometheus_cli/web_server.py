@@ -3736,7 +3736,7 @@ async def get_status(profile: Optional[str] = None):
 
         # Dashboard auth gate (Phase 7): surface whether the gate is engaged
         # and which providers are registered so ``prometheus status`` and the
-        # SPA's StatusPage can show "OAuth gate ON via Nous Research" or
+        # SPA's StatusPage can show "OAuth gate ON via Prometheus" or
         # "loopback only — no auth gate" with no extra round trips.
         auth_required = bool(getattr(app.state, "auth_required", False))
         auth_providers: list[str] = []
@@ -3766,20 +3766,20 @@ async def get_status(profile: Optional[str] = None):
             # Module not importable yet (early startup) — leave as [].
             pass
 
-        # Nous bootstrap-session validity for the NAS health sweep. A hosted
-        # agent whose Nous auth dies terminally (invalid_grant / quarantine)
+        # Prometheus bootstrap-session validity for the NAS health sweep. A hosted
+        # agent whose Prometheus auth dies terminally (invalid_grant / quarantine)
         # looks HEALTHY to every liveness/connectivity probe — the machine,
         # relay, and this dashboard all stay up — yet every inference turn
         # fails. This is the ONLY signal that surfaces that condition, and it
         # is determinable with no working token (local auth-store state). NAS
         # re-mints the bootstrap session when it reads "terminal". Best-effort:
         # never let auth classification break the public liveness probe.
-        nous_session_valid = "unknown"
+        prometheus_session_valid = "unknown"
         try:
-            from prometheus_cli.auth import get_nous_session_validity
-            nous_session_valid = get_nous_session_validity()
+            from prometheus_cli.auth import get_prometheus_session_validity
+            prometheus_session_valid = get_prometheus_session_validity()
         except Exception:
-            nous_session_valid = "unknown"
+            prometheus_session_valid = "unknown"
 
         # Always-public liveness + auth-gate shape. Safe for external uptime
         # probes (NAS's wildcard-subdomain liveness probe), the SPA's pre-login
@@ -3804,7 +3804,7 @@ async def get_status(profile: Optional[str] = None):
             "auth_required": auth_required,
             "auth_providers": auth_providers,
             "auth_flows": auth_flows,
-            "nous_session_valid": nous_session_valid,
+            "prometheus_session_valid": prometheus_session_valid,
         }
 
         # Stable per-install identity (see get_install_id above). First call
@@ -3864,7 +3864,7 @@ async def get_status(profile: Optional[str] = None):
         # 30s loop heartbeat + lifecycle sentinel — two small file reads,
         # no gateway IPC. Coarse MB numbers/enums/booleans only: this
         # endpoint is public (PUBLIC_API_PATHS), same disclosure class as
-        # nous_session_valid above. Deliberately NOT folded into
+        # prometheus_session_valid above. Deliberately NOT folded into
         # components/overall — memory pressure is advisory (toast/notice
         # material), not a liveness verdict, and flipping `overall` to
         # "degraded" on it would page NAS's availability sweep for a
@@ -4214,7 +4214,7 @@ def _safe_call(mod, fn_name: str, default):
 
 
 # ---------------------------------------------------------------------------
-# Portal endpoint — Nous Portal auth + Tool Gateway routing status (read-only).
+# Portal endpoint — Prometheus Portal auth + Tool Gateway routing status (read-only).
 # ---------------------------------------------------------------------------
 
 
@@ -4232,23 +4232,23 @@ def _get_portal_status_sync():
     cfg = load_config() or {}
     auth: Dict[str, Any] = {}
     try:
-        from prometheus_cli.auth import get_nous_auth_status_local
+        from prometheus_cli.auth import get_prometheus_auth_status_local
 
         # Read-only dashboard endpoint: refresh-free snapshot so polling
         # never performs an OAuth refresh or burns a refresh token.
-        auth = get_nous_auth_status_local() or {}
+        auth = get_prometheus_auth_status_local() or {}
     except Exception:
         auth = {}
 
     features = []
     try:
-        from prometheus_cli.nous_subscription import get_nous_subscription_features
+        from prometheus_cli.prometheus_subscription import get_prometheus_subscription_features
 
-        feats = get_nous_subscription_features(cfg)
+        feats = get_prometheus_subscription_features(cfg)
         if feats is not None:
             for feat in feats.items():
-                if getattr(feat, "managed_by_nous", False):
-                    state = "via Nous Portal"
+                if getattr(feat, "managed_by_prometheus", False):
+                    state = "via Prometheus Portal"
                 elif getattr(feat, "active", False) and getattr(feat, "current_provider", None):
                     state = feat.current_provider
                 elif getattr(feat, "active", False):
@@ -4265,7 +4265,7 @@ def _get_portal_status_sync():
         "portal_url": auth.get("portal_base_url"),
         "inference_url": auth.get("inference_base_url"),
         "provider": str((model_cfg or {}).get("provider") or ""),
-        "subscription_url": "https://portal.nousresearch.com/manage-subscription",
+        "subscription_url": "https://geohot0199.github.io/prometheus-agent/portal/manage-subscription",
         "features": features,
     }
 
@@ -7046,36 +7046,36 @@ def get_recommended_default_model(provider: str = ""):
 
     Mirrors the model-curation `prometheus model` does so GUI onboarding lands on a
     sensible default instead of blindly taking the first curated entry. For
-    Nous this honors the user's free/paid tier: free users get a free model,
+    Prometheus this honors the user's free/paid tier: free users get a free model,
     paid users get the full curated default. For any other provider it falls
     back to the first curated model (same as before).
 
     Response: {"provider": str, "model": str, "free_tier": bool | None}
-    where free_tier is True/False for Nous and None otherwise. `model` may be
+    where free_tier is True/False for Prometheus and None otherwise. `model` may be
     empty if nothing could be resolved (caller degrades gracefully).
     """
     slug = (provider or "").strip().lower()
 
-    if slug == "nous":
+    if slug == "prometheus":
         try:
             from prometheus_cli.models import (
-                get_curated_nous_model_ids,
+                get_curated_prometheus_model_ids,
                 get_pricing_for_provider,
-                check_nous_free_tier,
-                partition_nous_models_by_tier,
+                check_prometheus_free_tier,
+                partition_prometheus_models_by_tier,
                 pick_silent_default_model,
                 union_with_portal_free_recommendations,
                 union_with_portal_paid_recommendations,
             )
             from prometheus_cli.auth import get_provider_auth_state
 
-            model_ids = get_curated_nous_model_ids()
-            pricing = get_pricing_for_provider("nous") or {}
-            free_tier = check_nous_free_tier(force_fresh=True)
+            model_ids = get_curated_prometheus_model_ids()
+            pricing = get_pricing_for_provider("prometheus") or {}
+            free_tier = check_prometheus_free_tier(force_fresh=True)
 
             portal_url = ""
             try:
-                state = get_provider_auth_state("nous") or {}
+                state = get_provider_auth_state("prometheus") or {}
                 portal_url = state.get("portal_base_url", "") or ""
             except Exception:
                 portal_url = ""
@@ -7084,7 +7084,7 @@ def get_recommended_default_model(provider: str = ""):
                 model_ids, pricing = union_with_portal_free_recommendations(
                     model_ids, pricing, portal_url
                 )
-                model_ids, _unavailable = partition_nous_models_by_tier(
+                model_ids, _unavailable = partition_prometheus_models_by_tier(
                     model_ids, pricing, free_tier=True
                 )
             else:
@@ -7092,13 +7092,13 @@ def get_recommended_default_model(provider: str = ""):
                     model_ids, pricing, portal_url
                 )
 
-            model = pick_silent_default_model(model_ids, provider="nous")
-            return {"provider": "nous", "model": model, "free_tier": bool(free_tier)}
+            model = pick_silent_default_model(model_ids, provider="prometheus")
+            return {"provider": "prometheus", "model": model, "free_tier": bool(free_tier)}
         except Exception:
-            _log.exception("GET /api/model/recommended-default (nous) failed")
-            return {"provider": "nous", "model": "", "free_tier": None}
+            _log.exception("GET /api/model/recommended-default (prometheus) failed")
+            return {"provider": "prometheus", "model": "", "free_tier": None}
 
-    # Non-Nous: preferred silent default when the provider's curated list
+    # Non-Prometheus: preferred silent default when the provider's curated list
     # carries it, else the first curated model. Aggregator lists lead with the
     # priciest Anthropic flagship (claude-fable-5), which must never be the
     # model a user lands on without explicitly picking it.
@@ -7345,34 +7345,34 @@ def _apply_model_assignment_sync(
             model_cfg["api_key"] = provider_entry["api_key"]
         cfg["model"] = model_cfg
 
-        # When switching the main provider to Nous, mirror the CLI's
+        # When switching the main provider to Prometheus, mirror the CLI's
         # post-model-selection behaviour (prometheus_cli/main.py
-        # prompt_enable_tool_gateway / tools_config apply_nous_managed_defaults):
-        # auto-route any *unconfigured* tools through the Nous Tool Gateway.
-        # This is purely additive — apply_nous_managed_defaults skips every
+        # prompt_enable_tool_gateway / tools_config apply_prometheus_managed_defaults):
+        # auto-route any *unconfigured* tools through the Prometheus Tool Gateway.
+        # This is purely additive — apply_prometheus_managed_defaults skips every
         # tool where the user already has a direct key (FIRECRAWL_API_KEY,
         # FAL_KEY, etc.) or an explicit backend/provider in config, so it
         # never overwrites a user's own setup. GUI users thus land on the
         # gateway the same way CLI users do, without a separate prompt.
         gateway_tools: list[str] = []
-        if provider.strip().lower() == "nous":
+        if provider.strip().lower() == "prometheus":
             try:
-                from prometheus_cli.nous_subscription import apply_nous_managed_defaults
+                from prometheus_cli.prometheus_subscription import apply_prometheus_managed_defaults
                 from prometheus_cli.tools_config import _get_platform_tools
 
                 enabled = _get_platform_tools(
                     cfg, "cli", include_default_mcp_servers=False
                 )
-                changed = apply_nous_managed_defaults(
+                changed = apply_prometheus_managed_defaults(
                     cfg,
                     enabled_toolsets=enabled,
                     force_fresh=True,
                 )
                 gateway_tools = sorted(changed)
             except Exception:
-                # Portal lookup hiccups / non-subscriber / non-nous gating
+                # Portal lookup hiccups / non-subscriber / non-prometheus gating
                 # must never block saving the model assignment.
-                _log.debug("apply_nous_managed_defaults skipped", exc_info=True)
+                _log.debug("apply_prometheus_managed_defaults skipped", exc_info=True)
 
         save_config(cfg)
 
@@ -7401,7 +7401,7 @@ def _apply_model_assignment_sync(
         # the new main one. Switching the main model does NOT touch aux pins
         # (they're independent, sticky per-task overrides — see
         # auxiliary_client._resolve_auto). A user who switches main away from
-        # a now-unpaid provider (e.g. nous with $0 balance) keeps paying 402s
+        # a now-unpaid provider (e.g. prometheus with $0 balance) keeps paying 402s
         # on every background aux call until they reset those pins. We never
         # auto-clear them — pinning aux to a cheaper/different model is a
         # legitimate config — but we tell the caller so the UI can offer a
@@ -9751,7 +9751,7 @@ async def cancel_whatsapp_onboarding(pairing_id: str):
     return {"ok": True}
 
 
-_TELEGRAM_ONBOARDING_DEFAULT_URL = "https://setup.prometheus-agent.nousresearch.com"
+_TELEGRAM_ONBOARDING_DEFAULT_URL = "https://geohot0199.github.io/prometheus-agent/setup"
 _TELEGRAM_ONBOARDING_USER_AGENT = f"PrometheusDashboard/{__version__}"
 @dataclass
 class _TelegramOnboardingPairing:
@@ -10347,7 +10347,7 @@ async def test_messaging_platform(platform_id: str, profile: Optional[str] = Non
 #
 # Phase 1 surfaces *which OAuth providers exist* and whether each is
 # connected, plus a disconnect button. The actual login flow (PKCE for
-# Anthropic, device-code for Nous/Codex) still runs in the CLI for now;
+# Anthropic, device-code for Prometheus/Codex) still runs in the CLI for now;
 # Phase 2 will add in-browser flows. For unconnected providers we return
 # the canonical ``prometheus auth add <provider>`` command so the dashboard
 # can surface a one-click copy.
@@ -10508,12 +10508,12 @@ def _copilot_acp_status() -> Dict[str, Any]:
 # CLI like Claude Code or Qwen).
 _OAUTH_PROVIDER_CATALOG: tuple[Dict[str, Any], ...] = (
     {
-        "id": "nous",
-        "name": "Nous Portal",
+        "id": "prometheus",
+        "name": "Prometheus Portal",
         "flow": "device_code",
-        "cli_command": "prometheus auth add nous",
-        "docs_url": "https://portal.nousresearch.com",
-        "status_fn": None,  # dispatched via auth.get_nous_auth_status
+        "cli_command": "prometheus auth add prometheus",
+        "docs_url": "https://geohot0199.github.io/prometheus-agent/portal",
+        "status_fn": None,  # dispatched via auth.get_prometheus_auth_status
     },
     {
         "id": "openai-codex",
@@ -10537,7 +10537,7 @@ _OAUTH_PROVIDER_CATALOG: tuple[Dict[str, Any], ...] = (
         # MiniMax's flow is structurally device-code (verification URI +
         # user code, backend polls the token endpoint) with a PKCE
         # extension for code-binding. The dashboard renders the same UX
-        # as Nous's device-code flow; the PKCE bit is a security
+        # as Prometheus's device-code flow; the PKCE bit is a security
         # extension that doesn't change the operator experience.
         "flow": "device_code",
         "cli_command": "prometheus auth add minimax-oauth",
@@ -10594,14 +10594,14 @@ def _resolve_provider_status(provider_id: str, status_fn) -> Dict[str, Any]:
             return {"logged_in": False, "error": str(e)}
     try:
         from prometheus_cli import auth as hauth
-        if provider_id == "nous":
+        if provider_id == "prometheus":
             # Read-only accounts-tab card: refresh-free snapshot so listing
             # providers never performs an OAuth refresh.
-            raw = hauth.get_nous_auth_status_local()
+            raw = hauth.get_prometheus_auth_status_local()
             return {
                 "logged_in": bool(raw.get("logged_in")),
-                "source": "nous_portal",
-                "source_label": raw.get("portal_base_url") or "Nous Portal",
+                "source": "prometheus_portal",
+                "source_label": raw.get("portal_base_url") or "Prometheus Portal",
                 "token_preview": _truncate_token(raw.get("access_token")),
                 "expires_at": raw.get("access_expires_at"),
                 "has_refresh_token": bool(raw.get("has_refresh_token")),
@@ -10873,10 +10873,10 @@ async def disconnect_oauth_provider(
                 return {"ok": bool(cleared), "provider": provider_id}
 
             try:
-                from prometheus_cli.auth import clear_provider_auth, invalidate_nous_auth_status_cache
+                from prometheus_cli.auth import clear_provider_auth, invalidate_prometheus_auth_status_cache
                 cleared = clear_provider_auth(provider_id)
-                if provider_id == "nous":
-                    invalidate_nous_auth_status_cache()
+                if provider_id == "prometheus":
+                    invalidate_prometheus_auth_status_cache()
                 _log.info("oauth/disconnect: %s (cleared=%s)", provider_id, cleared)
                 return {"ok": bool(cleared), "provider": provider_id}
             except Exception as e:
@@ -10903,8 +10903,8 @@ async def disconnect_oauth_provider(
 #          → persists to ~/.prometheus/.anthropic_oauth.json AND credential pool
 #          → returns { ok: true, status: "approved" }
 #
-#   Device code (Nous, OpenAI Codex):
-#     1. POST /api/providers/oauth/{nous|openai-codex}/start
+#   Device code (Prometheus, OpenAI Codex):
+#     1. POST /api/providers/oauth/{prometheus|openai-codex}/start
 #          → server hits provider's device-auth endpoint
 #          → gets { user_code, verification_url, device_code, interval, expires_in }
 #          → spawns background poller thread that polls the token endpoint
@@ -11167,28 +11167,28 @@ async def _start_device_code_flow(
     provider_id: str,
     profile: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Initiate a device-code flow (Nous, OpenAI Codex, MiniMax, or xAI).
+    """Initiate a device-code flow (Prometheus, OpenAI Codex, MiniMax, or xAI).
 
     Calls the provider's device-auth endpoint via the existing CLI helpers,
     then spawns a background poller. Returns the user-facing display fields
     so the UI can render the verification page link + user code.
     """
-    if provider_id == "nous":
+    if provider_id == "prometheus":
         from prometheus_cli.auth import (
             _request_device_code,
             PROVIDER_REGISTRY,
         )
         import httpx
-        pconfig = PROVIDER_REGISTRY["nous"]
+        pconfig = PROVIDER_REGISTRY["prometheus"]
         portal_base_url = (
             os.getenv("PROMETHEUS_PORTAL_BASE_URL")
-            or os.getenv("NOUS_PORTAL_BASE_URL")
+            or os.getenv("PROMETHEUS_PORTAL_BASE_URL")
             or pconfig.portal_base_url
         ).rstrip("/")
         client_id = pconfig.client_id
         scope = pconfig.scope
 
-        def _do_nous_device_request():
+        def _do_prometheus_device_request():
             with httpx.Client(
                 timeout=httpx.Timeout(15.0),
                 headers={"Accept": "application/json"},
@@ -11204,9 +11204,9 @@ async def _start_device_code_flow(
                 )
 
         device_data, effective_scope = await asyncio.get_running_loop().run_in_executor(
-            None, _do_nous_device_request
+            None, _do_prometheus_device_request
         )
-        sid, sess = _new_oauth_session("nous", "device_code", profile=profile)
+        sid, sess = _new_oauth_session("prometheus", "device_code", profile=profile)
         sess["device_code"] = str(device_data["device_code"])
         sess["interval"] = int(device_data["interval"])
         sess["expires_at"] = time.time() + int(device_data["expires_in"])
@@ -11214,7 +11214,7 @@ async def _start_device_code_flow(
         sess["client_id"] = client_id
         sess["scope"] = effective_scope
         threading.Thread(
-            target=_nous_poller, args=(sid,), daemon=True, name=f"oauth-poll-{sid[:6]}"
+            target=_prometheus_poller, args=(sid,), daemon=True, name=f"oauth-poll-{sid[:6]}"
         ).start()
         return {
             "session_id": sid,
@@ -11263,7 +11263,7 @@ async def _start_device_code_flow(
     if provider_id == "minimax-oauth":
         # MiniMax uses a device-code-style flow (verification URI + user
         # code + background poll) with a PKCE extension on top. From the
-        # operator's perspective it's identical to Nous's device-code
+        # operator's perspective it's identical to Prometheus's device-code
         # flow; the PKCE bit (verifier + challenge from
         # _minimax_pkce_pair) is a security extension that binds the
         # token exchange to the original session.
@@ -11375,11 +11375,11 @@ async def _start_device_code_flow(
     raise HTTPException(status_code=400, detail=f"Provider {provider_id} does not support device-code flow")
 
 
-def _nous_poller(session_id: str) -> None:
-    """Background poller that drives a Nous device-code flow to completion."""
+def _prometheus_poller(session_id: str) -> None:
+    """Background poller that drives a Prometheus device-code flow to completion."""
     from prometheus_cli.auth import (
         _poll_for_token,
-        refresh_nous_oauth_from_state,
+        refresh_prometheus_oauth_from_state,
     )
     from datetime import datetime, timezone
     import httpx
@@ -11403,7 +11403,7 @@ def _nous_poller(session_id: str) -> None:
                 expires_in=expires_in,
                 poll_interval=interval,
             )
-        # Same post-processing as _nous_device_code_login (validate/refresh JWT)
+        # Same post-processing as _prometheus_device_code_login (validate/refresh JWT)
         now = datetime.now(timezone.utc)
         token_ttl = int(token_data.get("expires_in") or 0)
         auth_state = {
@@ -11422,18 +11422,18 @@ def _nous_poller(session_id: str) -> None:
             "expires_in": token_ttl,
         }
         with _profile_scope(_oauth_session_profile(session_id)):
-            full_state = refresh_nous_oauth_from_state(
+            full_state = refresh_prometheus_oauth_from_state(
                 auth_state,
                 timeout_seconds=15.0,
                 force_refresh=False,
             )
-            from prometheus_cli.auth import persist_nous_credentials
-            persist_nous_credentials(full_state)
+            from prometheus_cli.auth import persist_prometheus_credentials
+            persist_prometheus_credentials(full_state)
         with _oauth_sessions_lock:
             sess["status"] = "approved"
-        _log.info("oauth/device: nous login completed (session=%s)", session_id)
+        _log.info("oauth/device: prometheus login completed (session=%s)", session_id)
     except Exception as e:
-        _log.warning("nous device-code poll failed (session=%s): %s", session_id, e)
+        _log.warning("prometheus device-code poll failed (session=%s): %s", session_id, e)
         with _oauth_sessions_lock:
             sess["status"] = "error"
             sess["error_message"] = str(e)
@@ -11442,9 +11442,9 @@ def _nous_poller(session_id: str) -> None:
 def _minimax_poller(session_id: str) -> None:
     """Background poller that drives a MiniMax OAuth flow to completion.
 
-    Mirrors `_nous_poller` but calls the MiniMax-specific token endpoint,
+    Mirrors `_prometheus_poller` but calls the MiniMax-specific token endpoint,
     which uses a PKCE-style ``code_verifier`` + ``user_code`` rather than
-    the ``device_code`` field used by Nous. On success, builds the same
+    the ``device_code`` field used by Prometheus. On success, builds the same
     auth_state dict that ``_minimax_oauth_login`` (the CLI flow) builds
     and persists via ``_minimax_save_auth_state`` — so the dashboard
     path leaves the system in the same state as
@@ -11847,7 +11847,7 @@ async def poll_oauth_session(
 ):
     """Poll a session's status (no auth — read-only state).
 
-    Shared by the device-code flows (Nous, OpenAI Codex, MiniMax, xAI).
+    Shared by the device-code flows (Prometheus, OpenAI Codex, MiniMax, xAI).
     Each surfaces progress through the same background-worker-updated
     ``status`` field, so a single poll endpoint serves them all.
     """
@@ -14502,7 +14502,7 @@ from prometheus_cli.web_routers.skills import (  # noqa: E402,F401 — legacy re
 # Human-readable labels for each hub source id (matches `prometheus skills search`
 # provenance).  Keep in sync with create_source_router()'s source list.
 _SKILL_HUB_SOURCE_LABELS = {
-    "official": "Official (Nous)",
+    "official": "Official (Prometheus)",
     "prometheus-index": "Prometheus Index",
     "skills-sh": "skills.sh",
     "well-known": "Well-Known",
@@ -15004,7 +15004,7 @@ def _resolve_toolset_model_plugin(ts_key: str, provider_row: dict) -> Optional[s
     """Map a provider picker row to its model-catalog plugin name.
 
     Plugin-backed rows carry ``image_gen_plugin_name`` / ``video_gen_plugin_name``;
-    the managed "Nous Subscription" image row instead carries the legacy
+    the managed "Prometheus Subscription" image row instead carries the legacy
     ``imagegen_backend: "fal"`` marker (same underlying FAL catalog).
     """
     if ts_key == "image_gen":
@@ -17509,7 +17509,7 @@ def mount_spa(application: FastAPI):
 _BUILTIN_DASHBOARD_THEMES = [
     {"name": "default",       "label": "Prometheus Teal",         "description": "Classic dark teal — the canonical Prometheus look"},
     {"name": "default-large", "label": "Prometheus Teal (Large)", "description": "Prometheus Teal with bigger fonts and roomier spacing"},
-    {"name": "nous-blue",     "label": "Nous Blue",           "description": "Light mode — vivid Nous-blue accents on cream canvas"},
+    {"name": "prometheus-blue",     "label": "Prometheus Blue",           "description": "Light mode — vivid Prometheus-blue accents on cream canvas"},
     {"name": "midnight",      "label": "Midnight",            "description": "Deep blue-violet with cool accents"},
     {"name": "ember",     "label": "Ember",          "description": "Warm crimson and bronze — forge vibes"},
     {"name": "mono",      "label": "Mono",           "description": "Clean grayscale — minimal and focused"},
@@ -18883,11 +18883,11 @@ def start_server(
     import uvicorn
 
     try:
-        from prometheus_cli.nous_auth_keepalive import start_nous_auth_keepalive
+        from prometheus_cli.prometheus_auth_keepalive import start_prometheus_auth_keepalive
 
-        start_nous_auth_keepalive()
+        start_prometheus_auth_keepalive()
     except Exception as exc:
-        _log.debug("Nous auth keepalive did not start: %s", exc)
+        _log.debug("Prometheus auth keepalive did not start: %s", exc)
 
     # Phase 0: stash the auth-gate flag on app.state so middleware / SPA-token
     # injection / WS-auth paths can branch on it consistently.  Phase 3.5
@@ -18922,11 +18922,11 @@ def start_server(
             # is misleading when the provider IS installed but unconfigured.
             skip_reasons: list[str] = []
             try:
-                from plugins.dashboard_auth import nous as _nous_plugin
+                from plugins.dashboard_auth import prometheus as _prometheus_plugin
 
-                if _nous_plugin.LAST_SKIP_REASON:
+                if _prometheus_plugin.LAST_SKIP_REASON:
                     skip_reasons.append(
-                        f"  • nous: {_nous_plugin.LAST_SKIP_REASON}"
+                        f"  • prometheus: {_prometheus_plugin.LAST_SKIP_REASON}"
                     )
             except Exception:
                 pass
@@ -18938,7 +18938,7 @@ def start_server(
                 "    (hash with: python -c \"from "
                 "plugins.dashboard_auth.basic import hash_password; "
                 "print(hash_password('your-password'))\")\n"
-                "  • OAuth: run `prometheus dashboard register` (Nous Portal) or "
+                "  • OAuth: run `prometheus dashboard register` (Prometheus Portal) or "
                 "install a DashboardAuthProvider plugin.\n"
                 "There is no unauthenticated public-bind option — to keep it "
                 "local, bind 127.0.0.1 and tunnel in (SSH / Tailscale)."

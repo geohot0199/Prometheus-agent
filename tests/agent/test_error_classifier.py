@@ -223,11 +223,11 @@ class TestClassifyApiError:
                 "status": 404,
                 "message": (
                     "Model 'gpt-5' is not available on the Free Tier. "
-                    "Upgrade at https://portal.nousresearch.com or pick a free model."
+                    "Upgrade at https://geohot0199.github.io/prometheus-agent/portal or pick a free model."
                 ),
             },
         )
-        result = classify_api_error(e, provider="nous", model="gpt-5")
+        result = classify_api_error(e, provider="prometheus", model="gpt-5")
         assert result.reason == FailoverReason.billing
         assert result.retryable is False
         assert result.should_fallback is True
@@ -241,11 +241,11 @@ class TestClassifyApiError:
                 "message": (
                     "Model 'openai/gpt-5.5-pro' requires available credits. "
                     "Your account balance is too low to use paid models — "
-                    "add credits at https://portal.nousresearch.com or pick a free model."
+                    "add credits at https://geohot0199.github.io/prometheus-agent/portal or pick a free model."
                 ),
             },
         )
-        result = classify_api_error(e, provider="nous", model="openai/gpt-5.5-pro")
+        result = classify_api_error(e, provider="prometheus", model="openai/gpt-5.5-pro")
         assert result.reason == FailoverReason.billing
         assert result.retryable is False
         assert result.should_fallback is True

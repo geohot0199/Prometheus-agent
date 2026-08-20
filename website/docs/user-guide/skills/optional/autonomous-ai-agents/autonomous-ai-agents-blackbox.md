@@ -17,7 +17,7 @@ Delegate coding tasks to the Blackbox AI multi-model CLI.
 | Source | Optional — install with `prometheus skills install official/autonomous-ai-agents/blackbox` |
 | Path | `optional-skills/autonomous-ai-agents/blackbox` |
 | Version | `1.0.1` |
-| Author | Prometheus Agent (Nous Research) |
+| Author | Prometheus Agent (Prometheus) |
 | License | MIT |
 | Platforms | linux, macos, windows |
 | Tags | `Coding-Agent`, `Blackbox`, `Multi-Agent`, `Judge`, `Multi-Model` |

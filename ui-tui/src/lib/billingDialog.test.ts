@@ -6,7 +6,7 @@ import { billingDialogCopy } from './billingDialog.js'
 function makeBlock(overrides: Partial<BillingBlock> = {}): BillingBlock {
   return {
     billing_url: 'https://openrouter.ai/settings/credits',
-    is_nous: false,
+    is_prometheus: false,
     message: 'out of credits',
     model: 'x',
     provider: 'openrouter',
@@ -16,9 +16,9 @@ function makeBlock(overrides: Partial<BillingBlock> = {}): BillingBlock {
 }
 
 describe('billingDialogCopy', () => {
-  it('routes Nous to the /topup flow', () => {
-    const copy = billingDialogCopy(makeBlock({ is_nous: true, provider: 'nous', provider_label: 'Nous Portal' }))
-    expect(copy.title).toContain('Nous')
+  it('routes Prometheus to the /topup flow', () => {
+    const copy = billingDialogCopy(makeBlock({ is_prometheus: true, provider: 'prometheus', provider_label: 'Prometheus Portal' }))
+    expect(copy.title).toContain('Prometheus')
     expect(copy.confirmLabel).toBe('Top up')
     expect(copy.cancelLabel).toBe('Dismiss')
   })

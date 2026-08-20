@@ -1162,7 +1162,7 @@ class TestWebServerEndpoints:
         assert data["name"] == "prometheus-update"
         assert data["pid"] is None
         assert data["error"] == "docker_update_unsupported"
-        assert "docker pull nousresearch/prometheus-agent:latest" in data["message"]
+        assert "docker pull geohot0199/prometheus-agent:latest" in data["message"]
         assert spawned is False
 
         status = self.client.get("/api/actions/prometheus-update/status")
@@ -1171,7 +1171,7 @@ class TestWebServerEndpoints:
         assert status_data["running"] is False
         assert status_data["exit_code"] == 1
         assert status_data["pid"] is None
-        assert any("docker pull nousresearch/prometheus-agent:latest" in line for line in status_data["lines"])
+        assert any("docker pull geohot0199/prometheus-agent:latest" in line for line in status_data["lines"])
 
     def test_update_prometheus_returns_apt_guidance_without_spawning(self, monkeypatch):
         import prometheus_cli.web_server as web_server
@@ -2536,13 +2536,13 @@ class TestNewEndpoints:
 
     def test_toolsets_resolve_subscription_features_once(self, monkeypatch):
         import prometheus_cli.tools_config as tools_config
-        from prometheus_cli.nous_subscription import NousSubscriptionFeatures
+        from prometheus_cli.prometheus_subscription import PrometheusSubscriptionFeatures
 
         calls = 0
-        features = NousSubscriptionFeatures(
+        features = PrometheusSubscriptionFeatures(
             subscribed=False,
-            nous_auth_present=False,
-            provider_is_nous=False,
+            prometheus_auth_present=False,
+            provider_is_prometheus=False,
             features={},
             account_info=None,
         )
@@ -2554,7 +2554,7 @@ class TestNewEndpoints:
 
         monkeypatch.setattr(
             tools_config,
-            "get_nous_subscription_features",
+            "get_prometheus_subscription_features",
             resolve_features,
         )
 
@@ -2601,17 +2601,17 @@ class TestNewEndpoints:
         """Each provider row carries a server-computed readiness `status`.
 
         Regression: the GUI pilled every zero-env-var row "Ready" — including
-        logged-out Nous Subscription rows, xAI TTS without Grok OAuth, and
+        logged-out Prometheus Subscription rows, xAI TTS without Grok OAuth, and
         never-installed KittenTTS/Piper. The endpoint now reports the honest
         state so keyless ≠ ready.
         """
         import prometheus_cli.tools_config as tools_config
-        from prometheus_cli.nous_account import NousPortalAccountInfo
+        from prometheus_cli.prometheus_account import PrometheusPortalAccountInfo
 
-        # Logged out of Nous Portal → managed subscription rows need sign-in.
+        # Logged out of Prometheus Portal → managed subscription rows need sign-in.
         monkeypatch.setattr(
-            "prometheus_cli.nous_subscription.get_nous_portal_account_info",
-            lambda *a, **k: NousPortalAccountInfo(
+            "prometheus_cli.prometheus_subscription.get_prometheus_portal_account_info",
+            lambda *a, **k: PrometheusPortalAccountInfo(
                 logged_in=False, source="none", fresh=False, paid_service_access=None
             ),
         )
@@ -2631,7 +2631,7 @@ class TestNewEndpoints:
         # Genuinely-free keyless row stays Ready.
         assert by_name["Microsoft Edge TTS"]["status"] == "ready"
         # Keyless ≠ ready for gated rows:
-        assert by_name["Nous Subscription"]["status"] == "needs_auth"
+        assert by_name["Prometheus Subscription"]["status"] == "needs_auth"
         assert by_name["xAI TTS"]["status"] == "needs_auth"
         assert by_name["KittenTTS"]["status"] == "needs_setup"
         assert by_name["Piper"]["status"] == "needs_setup"
@@ -2643,39 +2643,39 @@ class TestNewEndpoints:
 
 
 
-    def test_select_managed_nous_provider_reports_needs_nous_auth(self, monkeypatch):
-        """Selecting a managed Nous row while logged out flags needs_nous_auth.
+    def test_select_managed_prometheus_provider_reports_needs_prometheus_auth(self, monkeypatch):
+        """Selecting a managed Prometheus row while logged out flags needs_prometheus_auth.
 
         Regression: the GUI PUT wrote browser.cloud_provider + use_gateway
         but skipped the Portal entitlement handshake the CLI runs inline
-        (ensure_nous_portal_access) — so the row never activated and nothing
+        (ensure_prometheus_portal_access) — so the row never activated and nothing
         told the user to sign in. The endpoint now reports the entitlement
-        gap so the client can drive the existing Nous OAuth flow.
+        gap so the client can drive the existing Prometheus OAuth flow.
         """
-        from prometheus_cli.nous_account import NousPortalAccountInfo
+        from prometheus_cli.prometheus_account import PrometheusPortalAccountInfo
 
         monkeypatch.setattr(
-            "prometheus_cli.nous_subscription.get_nous_portal_account_info",
-            lambda *a, **k: NousPortalAccountInfo(
+            "prometheus_cli.prometheus_subscription.get_prometheus_portal_account_info",
+            lambda *a, **k: PrometheusPortalAccountInfo(
                 logged_in=False, source="none", fresh=False, paid_service_access=None
             ),
         )
 
         resp = self.client.put(
             "/api/tools/toolsets/browser/provider",
-            json={"provider": "Nous Subscription (Browser Use cloud)"},
+            json={"provider": "Prometheus Subscription (Browser Use cloud)"},
         )
         assert resp.status_code == 200
         data = resp.json()
         assert data["ok"] is True
-        assert data["needs_nous_auth"] is True
+        assert data["needs_prometheus_auth"] is True
         assert data["feature"] == "browser"
         # The selection is still persisted — activation is what's gated.
-        # Managed rows store the single 'nous' provider string (the runtime
-        # maps it to the Browser Use cloud through the Nous Tool Gateway).
+        # Managed rows store the single 'prometheus' provider string (the runtime
+        # maps it to the Browser Use cloud through the Prometheus Tool Gateway).
         from prometheus_cli.config import load_config
         cfg = load_config()
-        assert cfg["browser"]["cloud_provider"] == "nous"
+        assert cfg["browser"]["cloud_provider"] == "prometheus"
         assert "use_gateway" not in cfg["browser"]
 
 

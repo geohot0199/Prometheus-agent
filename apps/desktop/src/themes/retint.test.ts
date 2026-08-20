@@ -1,24 +1,24 @@
 import { describe, expect, it } from 'vitest'
 
 import { contrastRatio, hexToOklch, withHue } from './color'
-import { githubTheme, nousTheme } from './presets'
+import { githubTheme, prometheusTheme } from './presets'
 import { retintTheme, themeHue } from './retint'
 import type { DesktopThemeColors } from './types'
 
 const HUES = [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330]
 
 // A retint seed for each hue, at the authored accent's lightness/chroma.
-const seedAt = (hue: number) => withHue(nousTheme.colors.primary, hue)
+const seedAt = (hue: number) => withHue(prometheusTheme.colors.primary, hue)
 
-const NOUS_BLUE = '#0053FD'
+const PROMETHEUS_BLUE = '#0053FD'
 
 describe('themeHue', () => {
   it('reads the accent hue that ships', () => {
-    // Nous blue. Both palettes sit at this hue — light seeds `#0053fd` and dark
+    // Prometheus blue. Both palettes sit at this hue — light seeds `#0053fd` and dark
     // `#4a84fe`, the same blue at two lightnesses, which is what lets one pick
     // serve both appearances.
-    expect(themeHue(nousTheme)).toBe(263)
-    expect(Math.round(hexToOklch(nousTheme.darkColors!.primary)!.h)).toBe(263)
+    expect(themeHue(prometheusTheme)).toBe(263)
+    expect(Math.round(hexToOklch(prometheusTheme.darkColors!.primary)!.h)).toBe(263)
   })
 
   it('reads the upstream GitHub green from the unforked theme', () => {
@@ -33,10 +33,10 @@ describe('themeHue', () => {
 // `#0053FD` is the brand color and passes on the light sidebar, but only 3.6:1
 // on the near-black dark one — so dark carries a lifted twin rather than the
 // literal brand hex. Anything that re-derives these must keep both legible.
-describe('the shipped nous accents', () => {
+describe('the shipped prometheus accents', () => {
   const cases = [
-    { appearance: 'light', colors: nousTheme.colors, seed: '#0053fd' },
-    { appearance: 'dark', colors: nousTheme.darkColors!, seed: '#4a84fe' }
+    { appearance: 'light', colors: prometheusTheme.colors, seed: '#0053fd' },
+    { appearance: 'dark', colors: prometheusTheme.darkColors!, seed: '#4a84fe' }
   ] as const
 
   it.each(cases)('$appearance seeds every accent slot from $seed', ({ colors, seed }) => {
@@ -54,8 +54,8 @@ describe('the shipped nous accents', () => {
   })
 
   it('is one blue at two lightnesses, not two blues', () => {
-    const light = hexToOklch(nousTheme.colors.primary)!
-    const dark = hexToOklch(nousTheme.darkColors!.primary)!
+    const light = hexToOklch(prometheusTheme.colors.primary)!
+    const dark = hexToOklch(prometheusTheme.darkColors!.primary)!
 
     expect(Math.abs(light.h - dark.h)).toBeLessThan(2)
     expect(dark.l).toBeGreaterThan(light.l)
@@ -63,8 +63,8 @@ describe('the shipped nous accents', () => {
 
   it('leaves GitHub’s neutrals in place — only the accent family is forked', () => {
     for (const key of ['background', 'foreground', 'card', 'border', 'sidebarBackground'] as const) {
-      expect(nousTheme.colors[key]).toBe(githubTheme.colors[key])
-      expect(nousTheme.darkColors![key]).toBe(githubTheme.darkColors![key])
+      expect(prometheusTheme.colors[key]).toBe(githubTheme.colors[key])
+      expect(prometheusTheme.darkColors![key]).toBe(githubTheme.darkColors![key])
     }
   })
 })
@@ -74,17 +74,17 @@ describe('retintTheme', () => {
   // ones that produced the shipped palette. If they drift, retinting at the
   // theme's OWN hue stops being a no-op — and this catches it.
   it('is an identity at the theme’s own accent', () => {
-    const same = retintTheme(nousTheme, nousTheme.colors.primary)
+    const same = retintTheme(prometheusTheme, prometheusTheme.colors.primary)
 
-    expect(same.colors).toEqual(nousTheme.colors)
-    expect(same.darkColors).toEqual(nousTheme.darkColors)
+    expect(same.colors).toEqual(prometheusTheme.colors)
+    expect(same.darkColors).toEqual(prometheusTheme.darkColors)
   })
 
   it('moves every accent-family slot, in both modes', () => {
-    const rose = retintTheme(nousTheme, seedAt(350))
+    const rose = retintTheme(prometheusTheme, seedAt(350))
 
     for (const mode of ['colors', 'darkColors'] as const) {
-      const before = nousTheme[mode]!
+      const before = prometheusTheme[mode]!
       const after = rose[mode]!
 
       for (const key of [
@@ -102,7 +102,7 @@ describe('retintTheme', () => {
   })
 
   it('keeps the four seed slots locked together', () => {
-    const teal = retintTheme(nousTheme, seedAt(195)).colors
+    const teal = retintTheme(prometheusTheme, seedAt(195)).colors
 
     expect(teal.ring).toBe(teal.primary)
     expect(teal.midground).toBe(teal.primary)
@@ -112,19 +112,19 @@ describe('retintTheme', () => {
   it('leaves the chrome alone', () => {
     // The neutrals are the app's surface, not its brand. A hue knob that also
     // swung these would make every theme a monochrome wash.
-    const violet = retintTheme(nousTheme, seedAt(285))
+    const violet = retintTheme(prometheusTheme, seedAt(285))
 
     for (const key of ['background', 'foreground', 'card', 'border', 'muted', 'mutedForeground'] as const) {
-      expect(violet.colors[key], key).toBe(nousTheme.colors[key])
-      expect(violet.darkColors![key], `dark ${key}`).toBe(nousTheme.darkColors![key])
+      expect(violet.colors[key], key).toBe(prometheusTheme.colors[key])
+      expect(violet.darkColors![key], `dark ${key}`).toBe(prometheusTheme.darkColors![key])
     }
   })
 
   it('holds perceived lightness and chroma while only the hue moves', () => {
-    const base = hexToOklch(nousTheme.colors.primary)!
+    const base = hexToOklch(prometheusTheme.colors.primary)!
 
     for (const hue of HUES) {
-      const seed = hexToOklch(retintTheme(nousTheme, seedAt(hue)).colors.primary)!
+      const seed = hexToOklch(retintTheme(prometheusTheme, seedAt(hue)).colors.primary)!
 
       expect(Math.abs(seed.l - base.l), `L at ${hue}`).toBeLessThan(0.02)
       // Chroma can only be REDUCED, and only where sRGB can't show it.
@@ -136,7 +136,7 @@ describe('retintTheme', () => {
   // collapses against it ships invisible section headers.
   it('keeps the accent readable on the sidebar at every hue', () => {
     for (const hue of HUES) {
-      const t = retintTheme(nousTheme, seedAt(hue))
+      const t = retintTheme(prometheusTheme, seedAt(hue))
 
       for (const mode of ['colors', 'darkColors'] as const) {
         const c = t[mode] as DesktopThemeColors
@@ -149,38 +149,38 @@ describe('retintTheme', () => {
 
   it('re-picks the foreground that sits on the accent', () => {
     for (const hue of HUES) {
-      const c = retintTheme(nousTheme, seedAt(hue)).colors
+      const c = retintTheme(prometheusTheme, seedAt(hue)).colors
 
       expect(contrastRatio(c.primary, c.primaryForeground), `on-accent @ ${hue}°`).toBeGreaterThanOrEqual(4.5)
     }
   })
 
   it('accepts any hex form and ignores junk', () => {
-    expect(retintTheme(nousTheme, '#0053FD').colors.primary).toBe(retintTheme(nousTheme, '0053fd').colors.primary)
+    expect(retintTheme(prometheusTheme, '#0053FD').colors.primary).toBe(retintTheme(prometheusTheme, '0053fd').colors.primary)
     // A half-typed hex from a text input must not blow up the theme.
-    expect(retintTheme(nousTheme, '#00').colors).toEqual(nousTheme.colors)
-    expect(retintTheme(nousTheme, 'nonsense').colors).toEqual(nousTheme.colors)
+    expect(retintTheme(prometheusTheme, '#00').colors).toEqual(prometheusTheme.colors)
+    expect(retintTheme(prometheusTheme, 'nonsense').colors).toEqual(prometheusTheme.colors)
   })
 
-  // The real motivating case: Nous blue is legible on GitHub's light sidebar
+  // The real motivating case: Prometheus blue is legible on GitHub's light sidebar
   // (5.4:1) but NOT its dark one (3.6:1), so dark has to adapt or ship
   // invisible section headers.
   describe('a seed that only works in one mode', () => {
-    const blue = retintTheme(nousTheme, NOUS_BLUE)
+    const blue = retintTheme(prometheusTheme, PROMETHEUS_BLUE)
 
     it('keeps the picked color where it already passes', () => {
-      expect(blue.colors.primary.toLowerCase()).toBe(NOUS_BLUE.toLowerCase())
+      expect(blue.colors.primary.toLowerCase()).toBe(PROMETHEUS_BLUE.toLowerCase())
     })
 
     it('lightens it for the mode where it does not', () => {
       const dark = blue.darkColors!.primary
 
-      expect(dark.toLowerCase()).not.toBe(NOUS_BLUE.toLowerCase())
+      expect(dark.toLowerCase()).not.toBe(PROMETHEUS_BLUE.toLowerCase())
       expect(contrastRatio(dark, blue.darkColors!.sidebarBackground!)).toBeGreaterThanOrEqual(4.5)
     })
 
     it('adapts by lightness, holding the hue — so it still reads as the brand', () => {
-      const picked = hexToOklch(NOUS_BLUE)!
+      const picked = hexToOklch(PROMETHEUS_BLUE)!
       const adapted = hexToOklch(blue.darkColors!.primary)!
 
       expect(Math.abs(adapted.h - picked.h)).toBeLessThan(3)
@@ -198,8 +198,8 @@ describe('retintTheme', () => {
   it('does not brand a slot that never tracked the accent', () => {
     // mono's ring is a neutral gray on purpose.
     const neutralRing = {
-      ...nousTheme,
-      colors: { ...nousTheme.colors, ring: '#9a9a9a' },
+      ...prometheusTheme,
+      colors: { ...prometheusTheme.colors, ring: '#9a9a9a' },
       darkColors: undefined
     }
 
@@ -212,8 +212,8 @@ describe('retintTheme', () => {
   // a half-retinted theme.
   describe('a theme whose accent slots are shades of each other', () => {
     const shaded = {
-      ...nousTheme,
-      colors: { ...nousTheme.colors, primary: '#ddd6ff', ring: '#8b80e8', midground: '#8b80e8' },
+      ...prometheusTheme,
+      colors: { ...prometheusTheme.colors, primary: '#ddd6ff', ring: '#8b80e8', midground: '#8b80e8' },
       darkColors: undefined
     }
 

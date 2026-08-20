@@ -93,9 +93,9 @@ def _resolve_provider_key(env_var: str, provider_id: str) -> str:
 
 from tools.managed_tool_gateway import resolve_managed_tool_gateway
 from tools.tool_backend_helpers import (
-    NOUS_MANAGED_PROVIDER,
-    managed_nous_tools_enabled,
-    nous_tool_gateway_unavailable_message,
+    PROMETHEUS_MANAGED_PROVIDER,
+    managed_prometheus_tools_enabled,
+    prometheus_tool_gateway_unavailable_message,
     read_selection,
     resolve_openai_audio_api_key,
     selection_error,
@@ -214,7 +214,7 @@ DEFAULT_ELEVENLABS_VOICE_ID = "pNInz6obpgDQGcFmaJgB"  # Adam
 DEFAULT_ELEVENLABS_MODEL_ID = "eleven_multilingual_v2"
 DEFAULT_ELEVENLABS_STREAMING_MODEL_ID = "eleven_flash_v2_5"
 DEFAULT_OPENAI_MODEL = "gpt-4o-mini-tts"
-# The managed OpenAI audio gateway (Nous portal proxy) only proxies these speech
+# The managed OpenAI audio gateway (Prometheus portal proxy) only proxies these speech
 # models. A user's tts.openai.model set for *direct* OpenAI (e.g. "tts-1-hd")
 # is rejected with a 400 "Unsupported managed OpenAI speech model", so it must be
 # coerced to a supported model when routing through the gateway.
@@ -654,12 +654,12 @@ def _get_provider(tts_config: Dict[str, Any]) -> str:
     Users opt into cloud TTS by setting ``tts.provider`` (normally through
     ``prometheus tools``); otherwise the historical Edge backend remains active.
 
-    The managed "Nous Subscription" selection (``tts.provider: nous``) is
+    The managed "Prometheus Subscription" selection (``tts.provider: prometheus``) is
     serviced by the OpenAI provider implementation, routed through the
     managed openai-audio gateway by ``_resolve_openai_audio_client_config``.
     """
     provider = (tts_config.get("provider") or DEFAULT_PROVIDER).lower().strip()
-    if provider == NOUS_MANAGED_PROVIDER:
+    if provider == PROMETHEUS_MANAGED_PROVIDER:
         return "openai"
     return provider
 
@@ -3792,13 +3792,13 @@ def check_tts_requirements() -> bool:
 def _resolve_openai_audio_client_config() -> tuple[str, str, bool]:
     """Return ``(api_key, base_url, is_managed)`` for the OpenAI audio client.
 
-    ``is_managed`` is True when the config resolves to the Nous managed audio
+    ``is_managed`` is True when the config resolves to the Prometheus managed audio
     gateway (a restricted proxy), so callers can coerce the request to what the
     gateway supports.
 
     Strict selection semantics (switch on the stored ``tts`` provider
     string):
-    - ``"nous"`` (or legacy ``use_gateway: true``) → managed gateway ONLY;
+    - ``"prometheus"`` (or legacy ``use_gateway: true``) → managed gateway ONLY;
       unentitled/unreachable is a selection-naming error.
     - any other stored tts provider → direct credentials ONLY
       (``tts.openai.api_key`` then ``VOICE_TOOLS_OPENAI_KEY``/
@@ -3814,17 +3814,17 @@ def _resolve_openai_audio_client_config() -> tuple[str, str, bool]:
 
     selected = read_selection("tts")
 
-    if selected == NOUS_MANAGED_PROVIDER:
+    if selected == PROMETHEUS_MANAGED_PROVIDER:
         managed_gateway = resolve_managed_tool_gateway("openai-audio")
         if managed_gateway is None:
             raise ValueError(selection_error(
                 "tts",
-                NOUS_MANAGED_PROVIDER,
-                "the Nous Tool Gateway is not available (not entitled or "
+                PROMETHEUS_MANAGED_PROVIDER,
+                "the Prometheus Tool Gateway is not available (not entitled or "
                 "unreachable)",
             ))
         return (
-            managed_gateway.nous_user_token,
+            managed_gateway.prometheus_user_token,
             urljoin(f"{managed_gateway.gateway_origin.rstrip('/')}/", "v1"),
             True,
         )
@@ -3857,17 +3857,17 @@ def _resolve_openai_audio_client_config() -> tuple[str, str, bool]:
             "Neither tts.openai.api_key in config nor "
             "VOICE_TOOLS_OPENAI_KEY/OPENAI_API_KEY is set"
         )
-        if managed_nous_tools_enabled():
+        if managed_prometheus_tools_enabled():
             message += (
                 ". "
-                + nous_tool_gateway_unavailable_message(
+                + prometheus_tool_gateway_unavailable_message(
                     "managed OpenAI audio for TTS",
                 )
             )
         raise ValueError(message)
 
     return (
-        managed_gateway.nous_user_token,
+        managed_gateway.prometheus_user_token,
         urljoin(f"{managed_gateway.gateway_origin.rstrip('/')}/", "v1"),
         True,
     )

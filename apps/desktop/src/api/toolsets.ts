@@ -74,11 +74,11 @@ export interface SelectToolsetProviderResponse {
   provider: string
   /** Present when the selection was scoped to one web capability. */
   capability?: string
-  /** Present (true) when a managed Nous row was selected but the Portal
+  /** Present (true) when a managed Prometheus row was selected but the Portal
    *  entitlement is missing — the row won't activate until the user signs
-   *  in to Nous Portal. */
-  needs_nous_auth?: boolean
-  /** The managed feature key (e.g. "browser") when needs_nous_auth is set. */
+   *  in to Prometheus Portal. */
+  needs_prometheus_auth?: boolean
+  /** The managed feature key (e.g. "browser") when needs_prometheus_auth is set. */
   feature?: string
 }
 
