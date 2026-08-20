@@ -45,14 +45,13 @@ Pinned to this release:
 iex (irm https://raw.githubusercontent.com/geohot0199/Prometheus-agent/v2026.8.20/scripts/install.ps1)
 ```
 
-You can also download the installers from the [GitHub release assets](https://github.com/geohot0199/Prometheus-agent/releases/latest):
+### Tagged source snapshots
 
-| Asset | Platform |
+| Asset | Link |
 | --- | --- |
-| [Prometheus-install.sh](https://github.com/geohot0199/Prometheus-agent/releases/latest/download/Prometheus-install.sh) | Linux, macOS, WSL2, Termux |
-| [Prometheus-install.ps1](https://github.com/geohot0199/Prometheus-agent/releases/latest/download/Prometheus-install.ps1) | Windows 10/11 (PowerShell) |
-| [Source code (zip)](https://github.com/geohot0199/Prometheus-agent/archive/refs/tags/v2026.8.20.zip) | All |
-| [Source code (tar.gz)](https://github.com/geohot0199/Prometheus-agent/archive/refs/tags/v2026.8.20.tar.gz) | All |
+| Source code (zip) | [v2026.8.20.zip](https://github.com/geohot0199/Prometheus-agent/archive/refs/tags/v2026.8.20.zip) |
+| Source code (tar.gz) | [v2026.8.20.tar.gz](https://github.com/geohot0199/Prometheus-agent/archive/refs/tags/v2026.8.20.tar.gz) |
+| Release notes | [GitHub Releases](https://github.com/geohot0199/Prometheus-agent/releases/latest) |
 
 ## Desktop app
 
