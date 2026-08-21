@@ -209,3 +209,6 @@ native/fts5_cjk/*.so
 # Runtime profile exports (e.g. `prometheus profile export`) are artifacts,
 # never source. The root-level default.tar.gz was committed by accident.
 /default.tar.gz
+
+# Local verification venvs (e.g. the .venv-ci used to validate CI jobs)
+.venv-ci/

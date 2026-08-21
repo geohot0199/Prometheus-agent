@@ -251,6 +251,30 @@ uv pip install -e ".[all,dev]"
 scripts/run_tests.sh
 ```
 
+### Verify from scratch (fresh clone, no accounts)
+
+One command installs everything from the lockfiles and runs the full
+Python + Node test suites on a machine that has never seen this repo:
+
+```bash
+git clone https://github.com/geohot0199/Prometheus-agent.git
+cd Prometheus-agent
+bash scripts/dev-setup.sh        # or: make setup && make test
+```
+
+Prerequisites are checked up front: Python 3.11+, [`uv`](https://docs.astral.sh/uv/),
+and Node.js (version in `.nvmrc`). The test command CI enforces is
+`scripts/run_tests.sh` (Python, per-file subprocess isolation) plus
+`npm run --ws test` (Node workspaces) — see `.github/workflows/ci.yml`.
+
+**No API keys required:** the suites are hermetic. `tests/conftest.py`
+scrubs every credential-shaped env var and isolates `PROMETHEUS_HOME`
+into a per-test tempdir, so `.env` is never read. `.env.example`
+documents all runtime configuration for real deployments — regenerate
+its auto-generated section any time with
+`python scripts/sync_env_example.py` (CI fails if it drifts from the
+env vars referenced in source).
+
 ---
 
 ## Community
