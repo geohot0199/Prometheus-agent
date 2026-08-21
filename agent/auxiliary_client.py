@@ -3496,6 +3496,37 @@ def set_runtime_main(
     return token
 
 
+def _resync_compat_mirrors_from_context() -> None:
+    """Rebuild the legacy mirrors from the current context binding.
+
+    ``set_runtime_main`` publishes to BOTH the authoritative ContextVar and
+    the process-global compatibility mirrors; a reset that only rewinds the
+    ContextVar leaves the mirrors holding the rolled-back session's values.
+    ``_compat_runtime_main`` then resurrects those stale values as soon as
+    anything diverges from the snapshot (e.g. a test patching one mirror),
+    leaking the old provider/model/key into unrelated calls. Mirrors must
+    always reflect the binding that is live right now.
+    """
+    global _RUNTIME_MAIN_PROVIDER, _RUNTIME_MAIN_MODEL
+    global _RUNTIME_MAIN_BASE_URL, _RUNTIME_MAIN_API_KEY, _RUNTIME_MAIN_API_MODE
+    global _RUNTIME_MAIN_AUTH_MODE, _RUNTIME_MAIN_COMPAT_SNAPSHOT
+    runtime = _RUNTIME_MAIN_CONTEXT.get()
+    if isinstance(runtime, dict):
+        values = tuple(runtime.get(field, "") for field in _MAIN_RUNTIME_FIELDS)
+    else:
+        values = ("", "", "", "", "", "")
+    with _RUNTIME_MAIN_COMPAT_LOCK:
+        (
+            _RUNTIME_MAIN_PROVIDER,
+            _RUNTIME_MAIN_MODEL,
+            _RUNTIME_MAIN_BASE_URL,
+            _RUNTIME_MAIN_API_KEY,
+            _RUNTIME_MAIN_API_MODE,
+            _RUNTIME_MAIN_AUTH_MODE,
+        ) = values
+        _RUNTIME_MAIN_COMPAT_SNAPSHOT = values
+
+
 def reset_runtime_main(token: contextvars.Token) -> None:
     """Restore the runtime binding that preceded one scoped turn."""
     if token is None:
@@ -3505,7 +3536,11 @@ def reset_runtime_main(token: contextvars.Token) -> None:
     except (RuntimeError, ValueError):
         # A token cannot be reset from another copied Context. Background
         # workers inherit values, not ownership of the parent's token.
-        pass
+        return
+    # Rewind the compatibility mirrors alongside the ContextVar so a nested
+    # set/reset pair restores the OUTER binding's mirrors (or clears them
+    # when there is no outer binding) instead of stranding the inner one.
+    _resync_compat_mirrors_from_context()
 
 
 @contextlib.contextmanager

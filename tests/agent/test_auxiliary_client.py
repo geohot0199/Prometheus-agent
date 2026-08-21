@@ -4620,3 +4620,65 @@ class TestFastModelTier:
             _FAST_MODEL_TASKS
         )
         assert not overlap
+
+
+class TestResetRuntimeMainCompatMirrors:
+    """reset_runtime_main must rewind the legacy mirrors, not just the ContextVar.
+
+    Regression: set_runtime_main publishes to both the authoritative
+    ContextVar and the process-global compat mirrors, but reset used to
+    rewind only the ContextVar. The stranded mirrors (provider/model/key of
+    the rolled-back session) were then resurrected by _compat_runtime_main()
+    the moment anything diverged from the snapshot — e.g. a test patching a
+    single mirror — leaking the stale provider into unrelated resolution
+    paths (TestResolveVisionCustomProvider saw provider="openai" from a
+    previous test instead of its mocked configured provider).
+    """
+
+    def test_reset_clears_mirrors_when_no_outer_binding(self):
+        import agent.auxiliary_client as aux
+
+        token = aux.set_runtime_main("openai", "gpt-5.5", api_key="sk-placeholder")
+        try:
+            assert aux._RUNTIME_MAIN_PROVIDER == "openai"
+        finally:
+            aux.reset_runtime_main(token)
+        assert aux._RUNTIME_MAIN_PROVIDER == ""
+        assert aux._RUNTIME_MAIN_MODEL == ""
+        assert aux._RUNTIME_MAIN_API_KEY == ""
+        assert aux._RUNTIME_MAIN_COMPAT_SNAPSHOT == ("", "", "", "", "", "")
+
+    def test_reset_restores_outer_binding_mirrors(self):
+        import agent.auxiliary_client as aux
+
+        outer = aux.set_runtime_main("anthropic", "claude-x")
+        try:
+            inner = aux.set_runtime_main("openai", "gpt-5.5")
+            try:
+                assert aux._RUNTIME_MAIN_PROVIDER == "openai"
+            finally:
+                aux.reset_runtime_main(inner)
+            # Inner reset must restore the OUTER binding, not clear it.
+            assert aux._RUNTIME_MAIN_PROVIDER == "anthropic"
+            assert aux._RUNTIME_MAIN_MODEL == "claude-x"
+        finally:
+            aux.reset_runtime_main(outer)
+        assert aux._RUNTIME_MAIN_PROVIDER == ""
+
+    def test_stale_mirrors_cannot_leak_into_compat_runtime(self, monkeypatch):
+        import agent.auxiliary_client as aux
+
+        token = aux.set_runtime_main(
+            "openai", "gpt-5.5", base_url="https://old.example/v1"
+        )
+        try:
+            pass
+        finally:
+            aux.reset_runtime_main(token)
+        # A consumer diverging one mirror (as vision tests do) must not make
+        # _compat_runtime_main() resurrect the rolled-back provider.
+        monkeypatch.setattr(aux, "_RUNTIME_MAIN_API_MODE", "chat_completions")
+        runtime = aux._compat_runtime_main()
+        assert runtime is None or not runtime.get("provider"), (
+            f"stale provider leaked from rolled-back binding: {runtime!r}"
+        )
