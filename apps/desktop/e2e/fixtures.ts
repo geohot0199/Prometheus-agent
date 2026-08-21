@@ -189,10 +189,22 @@ ${displaySection}${extraConfig ? `\n${extraConfig.trim()}\n` : ''}`
 }
 
 /**
+ * Placeholder credential for the loopback mock inference server spawned by
+ * these fixtures. This is TEST SCAFFOLDING, not a credential: it only
+ * satisfies the backend's "some key must be configured" check while the
+ * real provider is the in-process mock. Exported and named so secret
+ * scanners and future readers can see it is deliberately non-secret.
+ */
+export const E2E_MOCK_API_KEY_PLACEHOLDER = 'e2e-mock-key'
+
+/**
  * Write a minimal .env with the mock API key. The key_env in config.yaml
  * references MOCK_API_KEY, so the backend resolves credentials from here.
  */
-export function writeEnvFile(prometheusHome: string, apiKey = 'e2e-mock-key'): void {
+export function writeEnvFile(
+  prometheusHome: string,
+  apiKey = E2E_MOCK_API_KEY_PLACEHOLDER
+): void {
   const envPath = path.join(prometheusHome, '.env')
   fs.writeFileSync(envPath, `MOCK_API_KEY=${apiKey}\n`, 'utf8')
 }

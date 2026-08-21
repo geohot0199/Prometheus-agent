@@ -28,6 +28,9 @@ import { spawn, spawnSync } from 'node:child_process'
 
 const DESKTOP_ROOT = path.resolve(import.meta.dirname, '..')
 const REPO_ROOT = path.resolve(DESKTOP_ROOT, '..', '..')
+// Placeholder credential for the loopback mock provider. TEST SCAFFOLDING
+// ONLY — named as a constant so secret scanners can tell it is not real.
+const DEV_MOCK_API_KEY_PLACEHOLDER = 'e2e-mock-key'
 
 // ── Canned reply ───────────────────────────────────────────────────────
 
@@ -169,7 +172,11 @@ providers:
 `,
     'utf8',
   )
-  fs.writeFileSync(path.join(prometheusHome, '.env'), 'MOCK_API_KEY=e2e-mock-key\n', 'utf8')
+  fs.writeFileSync(
+    path.join(prometheusHome, '.env'),
+    `MOCK_API_KEY=${DEV_MOCK_API_KEY_PLACEHOLDER}\n`,
+    'utf8',
+  )
 }
 
 // ── Electron launch ────────────────────────────────────────────────────
