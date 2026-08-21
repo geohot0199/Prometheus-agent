@@ -25,16 +25,26 @@ Session context:
     Call ``set_session_context(session_id)`` at the start of a conversation
     and ``clear_session_context()`` when done.  All log lines emitted on
     that thread will include ``[session_id]`` for filtering/correlation.
+
+Structured (JSON) output:
+    Set ``PROMETHEUS_LOG_FORMAT=json`` (env, highest precedence) or
+    ``logging.format: json`` in config.yaml to emit single-line JSON
+    records instead of plain text — same files, same rotation, same
+    secret redaction, plus machine-readable fields (ts/level/logger/
+    session_id/event). Use ``log_event()`` to emit structured events
+    that survive both formats. See ``JsonLogFormatter`` for the schema.
 """
 
 import atexit
 import copy
 import io
+import json
 import logging
 import os
 import queue
 import sys
 import threading
+from datetime import datetime, timezone
 from logging.handlers import QueueHandler, QueueListener
 from pathlib import Path
 from typing import Optional, Sequence
@@ -201,6 +211,10 @@ def _install_session_record_factory() -> None:
         record = current_factory(*args, **kwargs)
         sid = getattr(_session_context, "session_id", None)
         record.session_tag = f" [{sid}]" if sid else ""  # type: ignore[attr-defined]
+        # Machine-readable twin of session_tag: structured (JSON) log
+        # formatters surface this as a top-level field instead of parsing
+        # the square-bracket tag out of the text line.
+        record.session_id = sid  # type: ignore[attr-defined]
         return record
 
     _session_record_factory._prometheus_session_injector = True  # type: ignore[attr-defined]
@@ -250,6 +264,116 @@ COMPONENT_PREFIXES = {
         "uvicorn",
     ),
 }
+
+
+# ---------------------------------------------------------------------------
+# Structured (JSON) logging
+# ---------------------------------------------------------------------------
+
+_STRUCTURED_LOG_ENV_VAR = "PROMETHEUS_LOG_FORMAT"
+
+
+class JsonLogFormatter(logging.Formatter):
+    """Format each record as a single-line JSON document.
+
+    Structured alternative to the plain-text ``_LOG_FORMAT``, selected
+    process-wide via ``PROMETHEUS_LOG_FORMAT=json`` or
+    ``logging.format: json`` in config.yaml (see
+    ``structured_logging_enabled``).
+
+    Security: the message passes through
+    ``agent.redact.redact_sensitive_text`` — the same redaction pipeline
+    the plain-text ``RedactingFormatter`` uses — so secrets never reach a
+    log file in either mode. ``agent.redact`` is imported lazily inside
+    ``format()`` to keep this module import-cycle-free at startup.
+
+    Schema (stable — consumed by log dashboards):
+        ts        ISO-8601 UTC timestamp of the record
+        level     level name (INFO, WARNING, ...)
+        logger    logger name (component routing key)
+        message   redacted, %-formatted message
+        session_id, event, platform, component   when present on record
+        exc_info  rendered traceback, when present
+    """
+
+    #: Record attributes surfaced as top-level JSON keys when present.
+    _STRUCTURED_FIELDS = ("session_id", "event", "platform", "component")
+
+    def format(self, record: logging.LogRecord) -> str:
+        from agent.redact import redact_sensitive_text
+
+        payload = {
+            "ts": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": redact_sensitive_text(record.getMessage()),
+        }
+        for field in self._STRUCTURED_FIELDS:
+            value = getattr(record, field, None)
+            if value not in (None, ""):
+                payload[field] = value
+        if record.exc_info:
+            payload["exc_info"] = self.formatException(record.exc_info)
+        try:
+            return json.dumps(payload, ensure_ascii=False, default=str)
+        except (TypeError, ValueError):
+            # Non-serializable remnant — degrade loudly but never crash the
+            # logging path (an unraisable exception here would kill emits).
+            payload["message"] = repr(payload["message"])
+            return json.dumps(payload, ensure_ascii=False, default=str)
+
+
+def structured_logging_enabled(config_format: Optional[str] = None) -> bool:
+    """Whether JSON structured logging is active for this process.
+
+    Precedence: ``PROMETHEUS_LOG_FORMAT`` env var wins when set (so
+    operators can flip formats without editing config.yaml), otherwise
+    ``logging.format`` from config.yaml.
+    """
+    env_value = os.environ.get(_STRUCTURED_LOG_ENV_VAR, "").strip().lower()
+    if env_value:
+        return env_value == "json"
+    return str(config_format or "").strip().lower() == "json"
+
+
+# LogRecord attributes that logging.LogRecord.set/get reserve; passing them
+# via ``extra=`` raises KeyError. log_event() filters caller fields against
+# this set so structured call sites can never crash the emit path.
+_RESERVED_LOG_EXTRA = {
+    "name", "msg", "args", "levelname", "levelno", "pathname", "filename",
+    "module", "exc_info", "exc_text", "stack_info", "lineno", "funcName",
+    "created", "msecs", "relativeCreated", "thread", "threadName",
+    "processName", "process", "message", "asctime", "taskName",
+    # Injected by our own record factory:
+    "session_tag", "session_id",
+}
+
+
+def log_event(
+    logger: logging.Logger,
+    event: str,
+    *,
+    level: int = logging.INFO,
+    message: Optional[str] = None,
+    **fields,
+) -> None:
+    """Emit a structured event that survives both log formats.
+
+    In JSON mode the ``event`` name and ``fields`` appear as top-level
+    keys in the envelope; in plain-text mode the fields are appended as
+    ``key=value`` pairs so nothing is silently dropped. One call site
+    works for both formats::
+
+        log_event(log, "session.resumed", platform="telegram", turns=12)
+    """
+    text = message if message is not None else event
+    extra = {"event": event}
+    safe_fields = {k: v for k, v in fields.items() if k not in _RESERVED_LOG_EXTRA}
+    extra.update(safe_fields)
+    if safe_fields:
+        rendered = " ".join(f"{k}={v!r}" for k, v in sorted(safe_fields.items()))
+        text = f"{text} | {rendered}"
+    logger.log(level, text, extra=extra)
 
 
 # ---------------------------------------------------------------------------
@@ -305,7 +429,7 @@ def setup_logging(
     log_dir.mkdir(parents=True, exist_ok=True)
 
     # Read config defaults (best-effort — config may not be loaded yet).
-    cfg_level, cfg_max_size, cfg_backup = _read_logging_config()
+    cfg_level, cfg_max_size, cfg_backup, cfg_format = _read_logging_config()
 
     level_name = (log_level or cfg_level or "INFO").upper()
     level = getattr(logging, level_name, logging.INFO)
@@ -314,6 +438,13 @@ def setup_logging(
 
     # Lazy import to avoid circular dependency at module load time.
     from agent.redact import RedactingFormatter
+
+    # Structured (JSON) logging: one process-wide decision so every file
+    # handler agrees on format. JsonLogFormatter keeps the same redaction
+    # guarantees as the plain-text formatter.
+    formatter_cls = (
+        JsonLogFormatter if structured_logging_enabled(cfg_format) else RedactingFormatter
+    )
 
     root = logging.getLogger()
 
@@ -324,7 +455,7 @@ def setup_logging(
         level=level,
         max_bytes=max_bytes,
         backup_count=backups,
-        formatter=RedactingFormatter(_LOG_FORMAT),
+        formatter=formatter_cls(_LOG_FORMAT),
     )
 
     # --- errors.log (WARNING+) — quick triage log --------------------------
@@ -334,7 +465,7 @@ def setup_logging(
         level=logging.WARNING,
         max_bytes=2 * 1024 * 1024,
         backup_count=2,
-        formatter=RedactingFormatter(_LOG_FORMAT),
+        formatter=formatter_cls(_LOG_FORMAT),
     )
 
     # --- gateway.log (INFO+, gateway component only) ------------------------
@@ -345,7 +476,7 @@ def setup_logging(
             level=logging.INFO,
             max_bytes=5 * 1024 * 1024,
             backup_count=3,
-            formatter=RedactingFormatter(_LOG_FORMAT),
+            formatter=formatter_cls(_LOG_FORMAT),
             log_filter=_ComponentFilter(COMPONENT_PREFIXES["gateway"]),
         )
 
@@ -357,7 +488,7 @@ def setup_logging(
             level=logging.INFO,
             max_bytes=10 * 1024 * 1024,
             backup_count=5,
-            formatter=RedactingFormatter(_LOG_FORMAT),
+            formatter=formatter_cls(_LOG_FORMAT),
             log_filter=_ComponentFilter(COMPONENT_PREFIXES["gui"]),
         )
 
@@ -762,7 +893,8 @@ def _add_rotating_handler(
 def _read_logging_config():
     """Best-effort read of ``logging.*`` from config.yaml.
 
-    Returns ``(level, max_size_mb, backup_count)`` — any may be ``None``.
+    Returns ``(level, max_size_mb, backup_count, format)`` — any may be
+    ``None``. ``format`` is ``"json"`` to select structured logging.
     """
     try:
         # Prefer the shared (mtime, size)-keyed raw-config cache so this read
@@ -777,7 +909,7 @@ def _read_logging_config():
             from utils import fast_safe_load
             config_path = get_config_path()
             if not config_path.exists():
-                return (None, None, None)
+                return (None, None, None, None)
             with open(config_path, "r", encoding="utf-8") as f:
                 cfg = fast_safe_load(f) or {}
         if cfg:
@@ -794,7 +926,8 @@ def _read_logging_config():
                     log_cfg.get("level"),
                     log_cfg.get("max_size_mb"),
                     log_cfg.get("backup_count"),
+                    log_cfg.get("format"),
                 )
     except Exception:
         pass
-    return (None, None, None)
+    return (None, None, None, None)

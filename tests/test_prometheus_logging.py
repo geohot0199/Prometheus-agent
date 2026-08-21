@@ -455,20 +455,30 @@ class TestReadLoggingConfig:
     """_read_logging_config() reads from config.yaml."""
 
     def test_returns_none_when_no_config(self, prometheus_home):
-        level, max_size, backup = prometheus_logging._read_logging_config()
+        level, max_size, backup, fmt = prometheus_logging._read_logging_config()
         assert level is None
         assert max_size is None
         assert backup is None
+        assert fmt is None
 
     def test_reads_logging_section(self, prometheus_home):
         import yaml
         config = {"logging": {"level": "DEBUG", "max_size_mb": 10, "backup_count": 5}}
         (prometheus_home / "config.yaml").write_text(yaml.dump(config))
 
-        level, max_size, backup = prometheus_logging._read_logging_config()
+        level, max_size, backup, fmt = prometheus_logging._read_logging_config()
         assert level == "DEBUG"
         assert max_size == 10
         assert backup == 5
+        assert fmt is None
+
+    def test_reads_logging_format_json(self, prometheus_home):
+        import yaml
+        config = {"logging": {"format": "json"}}
+        (prometheus_home / "config.yaml").write_text(yaml.dump(config))
+
+        level, max_size, backup, fmt = prometheus_logging._read_logging_config()
+        assert fmt == "json"
 
 
 
@@ -678,3 +688,142 @@ class TestAsyncQueueLogging:
         )
 
 
+
+class TestStructuredLogging:
+    """JSON structured logging: JsonLogFormatter, selection, log_event."""
+
+    def _format_record(self, msg="hello structured world", **extra):
+        record = logging.LogRecord(
+            name="gateway.test", level=logging.INFO,
+            pathname=__file__, lineno=1, msg=msg, args=(), exc_info=None,
+        )
+        for key, value in extra.items():
+            setattr(record, key, value)
+        return prometheus_logging.JsonLogFormatter().format(record)
+
+    def test_json_envelope_fields(self):
+        import json as _json
+
+        line = self._format_record(event="session.resumed", platform="telegram")
+        payload = _json.loads(line)
+        assert payload["level"] == "INFO"
+        assert payload["logger"] == "gateway.test"
+        assert payload["message"] == "hello structured world"
+        assert payload["event"] == "session.resumed"
+        assert payload["platform"] == "telegram"
+        # ISO-8601 UTC timestamp, parseable and timezone-aware
+        assert payload["ts"].endswith("+00:00")
+
+    def test_json_includes_session_id_from_record_factory(self):
+        import json as _json
+
+        prometheus_logging.set_session_context("sess-json-123")
+        try:
+            record = logging.LogRecord(
+                name="agent.test", level=logging.WARNING,
+                pathname=__file__, lineno=1, msg="with session", args=(),
+                exc_info=None,
+            )
+            # The installed record factory injects session_id on real records;
+            # LogRecord() direct construction bypasses it, so emulate:
+            record.session_id = "sess-json-123"
+            payload = _json.loads(prometheus_logging.JsonLogFormatter().format(record))
+            assert payload["session_id"] == "sess-json-123"
+        finally:
+            prometheus_logging.clear_session_context()
+
+    def test_json_output_still_redacts_secrets(self):
+        import json as _json
+
+        token = "ghp_" + "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8"
+        payload = _json.loads(self._format_record(msg=f"auth failed key={token}"))
+        assert token not in payload["message"], "secret leaked into JSON logs"
+
+    def test_json_exception_info_is_captured(self):
+        import json as _json
+
+        try:
+            raise ValueError("structured boom")
+        except ValueError:
+            record = logging.LogRecord(
+                name="x", level=logging.ERROR, pathname=__file__, lineno=1,
+                msg="failed", args=(), exc_info=sys.exc_info(),
+            )
+        payload = _json.loads(prometheus_logging.JsonLogFormatter().format(record))
+        assert "ValueError: structured boom" in payload["exc_info"]
+
+    def test_selection_precedence_env_over_config(self, monkeypatch):
+        env = prometheus_logging._STRUCTURED_LOG_ENV_VAR
+        monkeypatch.delenv(env, raising=False)
+        assert prometheus_logging.structured_logging_enabled() is False
+        assert prometheus_logging.structured_logging_enabled("json") is True
+        assert prometheus_logging.structured_logging_enabled("JSON") is True
+        assert prometheus_logging.structured_logging_enabled("text") is False
+        monkeypatch.setenv(env, "json")
+        # env wins even when config says text
+        assert prometheus_logging.structured_logging_enabled("text") is True
+        monkeypatch.setenv(env, "text")
+        assert prometheus_logging.structured_logging_enabled("json") is False
+
+    def test_setup_logging_installs_json_formatter_when_env_set(
+        self, prometheus_home, monkeypatch
+    ):
+        monkeypatch.setenv(prometheus_logging._STRUCTURED_LOG_ENV_VAR, "json")
+        prometheus_logging.setup_logging(prometheus_home=prometheus_home, force=True)
+        handlers = prometheus_logging.rotating_file_handlers()
+        assert handlers, "no rotating handlers installed"
+        assert all(
+            isinstance(h.formatter, prometheus_logging.JsonLogFormatter)
+            for h in handlers
+        )
+
+    def test_setup_logging_defaults_to_redacting_formatter(self, prometheus_home, monkeypatch):
+        monkeypatch.delenv(prometheus_logging._STRUCTURED_LOG_ENV_VAR, raising=False)
+        prometheus_logging.setup_logging(prometheus_home=prometheus_home, force=True)
+        from agent.redact import RedactingFormatter
+
+        handlers = prometheus_logging.rotating_file_handlers()
+        assert handlers
+        assert all(
+            isinstance(h.formatter, RedactingFormatter)
+            and not isinstance(h.formatter, prometheus_logging.JsonLogFormatter)
+            for h in handlers
+        )
+
+    def test_log_event_renders_fields_in_plain_text(self):
+        logger = logging.getLogger("prometheus.test.log_event")
+        records = []
+        handler = logging.Handler()
+        handler.emit = records.append  # type: ignore[method-assign]
+        logger.addHandler(handler)
+        logger.setLevel(logging.DEBUG)
+        try:
+            prometheus_logging.log_event(
+                logger, "session.resumed", platform="telegram", turns=12
+            )
+        finally:
+            logger.removeHandler(handler)
+        (record,) = records
+        # plain-text survival: fields appear in the rendered message
+        assert "platform='telegram'" in record.getMessage()
+        assert "turns=12" in record.getMessage()
+        # structured survival: attached as extras for the JSON envelope
+        assert record.event == "session.resumed"  # type: ignore[attr-defined]
+        assert record.platform == "telegram"  # type: ignore[attr-defined]
+
+    def test_log_event_never_collides_with_reserved_attrs(self):
+        logger = logging.getLogger("prometheus.test.log_event.reserved")
+        records = []
+        handler = logging.Handler()
+        handler.emit = records.append  # type: ignore[method-assign]
+        logger.addHandler(handler)
+        logger.setLevel(logging.DEBUG)
+        try:
+            # "message" and "name" are reserved LogRecord attrs — must not raise
+            prometheus_logging.log_event(
+                logger, "edge.case", message="custom", name="impostor"
+            )
+        finally:
+            logger.removeHandler(handler)
+        (record,) = records
+        assert record.getMessage().startswith("custom")
