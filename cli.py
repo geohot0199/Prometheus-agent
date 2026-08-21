@@ -218,7 +218,12 @@ _COMMAND_SPINNER_FRAMES = ("⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧
 
 # Load .env from ~/.prometheus/.env first, then project root as dev fallback.
 # User-managed env files should override stale shell exports on restart.
-from prometheus_constants import get_prometheus_home, display_prometheus_home
+from prometheus_constants import (
+    MOA_VIRTUAL_PROVIDER_API_KEY,
+    MOA_VIRTUAL_PROVIDER_BASE_URL,
+    get_prometheus_home,
+    display_prometheus_home,
+)
 from prometheus_cli.browser_connect import (
     DEFAULT_BROWSER_CDP_URL,
     is_browser_debug_ready,
@@ -12298,8 +12303,8 @@ class PrometheusCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
             self.requested_provider = "moa"
             self.provider = "moa"
             self.model = preset
-            self.api_key = "moa-virtual-provider"
-            self.base_url = "moa://local"
+            self.api_key = MOA_VIRTUAL_PROVIDER_API_KEY
+            self.base_url = MOA_VIRTUAL_PROVIDER_BASE_URL
             self.api_mode = "chat_completions"
             self.agent = None
             self._pending_moa_disable_after_turn = True

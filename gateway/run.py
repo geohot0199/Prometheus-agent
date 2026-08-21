@@ -1981,7 +1981,12 @@ _ensure_ssl_certs()
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Resolve Prometheus home directory (respects PROMETHEUS_HOME override)
-from prometheus_constants import get_prometheus_home, get_prometheus_home_override
+from prometheus_constants import (
+    MOA_VIRTUAL_PROVIDER_API_KEY,
+    MOA_VIRTUAL_PROVIDER_BASE_URL,
+    get_prometheus_home,
+    get_prometheus_home_override,
+)
 from utils import atomic_json_write, base_url_hostname, is_truthy_value
 _prometheus_home = get_prometheus_home()
 
@@ -17573,8 +17578,8 @@ class GatewayRunner(GatewayAuthorizationMixin, GatewayKanbanWatchersMixin, Gatew
                 _moa_state.conversation.model_override = {
                     "provider": "moa",
                     "model": preset,
-                    "base_url": "moa://local",
-                    "api_key": "moa-virtual-provider",
+                    "base_url": MOA_VIRTUAL_PROVIDER_BASE_URL,
+                    "api_key": MOA_VIRTUAL_PROVIDER_API_KEY,
                     "api_mode": "chat_completions",
                 }
                 self._evict_cached_agent(_quick_key)

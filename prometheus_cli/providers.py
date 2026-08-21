@@ -23,6 +23,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
+from prometheus_constants import MOA_VIRTUAL_PROVIDER_BASE_URL
 from utils import base_url_host_matches, base_url_hostname
 
 logger = logging.getLogger(__name__)
@@ -47,7 +48,7 @@ PROMETHEUS_OVERLAYS: Dict[str, PrometheusOverlay] = {
     "moa": PrometheusOverlay(
         transport="openai_chat",
         auth_type="virtual",
-        base_url_override="moa://local",
+        base_url_override=MOA_VIRTUAL_PROVIDER_BASE_URL,
     ),
     "openrouter": PrometheusOverlay(
         transport="openai_chat",

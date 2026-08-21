@@ -2762,8 +2762,12 @@ def switch_model(agent, new_model, new_provider, api_key='', base_url='', api_mo
             # model. Pin chat_completions here so the primary call always goes
             # through MoAClient.chat.completions, matching agent_init.py.
             agent.api_mode = "chat_completions"
-            agent.api_key = api_key or "moa-virtual-provider"
-            agent.base_url = "moa://local"
+            from prometheus_constants import (
+                MOA_VIRTUAL_PROVIDER_API_KEY,
+                MOA_VIRTUAL_PROVIDER_BASE_URL,
+            )
+            agent.api_key = api_key or MOA_VIRTUAL_PROVIDER_API_KEY
+            agent.base_url = MOA_VIRTUAL_PROVIDER_BASE_URL
             agent._client_kwargs = {}
             agent.client = build_moa_facade(agent, agent.model)
         elif api_mode == "anthropic_messages":
