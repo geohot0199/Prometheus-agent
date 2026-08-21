@@ -21,13 +21,14 @@
   <a href="https://github.com/geohot0199/Prometheus-agent/releases"><img src="https://img.shields.io/github/v/release/geohot0199/Prometheus-agent?style=for-the-badge&label=Release" alt="Latest release"></a>
   <a href="https://github.com/geohot0199/Prometheus-agent/blob/main/website/docs/getting-started/downloads.md"><img src="https://img.shields.io/badge/Docs-GitHub-FFD700?style=for-the-badge" alt="Documentation"></a>
   <a href="https://github.com/geohot0199/Prometheus-agent/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License: MIT"></a>
-  <a href="https://github.com/geohot0199"><img src="https://img.shields.io/badge/Built%20by-geohot-blueviolet?style=for-the-badge" alt="Built by geohot"></a>
+  <a href="https://github.com/geohot0199"><img src="https://img.shields.io/badge/Maintained%20by-geohot0199-blueviolet?style=for-the-badge" alt="Maintained by geohot0199"></a>
+  <a href="https://github.com/NousResearch/hermes-agent"><img src="https://img.shields.io/badge/Fork%20of-Hermes%20Agent-orange?style=for-the-badge" alt="Fork of Hermes Agent by Nous Research"></a>
   <a href="README.zh-CN.md"><img src="https://img.shields.io/badge/Lang-中文-red?style=for-the-badge" alt="中文"></a>
   <a href="README.ur-pk.md"><img src="https://img.shields.io/badge/Lang-اردو-green?style=for-the-badge" alt="اردو"></a>
   <a href="README.es.md"><img src="https://img.shields.io/badge/Lang-Español-orange?style=for-the-badge" alt="Español"></a>
 </p>
 
-**The self-improving AI agent built by [geohot](https://github.com/geohot0199).** It's the only agent with a built-in learning loop — it creates skills from experience, improves them during use, nudges itself to persist knowledge, searches its own past conversations, and builds a deepening model of who you are across sessions. Run it on a $5 VPS, a GPU cluster, or serverless infrastructure that costs nearly nothing when idle. It's not tied to your laptop — talk to it from Telegram while it works on a cloud VM.
+**The self-improving AI agent maintained by [geohot0199](https://github.com/geohot0199).** Prometheus Agent is a fork of [Hermes Agent](https://github.com/NousResearch/hermes-agent) by [Nous Research](https://github.com/NousResearch) (MIT-licensed; see [Lineage & Attribution](#lineage--attribution)). It's the only agent with a built-in learning loop — it creates skills from experience, improves them during use, nudges itself to persist knowledge, searches its own past conversations, and builds a deepening model of who you are across sessions. Run it on a $5 VPS, a GPU cluster, or serverless infrastructure that costs nearly nothing when idle. It's not tied to your laptop — talk to it from Telegram while it works on a cloud VM.
 
 Use any model you want — OpenRouter, OpenAI, your own endpoint, and [many others](https://github.com/geohot0199/Prometheus-agent/docs/integrations/providers). Switch with `prometheus model` — no code changes, no lock-in.
 
@@ -262,8 +263,29 @@ scripts/run_tests.sh
 
 ---
 
+## Lineage & Attribution
+
+Prometheus Agent is a derivative work of **[Hermes Agent](https://github.com/NousResearch/hermes-agent)**,
+the self-improving AI agent created by **[Nous Research](https://github.com/NousResearch)**.
+The upstream project is released under the MIT License, and this repository
+complies with its terms:
+
+- The original copyright notice is preserved in [LICENSE](LICENSE)
+  (`Copyright (c) 2025 Nous Research`) alongside the copyright of this
+  fork's maintainers.
+- Feature architecture — the learning loop, skill creation, persistent
+  memory, multi-platform gateway, terminal backends, and trajectory
+  tooling — originates from the upstream Hermes Agent codebase.
+- Changes made in this fork are listed in the git history and release
+  notes; they are modifications of the upstream work, not an independent
+  reimplementation.
+
+If you redistribute this codebase, keep both copyright notices and this
+attribution section intact, as the MIT License requires.
+
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). Copyright (c) 2025 Nous Research (upstream
+Hermes Agent); Copyright (c) 2026 Prometheus Agent maintainers.
 
-Built by [geohot](https://github.com/geohot0199).
+Maintained by [geohot0199](https://github.com/geohot0199).
