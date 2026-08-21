@@ -205,3 +205,10 @@ native/fts5_cjk/*.so
 # interrupted; consumed by launch-time recovery. Never commit it (was tracked
 # by accident via 3a69e34702, removed in the #72002 salvage).
 .lazy-refresh-incomplete
+
+# Runtime profile exports (e.g. `prometheus profile export`) are artifacts,
+# never source. The root-level default.tar.gz was committed by accident.
+/default.tar.gz
+
+# Local verification venvs (e.g. the .venv-ci used to validate CI jobs)
+.venv-ci/

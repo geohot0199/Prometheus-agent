@@ -51,7 +51,11 @@ from agent.tool_guardrails import (
 from prometheus_cli.config import cfg_get
 from prometheus_cli.route_identity import normalize_route_base_url
 from prometheus_cli.timeouts import get_provider_request_timeout
-from prometheus_constants import get_prometheus_home
+from prometheus_constants import (
+    MOA_VIRTUAL_PROVIDER_API_KEY,
+    MOA_VIRTUAL_PROVIDER_BASE_URL,
+    get_prometheus_home,
+)
 from utils import base_url_host_matches, is_truthy_value
 
 # Use the same logger name as run_agent so tests patching ``run_agent.logger``
@@ -1230,8 +1234,8 @@ def init_agent(
         # paths so a restored facade keeps emitting these events (#53802).
         agent.client = build_moa_facade(agent, agent.model)
         agent._client_kwargs = {}
-        agent.api_key = api_key or "moa-virtual-provider"
-        agent.base_url = "moa://local"
+        agent.api_key = api_key or MOA_VIRTUAL_PROVIDER_API_KEY
+        agent.base_url = MOA_VIRTUAL_PROVIDER_BASE_URL
         if not agent.quiet_mode:
             print(f"🤖 AI Agent initialized with MoA preset: {agent.model}")
     elif agent.api_mode == "bedrock_converse":

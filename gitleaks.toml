@@ -1,0 +1,29 @@
+# gitleaks configuration for Prometheus Agent.
+#
+# Default gitleaks rules apply; the allowlist below documents values that
+# LOOK credential-shaped but are deliberate, non-secret protocol/test
+# sentinels. Keep this list minimal — every entry is a promise that the
+# value is not and never will be a real secret.
+
+title = "Prometheus Agent gitleaks config"
+
+[allowlist]
+description = "Deliberate non-secret sentinels and test scaffolding"
+regexes = [
+  # Virtual MoA provider sentinel (gateway/outbound protocol placeholder,
+  # never sent over HTTP — see prometheus_constants.MOA_VIRTUAL_PROVIDER_API_KEY).
+  '''moa-virtual-provider''',
+  # Loopback mock-provider placeholders for e2e/dev scaffolding
+  # (E2E_MOCK_API_KEY_PLACEHOLDER, DEV_MOCK_API_KEY_PLACEHOLDER,
+  # SHORT_SESSION_PLACEHOLDER_API_KEY).
+  '''e2e-mock-key''',
+  '''local-diagnostic-only''',
+]
+paths = [
+  # Test fixtures intentionally contain fake credentials exercising the
+  # redaction pipeline; real secrets are still caught by conftest's
+  # hermetic env scrubbing at runtime.
+  '''(^|/)tests/''',
+  '''(^|/)test_[^/]+$''',
+  '''(^|/)e2e/''',
+]

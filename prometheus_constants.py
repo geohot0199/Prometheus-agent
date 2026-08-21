@@ -26,6 +26,17 @@ _PROMETHEUS_HOME_OVERRIDE: ContextVar[str | object] = ContextVar(
 INDICATOR_STYLES: tuple[str, ...] = ("ascii", "emoji", "kaomoji", "unicode")
 DEFAULT_INDICATOR_STYLE: str = "kaomoji"
 
+# ── MoA (Mixture-of-Agents) virtual-provider sentinels ─────────────────
+# When a MoA preset is active there is no real upstream HTTP endpoint:
+# the provider is virtual and requests are dispatched in-process. These
+# values are *protocol sentinels*, not credentials — they must never
+# contain anything secret, and they must match byte-for-byte across the
+# CLI, gateway, TUI gateway, and agent-init code paths, so they are
+# defined here exactly once. Secret scanners: nothing to see here.
+MOA_VIRTUAL_PROVIDER_API_KEY: str = "moa-virtual-provider"
+MOA_VIRTUAL_PROVIDER_SOURCE: str = "moa-virtual-provider"
+MOA_VIRTUAL_PROVIDER_BASE_URL: str = "moa://local"
+
 
 def set_prometheus_home_override(path: str | Path | None) -> Token:
     """Set a context-local Prometheus home override and return its reset token.

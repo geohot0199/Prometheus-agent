@@ -4,6 +4,11 @@ Handler bodies are byte-identical to their pre-split server.py form; they
 are rebound onto server.py's globals at install time — see method_ctx.py.
 """
 
+from prometheus_constants import (
+    MOA_VIRTUAL_PROVIDER_API_KEY,
+    MOA_VIRTUAL_PROVIDER_BASE_URL,
+)
+
 from .method_ctx import HandlerRegistry
 
 _registry = HandlerRegistry()
@@ -641,8 +646,8 @@ def _(rid, params: dict) -> dict:
                 session["model_override"] = {
                     "provider": "moa",
                     "model": preset,
-                    "base_url": "moa://local",
-                    "api_key": "moa-virtual-provider",
+                    "base_url": MOA_VIRTUAL_PROVIDER_BASE_URL,
+                    "api_key": MOA_VIRTUAL_PROVIDER_API_KEY,
                     "api_mode": "chat_completions",
                 }
             return _ok(

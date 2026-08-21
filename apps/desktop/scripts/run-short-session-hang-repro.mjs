@@ -32,6 +32,10 @@ const HARNESS_SOURCE = resolve(DESKTOP_ROOT, 'src/app/chat/short-session-hang-re
 const UPSTREAM_URL = 'https://github.com/geohot0199/Prometheus-agent.git'
 const DEFAULT_BASELINE = '3651627d88858912e8460e6f949b7125725600c3'
 const DEFAULT_CANDIDATE = '3651627d88858912e8460e6f949b7125725600c3'
+// Placeholder credential for the loopback diagnostic mock provider spawned
+// below. TEST SCAFFOLDING ONLY — no real key ever appears in this script;
+// named as a constant so secret scanners can tell it is deliberately fake.
+const SHORT_SESSION_PLACEHOLDER_API_KEY = 'local-diagnostic-only'
 const FREEZE_MS = 5_000
 const JOURNAL_SEED_TIMEOUT_MS = 30_000
 const STREAM_RESPONSE_TIMEOUT_MS = 30_000
@@ -458,7 +462,7 @@ function writeSandboxConfig(home, mockUrl) {
     join(home, 'config.yaml'),
     `model:\n  default: short-session-model\n  provider: custom:short-session\nauxiliary:\n  title_generation:\n    enabled: false\nproviders:\n  short-session:\n    api: ${mockUrl}/v1\n    transport: chat_completions\n    default_model: short-session-model\n    key_env: SHORT_SESSION_API_KEY\n`
   )
-  writeFileSync(join(home, '.env'), 'SHORT_SESSION_API_KEY=local-diagnostic-only\n')
+  writeFileSync(join(home, '.env'), `SHORT_SESSION_API_KEY=${SHORT_SESSION_PLACEHOLDER_API_KEY}\n`)
 }
 
 async function waitFor(cdp, expression, timeoutMs, label, ErrorType = Error) {
@@ -1274,7 +1278,7 @@ async function executeRunInSandboxAttempt(target, index, warmup, mock, output, s
         PROMETHEUS_DESKTOP_IGNORE_EXISTING: '1',
         PROMETHEUS_DESKTOP_USER_DATA_DIR: userData,
         PROMETHEUS_HOME: prometheusHome,
-        SHORT_SESSION_API_KEY: 'local-diagnostic-only'
+        SHORT_SESSION_API_KEY: SHORT_SESSION_PLACEHOLDER_API_KEY
       }),
       stdio: ['ignore', 'pipe', 'pipe']
     }

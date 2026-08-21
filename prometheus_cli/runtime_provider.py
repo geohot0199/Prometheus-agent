@@ -46,7 +46,12 @@ from prometheus_cli.config import (
     normalize_extra_headers,
 )
 from prometheus_cli.providers import custom_provider_aliases, custom_provider_slug
-from prometheus_constants import OPENROUTER_BASE_URL
+from prometheus_constants import (
+    MOA_VIRTUAL_PROVIDER_API_KEY,
+    MOA_VIRTUAL_PROVIDER_BASE_URL,
+    MOA_VIRTUAL_PROVIDER_SOURCE,
+    OPENROUTER_BASE_URL,
+)
 from prometheus_cli.providers import is_official_openai_host
 from utils import base_url_host_matches, base_url_hostname, env_int
 
@@ -1767,9 +1772,9 @@ def resolve_runtime_provider(
         return {
             "provider": "moa",
             "api_mode": "chat_completions",
-            "base_url": "moa://local",
-            "api_key": "moa-virtual-provider",
-            "source": "moa-virtual-provider",
+            "base_url": MOA_VIRTUAL_PROVIDER_BASE_URL,
+            "api_key": MOA_VIRTUAL_PROVIDER_API_KEY,
+            "source": MOA_VIRTUAL_PROVIDER_SOURCE,
             "requested_provider": requested_provider,
         }
 
